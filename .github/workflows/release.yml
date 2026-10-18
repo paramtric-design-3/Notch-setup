@@ -17,19 +17,19 @@ concurrency:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Is this version already released?
         id: check
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
           "version=$v" >> $env:GITHUB_OUTPUT
-          gh release view "v$v" --repo "${{ github.repository }}" *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $assets = gh release view "v$v" --repo "${{ github.repository }}" --json assets --jq '.assets[].name' 2>$null
+          if ($LASTEXITCODE -eq 0 -and ($assets -contains 'latest.yml')) {
             Write-Host "v$v is already released, nothing to do."
             "skip=true" >> $env:GITHUB_OUTPUT
           } else {
@@ -46,8 +46,28 @@ jobs:
       - run: npm ci
         if: steps.check.outputs.skip == 'false'
 
-      - name: Build and publish v${{ steps.check.outputs.version }}
+      - name: Build installer
         if: steps.check.outputs.skip == 'false'
-        run: npx electron-builder --win --x64 --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          npx electron-builder --win --x64 --publish never *>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content build.log -Tail 15 | ForEach-Object { Write-Host "::error::$_" }
+            exit 1
+          }
+
+      - name: Publish release v${{ steps.check.outputs.version }}
+        if: steps.check.outputs.skip == 'false'
+        shell: pwsh
+        run: |
+          $v = "${{ steps.check.outputs.version }}"
+          $files = @("dist/FJBC-Notch-Setup-$v.exe", "dist/FJBC-Notch-Setup-$v.exe.blockmap", "dist/latest.yml")
+          foreach ($f in $files) { if (-not (Test-Path $f)) { Write-Host "::error::Missing $f"; exit 1 } }
+          gh release view "v$v" --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            $out = gh release create "v$v" @files --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "FJBC Notch $v" --notes "Download **FJBC-Notch-Setup-$v.exe** below and run it. Installed copies update themselves." 2>&1
+          } else {
+            $out = gh release upload "v$v" @files --repo "${{ github.repository }}" --clobber 2>&1
+          }
+          if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "::error::$_" }; exit 1 }
+          Write-Host "Published v$v"
