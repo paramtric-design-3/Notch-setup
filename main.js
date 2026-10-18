@@ -4,7 +4,7 @@
 'use strict';
 
 const {
-  app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage,
+  app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, powerMonitor,
   globalShortcut, clipboard, shell, nativeTheme
 } = require('electron');
 const path = require('path');
@@ -662,7 +662,9 @@ function startClaudeServer() {
   server.listen(CLAUDE_PORT, '127.0.0.1');
 }
 
+let lastClaudeAt = 0;   // last hook event, so updates wait while Claude Code is working
 function handleClaudeEvent(ev, res) {
+  lastClaudeAt = Date.now();
   const name = ev.hook_event_name;
   const sid = ev.session_id || 'default';
   const s = claudeSessions.get(sid) || { start: Date.now() };
@@ -736,8 +738,9 @@ function claudeSettingsSnippet() {
 }
 
 // ---------------------------------------------------------------- auto-update (GitHub releases)
-// Checks paramtric-design-3/Notch-setup releases at start and every 4 hours, downloads quietly,
-// installs when the app quits (or right away from the tray).
+// Checks paramtric-design-3/Notch-setup releases at start, every 5 minutes, and after sleep or unlock.
+// Downloads quietly, then installs by itself as soon as you've been idle for a minute with the notch closed
+// (or straight away from the tray, or when the app quits).
 const update = { state: 'idle', version: null, percent: 0, error: null, manual: false };
 let autoUpdater = null;
 
@@ -775,14 +778,19 @@ function setupUpdater() {
   });
   autoUpdater.on('update-downloaded', info => {
     setUpdate({ state: 'ready', version: info.version, manual: false });
-    toIsland('peek', { kind: 'update', title: `Update ${info.version} ready`, sub: 'Installs when you quit, or restart from the tray', ms: 5000 });
+    toIsland('peek', { kind: 'update', title: `Update ${info.version} ready`, sub: 'Installs as soon as you take a short break', ms: 5000 });
+    waitForIdleThenInstall();
   });
   autoUpdater.on('error', e => {
     if (update.manual) toIsland('peek', { kind: 'update', title: 'Could not check for updates', sub: 'Try again later' });
     setUpdate({ state: update.state === 'ready' ? 'ready' : 'idle', error: String(e && e.message || e).slice(0, 200), manual: false });
   });
   setTimeout(() => checkForUpdates(false), 15 * 1000);
-  setInterval(() => checkForUpdates(false), 4 * 60 * 60 * 1000);
+  setInterval(() => checkForUpdates(false), UPDATE_EVERY_MS);
+  // A PC that slept through a release checks as soon as it's back.
+  const soon = () => setTimeout(() => checkForUpdates(false), 5000);
+  powerMonitor.on('resume', soon);
+  powerMonitor.on('unlock-screen', soon);
 }
 
 function checkForUpdates(manual) {
@@ -790,6 +798,23 @@ function checkForUpdates(manual) {
   if (update.state === 'ready') { if (manual) installUpdate(); return; }
   update.manual = !!manual;
   autoUpdater.checkForUpdates().catch(() => { /* reported through 'error' */ });
+}
+
+const UPDATE_EVERY_MS = 5 * 60 * 1000;
+const IDLE_BEFORE_INSTALL_S = 60;
+let idleWatch = null;
+
+function waitForIdleThenInstall() {
+  clearInterval(idleWatch);
+  idleWatch = setInterval(() => {
+    if (update.state !== 'ready') { clearInterval(idleWatch); return; }
+    const claudeBusy = claudeSessions.size > 0 && Date.now() - lastClaudeAt < 3 * 60 * 1000;
+    const busy = islandOpen || pendingPermissions.size > 0 || claudeBusy;
+    if (busy || powerMonitor.getSystemIdleTime() < IDLE_BEFORE_INSTALL_S) return;
+    clearInterval(idleWatch);
+    toIsland('peek', { kind: 'update', title: `Updating to ${update.version}`, sub: 'Back in a few seconds', ms: 2500 });
+    setTimeout(installUpdate, 2500);
+  }, 10 * 1000);
 }
 
 function installUpdate() {

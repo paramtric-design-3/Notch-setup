@@ -85,9 +85,10 @@ Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRC
 
 FJBC Notch updates itself from this repo's [releases](https://github.com/paramtric-design-3/Notch-setup/releases):
 
-- It checks when it starts and every 4 hours after.
+- It checks when it starts, every 5 minutes, and whenever your PC wakes from sleep or is unlocked.
 - A new version downloads quietly in the background.
-- When it's ready, the notch shows a peek: "Update x.y.z ready". It installs the next time you quit, or straight away with tray icon → **Restart to update**.
+- Once it's downloaded, it installs by itself the next time you've left the PC alone for a minute while the notch is closed and Claude Code isn't busy. The notch shows "Updating to x.y.z" and is back a few seconds later.
+- To install straight away instead: tray icon → **Restart to update**.
 - Tray icon → **Check for updates**, or Settings → **Updates**, checks right away.
 
 ## Remove it
@@ -109,9 +110,9 @@ npm run dist         # build the installer into dist/ (on Linux or macOS this ne
 
 ## Publish a new version
 
-1. Raise `"version"` in `package.json`, for example from `1.1.0` to `1.2.0`.
+1. Raise `"version"` in `package.json`, for example from `1.2.0` to `1.3.0`.
 2. Commit and push to `main`.
-3. The **Release** GitHub Action sees the new version, builds the installer on Windows and publishes it as release `v1.2.0`. Installed copies pick it up within 4 hours.
+3. The **Release** GitHub Action sees the new version, builds the installer on Windows and publishes it as release `v1.3.0`. Installed copies pick it up within about 10 minutes (the build takes about 5, then the next check finds it).
 
 Pushes that don't change the version don't publish anything. You can also start the Action by hand from the repo's **Actions** tab.
 
