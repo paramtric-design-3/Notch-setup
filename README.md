@@ -28,6 +28,7 @@ Tray icon → **Screen**, or Settings → **Screen**:
 
 | Tile | Where the data comes from |
 |---|---|
+| Claude Code | What Claude Code on this PC is doing: your request, the project folder, the current step, a live timer, the step count and the last few steps. It gets its own row at the top. |
 | Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key). If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
 | Messages | The notifications Windows is still holding (WhatsApp, Telegram, Teams…). Read-only and local. |
@@ -37,7 +38,7 @@ Tray icon → **Screen**, or Settings → **Screen**:
 
 Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in Settings.
 
-**Peeks** are small bubbles that appear for a few seconds: an app opening or closing (with its icon), the charger connected or disconnected, and battery at 20% and 10%.
+**Peeks** are small bubbles that appear for a few seconds: Claude Code starting or finishing a task, the charger connected or disconnected, and battery at 20% and 10%. Bubbles for apps opening and closing are off by default (Settings → Peeks).
 
 **Compact state**: while music plays, a Claude Code task runs or the focus timer counts down, the pill widens a little to show it.
 

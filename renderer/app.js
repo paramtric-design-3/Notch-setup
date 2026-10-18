@@ -13,7 +13,7 @@ const permView = $('#perm');
 const compactL = $('.compact-l');
 const compactR = $('.compact-r');
 
-const NOTCH_W = 200, NOTCH_H = 32, COMPACT_W = 328, PEEK_W = 360, PERM_W = 580;
+const NOTCH_W = 200, NOTCH_H = 32, COMPACT_W = 328, COMPACT_CLAUDE_W = 560, PEEK_W = 360, PERM_W = 580;
 
 // ------------------------------------------------------------------ data
 const D = {
@@ -22,7 +22,8 @@ const D = {
   radios: {}, volume: null, brightness: null, dark: null,
   weather: null, messages: null, calendar: null,
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
-  claude: null,           // { state, step, detail, at }
+  claude: null,           // { state, step, detail, start, at }
+  cc: { connected: false, sessions: [] },   // Claude Code sessions for the tile
   perms: [],              // queue of { id, tool, command, cwd }
 };
 
@@ -64,7 +65,7 @@ function settle() {
 
 function sizeIsland() {
   let w = NOTCH_W, h = NOTCH_H;
-  if (state === 'compact') w = COMPACT_W;
+  if (state === 'compact') w = wantCompact() === 'claude' ? COMPACT_CLAUDE_W : COMPACT_W;
   else if (state === 'peek') { w = PEEK_W; h = NOTCH_H + peekView.offsetHeight; }
   else if (state === 'perm') { w = PERM_W; h = NOTCH_H + permView.offsetHeight; }
   else if (state === 'open') { w = Math.max(tilesView.offsetWidth, NOTCH_W + 80); h = NOTCH_H + tilesView.offsetHeight; }
@@ -272,6 +273,43 @@ const TILE = {
     return t;
   },
 
+  claude(size) {
+    const t = el('div', `tile claude w${size}`);
+    const { connected, sessions } = D.cc;
+    const s = sessions[0];
+    if (!connected && !s) {
+      t.innerHTML = `<div class="empty"><div class="ico">${I.run}</div>${size > 1 ? 'Claude Code isn\'t connected yet. Right-click → Settings → Claude Code.' : 'Not connected'}</div>`;
+      return t;
+    }
+    if (!s) {
+      t.innerHTML = `<div class="empty"><div class="ico">${I.think}</div>No task running</div>`;
+      return t;
+    }
+    const others = sessions.filter(x => x !== s && (x.state === 'working' || x.state === 'waiting')).length;
+    const status = {
+      working: `<span class="cdot on"></span>Working · <span data-since="${s.start}">${fmtTime(Date.now() - s.start)}</span>`,
+      waiting: `<span class="cdot wait"></span>Waiting for you`,
+      done: `<span class="cdot"></span>Done in ${fmtDur(s.took)}`,
+      idle: `<span class="cdot"></span>Quiet`,
+    }[s.state] || '';
+    if (size === 1) {
+      t.innerHTML = `<div class="cbig">${I[s.state === 'done' ? 'check' : s.step] || I.think}</div><div class="cstate">${s.state === 'working' ? `<span data-since="${s.start}">${fmtTime(Date.now() - s.start)}</span>` : s.state === 'waiting' ? 'Waiting' : 'Done'}</div>`;
+      return t;
+    }
+    const recent = s.recent.slice(s.state === 'done' ? 0 : 1, 4).map(r => `<div class="crecent ellipsis"><span class="cico">${I[r.step] || I.think}</span>${esc(r.detail)}</div>`).join('');
+    t.innerHTML = `
+      <div class="cmain">
+        <div class="chead"><span class="cstatus">${status}</span><span class="cfolder ellipsis">${esc(s.folder || '')}</span></div>
+        <div class="cprompt">${esc(s.prompt || 'Task in ' + (s.folder || 'Claude Code'))}</div>
+        <div class="cnow ellipsis"><span class="cico">${I[s.state === 'done' ? 'check' : s.step] || I.think}</span>${esc(s.state === 'done' ? 'Finished' : s.detail)}</div>
+      </div>
+      ${size >= 3 ? `<div class="cside">
+        <div class="clabel">${s.stepCount} step${s.stepCount === 1 ? '' : 's'}${others ? ` · +${others} more session${others > 1 ? 's' : ''}` : ''}</div>
+        ${recent || '<div class="crecent">—</div>'}
+      </div>` : ''}`;
+    return t;
+  },
+
   timer(size) {
     const t = el('div', `tile timer w${size}`);
     const T = D.timer;
@@ -286,9 +324,26 @@ const TILE = {
   },
 };
 
+const CELL = 84, GAP = 8, PAD = 12, MAX_CELLS = 10;
+const CLAUDE_CELLS = { 1: 2, 2: 4, 3: 6 };
+function layoutWidth(shown) {
+  // Rows of at most 10 cells; the Claude tile always sits on a row of its own.
+  const rows = []; let cur = 0;
+  for (const x of shown) {
+    const size = Math.max(1, Math.min(3, x.size || 2));
+    if (x.id === 'claude') { if (cur) rows.push(cur); rows.push(CLAUDE_CELLS[size]); cur = 0; continue; }
+    if (cur && cur + size > MAX_CELLS) { rows.push(cur); cur = 0; }
+    cur += size;
+  }
+  if (cur) rows.push(cur);
+  const cells = Math.max(2, ...rows);
+  return cells * CELL + (cells - 1) * GAP + 2 * PAD;
+}
 function renderTiles() {
   if (!D.settings) return;
-  tilesView.replaceChildren(...D.settings.tiles.filter(x => x.show).map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
+  const shown = D.settings.tiles.filter(x => x.show);
+  tilesView.style.width = layoutWidth(shown) + 'px';
+  tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
   tick();
   if (state === 'open') sizeIsland();
@@ -352,8 +407,8 @@ function renderCompact() {
   if (kind !== compactKind) {
     compactKind = kind; compactArt = null; compactStep = null;
     if (kind === 'claude') {
-      compactL.innerHTML = '<div class="ico" data-step></div>';
-      compactR.innerHTML = `<div class="workgrid">${'<i></i>'.repeat(9)}</div>`;
+      compactL.innerHTML = '<div class="ico" data-step></div><span class="ctext cstep" data-cstep></span>';
+      compactR.innerHTML = `<span class="ctext" data-celapsed></span><div class="workgrid">${'<i></i>'.repeat(9)}</div>`;
     } else if (kind === 'timer') {
       compactL.innerHTML = `<div class="ico">${I.timer}</div>`;
       compactR.innerHTML = '<span class="ctext" data-ctimer></span>';
@@ -367,6 +422,9 @@ function renderCompact() {
   if (kind === 'claude') {
     const step = D.claude.step || 'think';
     if (step !== compactStep) { compactStep = step; compactL.querySelector('[data-step]').innerHTML = I[step] || I.think; }
+    const label = compactL.querySelector('[data-cstep]');
+    if (label.textContent !== (D.claude.detail || 'Working')) label.textContent = D.claude.detail || 'Working';
+    compactR.querySelector('[data-celapsed]').textContent = fmtTime(Date.now() - (D.claude.start || Date.now()));
   } else if (kind === 'timer') {
     compactR.querySelector('[data-ctimer]').textContent = fmtTime(timerLeft());
   } else if (kind === 'music') {
@@ -382,12 +440,19 @@ function renderCompact() {
 // ------------------------------------------------------------------ ticker (only while something on screen moves)
 let ticker = null;
 function startTicker() {
-  const need = (state === 'open' && (D.media || D.timer.running)) || (state === 'compact' && D.timer.running) || D.timer.running;
+  const claudeOn = D.cc.sessions.some(x => x.state === 'working' || x.state === 'waiting') || (D.claude && D.claude.state === 'working');
+  const need = (state === 'open' && (D.media || D.timer.running || claudeOn)) || (state === 'compact' && claudeOn) || D.timer.running;
   if (need && !ticker) ticker = setInterval(tick, 500);
   if (!need && ticker) { clearInterval(ticker); ticker = null; }
 }
 
 function tick() {
+  // live elapsed times for Claude Code
+  for (const el of document.querySelectorAll('[data-since]')) el.textContent = fmtTime(Date.now() - +el.dataset.since);
+  if (state === 'compact' && wantCompact() === 'claude') {
+    const e = compactR.querySelector('[data-celapsed]');
+    if (e && D.claude) e.textContent = fmtTime(Date.now() - (D.claude.start || Date.now()));
+  }
   if (D.timer.running && timerLeft() <= 0) {
     D.timer.running = false; D.timer.left = 0;
     peek({ icon: I.timer, title: 'Focus session done', sub: '25 minutes — take a short break' });
@@ -531,23 +596,27 @@ api.on('calendar', c => { D.calendar = c; rerenderTile('calendar'); });
 api.on('peek', p => {
   if (p.kind === 'app') peek({ img: p.icon, icon: I.grid, title: p.title, sub: p.sub });
   else if (p.kind === 'claude') peek({ icon: I.bell, title: p.title, sub: p.sub, ms: 4000 });
+  else if (p.kind === 'claude-start') peek({ icon: I.think, title: p.title, sub: p.sub, ms: p.ms || 3000 });
   else if (p.kind === 'update') peek({ icon: I.download, title: p.title, sub: p.sub, ms: p.ms || 3500 });
   else peek(p);
 });
 
 let claudeIdle = null;
+api.on('claude-sessions', cc => { D.cc = cc; rerenderTile('claude'); startTicker(); });
 api.on('claude', c => {
   clearTimeout(claudeIdle);
+  if (c.state === 'idle') { D.claude = null; if (state === 'compact') settle(); startTicker(); return; }
   if (c.state === 'done') {
     D.claude = null;
-    peek({ icon: I.check, title: 'Done', sub: `Claude Code finished in ${fmtDur(c.took)}`, ms: 4000 });
+    peek({ icon: I.check, title: 'Done', sub: `Claude Code finished in ${fmtDur(c.took)}${c.steps ? ` · ${c.steps} steps` : ''}`, ms: 4000 });
   } else {
     D.claude = { ...c, at: Date.now() };
     claudeIdle = setTimeout(() => { D.claude = null; if (state === 'compact') settle(); }, 10 * 60 * 1000);
-    if (state === 'compact') renderCompact();
+    if (state === 'compact') { renderCompact(); sizeIsland(); }
     else if (state === 'rest') settle();
   }
   if (state === 'compact' && !D.claude) settle();
+  startTicker();
 });
 api.on('claude-perm', p => {
   D.perms.push(p);
@@ -574,4 +643,5 @@ api.on('perm-key', k => answerPerm(k));
   applyTheme();
   settle();
   watchBattery();
+  api.send('claude-sessions-request');
 })();

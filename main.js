@@ -33,8 +33,10 @@ const DEFAULT_SETTINGS = {
   calendarUrl: '',              // ICS link (Outlook: Settings > Calendar > Shared calendars > Publish)
   messageApps: 'WhatsApp, Telegram, Signal, Teams, Discord, Messenger, Slack, Instagram, Phone Link, YourPhone, Mail, Outlook',
   messageAllApps: false,
-  peeks: { apps: true, power: true },
+  peeks: { apps: false, power: true },
+  schema: 2,
   tiles: [
+    { id: 'claude', show: true, size: 3 },
     { id: 'music', show: true, size: 3 },
     { id: 'weather', show: true, size: 2 },
     { id: 'messages', show: true, size: 3 },
@@ -56,6 +58,13 @@ function loadSettings() {
     const ids = new Set(settings.tiles.map(t => t.id));
     for (const t of DEFAULT_SETTINGS.tiles) if (!ids.has(t.id)) settings.tiles.push({ ...t });
     settings.tiles = settings.tiles.filter(t => DEFAULT_SETTINGS.tiles.some(d => d.id === t.id));
+    // 1.9.0: Claude Code tile first, app open/close bubbles off.
+    if (!saved.schema || saved.schema < 2) {
+      settings.tiles = [{ id: 'claude', show: true, size: 3 }, ...settings.tiles.filter(t => t.id !== 'claude')];
+      settings.peeks = { ...settings.peeks, apps: false };
+      settings.schema = 2;
+      saveSettings();
+    }
   } catch { /* first run */ }
 }
 
@@ -238,7 +247,7 @@ function trayImage() {
 }
 
 const TILE_NAMES = {
-  music: 'Music', weather: 'Weather', messages: 'Messages',
+  claude: 'Claude Code', music: 'Music', weather: 'Weather', messages: 'Messages',
   controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer',
 };
 
@@ -661,11 +670,20 @@ let permShortcutsOn = false;
 
 function claudeStep(toolName, input) {
   const t = String(toolName || '');
-  if (/^(Read|NotebookRead)$/.test(t)) return { step: 'read', detail: shortPath(input.file_path) };
-  if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(t)) return { step: 'edit', detail: shortPath(input.file_path || input.notebook_path) };
-  if (/^(Bash|PowerShell)$/.test(t)) return { step: 'run', detail: String(input.command || '').split('\n')[0] };
-  if (/^(Grep|Glob|WebSearch|WebFetch|ToolSearch)$/.test(t)) return { step: 'search', detail: input.pattern || input.query || input.url || '' };
-  return { step: 'think', detail: t };
+  const i = input || {};
+  const first = (x, n = 70) => { const l = String(x || '').split('\n')[0].trim(); return l.length > n ? l.slice(0, n - 1) + '…' : l; };
+  if (/^(Read|NotebookRead)$/.test(t)) return { step: 'read', detail: `Reading ${shortPath(i.file_path || i.notebook_path)}` };
+  if (t === 'Write') return { step: 'edit', detail: `Writing ${shortPath(i.file_path)}` };
+  if (/^(Edit|MultiEdit|NotebookEdit)$/.test(t)) return { step: 'edit', detail: `Editing ${shortPath(i.file_path || i.notebook_path)}` };
+  if (/^(Bash|PowerShell)$/.test(t)) return { step: 'run', detail: `Running ${first(i.command)}` };
+  if (/^(Grep|Glob)$/.test(t)) return { step: 'search', detail: `Searching for ${first(i.pattern, 50)}` };
+  if (t === 'WebSearch') return { step: 'search', detail: `Searching the web: ${first(i.query, 50)}` };
+  if (t === 'WebFetch') { let h = ''; try { h = new URL(i.url).hostname; } catch {} return { step: 'read', detail: `Reading ${h || 'a web page'}` }; }
+  if (/^(Task|Agent)$/.test(t)) return { step: 'think', detail: `Starting a helper: ${first(i.description || i.prompt, 50)}` };
+  if (t === 'TodoWrite') return { step: 'think', detail: 'Updating its to-do list' };
+  const mcp = t.match(/^mcp__([^_]+(?:_[^_]+)*)__(.+)$/);
+  if (mcp) return { step: 'think', detail: `Using ${mcp[1].replace(/[-_]/g, ' ')}` };
+  return { step: 'think', detail: `Using ${t || 'a tool'}` };
 }
 function shortPath(p) { return p ? String(p).split(/[\\/]/).slice(-2).join('/') : ''; }
 
@@ -695,12 +713,12 @@ function answerPermission(id, behavior) {
   if (!p) return;
   pendingPermissions.delete(id);
   clearTimeout(p.timer);
+  setImmediate(() => p.done && p.done());
   const decision = behavior === 'allow'
     ? { behavior: 'allow' }
     : { behavior: 'deny', message: 'Denied from FJBC Notch' };
   p.res.writeHead(200, { 'Content-Type': 'application/json' });
   p.res.end(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } }));
-  if (pendingPermissions.size === 0) setPermissionShortcuts(false);
 }
 
 function startClaudeServer() {
@@ -729,6 +747,49 @@ function startClaudeServer() {
 
 let lastClaudeAt = 0;   // last hook event, so updates wait while Claude Code is working
 const claudeStatus = { listening: false, error: null, lastAt: 0, lastEvent: null, counts: {} };
+function sessionFor(ev) {
+  const sid = ev.session_id || 'default';
+  let s = claudeSessions.get(sid);
+  if (!s) {
+    s = { id: sid, start: Date.now(), prompt: '', cwd: '', state: 'working', step: 'think', detail: 'Thinking', steps: [], stepCount: 0, lastAt: Date.now(), took: 0 };
+    claudeSessions.set(sid, s);
+  }
+  if (ev.cwd) s.cwd = ev.cwd;
+  s.lastAt = Date.now();
+  return s;
+}
+
+function sendSessions() {
+  const list = [...claudeSessions.values()].sort((a, b) => b.lastAt - a.lastAt).map(s => ({
+    id: s.id, start: s.start, prompt: s.prompt, cwd: s.cwd, folder: shortPath(s.cwd).split('/').pop(),
+    state: s.state, step: s.step, detail: s.detail, stepCount: s.stepCount, took: s.took, lastAt: s.lastAt,
+    recent: s.steps.slice(-4).reverse(),
+  }));
+  toIsland('claude-sessions', { connected: claudeStatus.lastAt > 0, sessions: list });
+}
+
+function workingSessions() { return [...claudeSessions.values()].filter(s => s.state === 'working' || s.state === 'waiting'); }
+
+function setClaudeStep(s, st) {
+  Object.assign(s, st, { state: 'working' });
+  s.steps.push({ ...st, at: Date.now() });
+  if (s.steps.length > 20) s.steps.shift();
+  s.stepCount++;
+}
+
+function announceWorking(s) { toIsland('claude', { state: 'working', step: s.step, detail: s.detail, start: s.start }); }
+
+// Forget finished or silent sessions after a while.
+setInterval(() => {
+  let changed = false;
+  for (const [id, s] of claudeSessions) {
+    const quietFor = Date.now() - s.lastAt;
+    if ((s.state === 'done' && quietFor > 30 * 60 * 1000) || quietFor > 60 * 60 * 1000) { claudeSessions.delete(id); changed = true; }
+    else if (s.state === 'working' && quietFor > 15 * 60 * 1000) { s.state = 'idle'; changed = true; }
+  }
+  if (changed) { sendSessions(); if (!workingSessions().length) toIsland('claude', { state: 'idle' }); }
+}, 60 * 1000);
+
 function handleClaudeEvent(ev, res) {
   lastClaudeAt = Date.now();
   claudeStatus.lastAt = lastClaudeAt;
@@ -736,24 +797,35 @@ function handleClaudeEvent(ev, res) {
   claudeStatus.counts[claudeStatus.lastEvent] = (claudeStatus.counts[claudeStatus.lastEvent] || 0) + 1;
   broadcast('claude-status', claudeStatus);
   const name = ev.hook_event_name;
-  const sid = ev.session_id || 'default';
-  const s = claudeSessions.get(sid) || { start: Date.now() };
   const ok = () => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); };
 
   switch (name) {
-    case 'UserPromptSubmit':
-      claudeSessions.set(sid, { start: Date.now(), step: 'think', detail: 'Thinking' });
-      toIsland('claude', { state: 'working', step: 'think', detail: 'Thinking' });
+    case 'UserPromptSubmit': {
+      const sid = ev.session_id || 'default';
+      claudeSessions.delete(sid);                     // a new prompt starts a new task
+      const s = sessionFor(ev);
+      s.prompt = String(ev.prompt || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+      announceWorking(s);
+      sendSessions();
+      toIsland('peek', { kind: 'claude-start', title: 'Claude Code started', sub: s.prompt || shortPath(s.cwd), ms: 3000 });
       return ok();
+    }
     case 'PreToolUse': {
-      if (!claudeSessions.has(sid)) claudeSessions.set(sid, s);
-      const st = claudeStep(ev.tool_name, ev.tool_input || {});
-      Object.assign(s, st);
-      toIsland('claude', { state: 'working', ...st });
+      const s = sessionFor(ev);
+      setClaudeStep(s, claudeStep(ev.tool_name, ev.tool_input || {}));
+      announceWorking(s);
+      sendSessions();
       return ok();
     }
     case 'PermissionRequest': {
+      const s = sessionFor(ev);
+      s.state = 'waiting';
+      sendSessions();
       const id = crypto.randomUUID();
+      const done = () => {
+        if (pendingPermissions.size === 0) setPermissionShortcuts(false);
+        if (s.state === 'waiting') { s.state = 'working'; sendSessions(); }
+      };
       const timer = setTimeout(() => {
         // No answer: hand the decision back to Claude Code's own prompt.
         const p = pendingPermissions.get(id);
@@ -761,14 +833,14 @@ function handleClaudeEvent(ev, res) {
         pendingPermissions.delete(id);
         p.res.writeHead(200, { 'Content-Type': 'application/json' }); p.res.end('{}');
         toIsland('claude-perm-cancel', { id });
-        if (pendingPermissions.size === 0) setPermissionShortcuts(false);
+        done();
       }, 110 * 1000);
-      pendingPermissions.set(id, { res, timer });
+      pendingPermissions.set(id, { res, timer, done });
       res.on('close', () => {
         if (pendingPermissions.has(id) && !res.writableEnded) {
           clearTimeout(timer); pendingPermissions.delete(id);
           toIsland('claude-perm-cancel', { id });
-          if (pendingPermissions.size === 0) setPermissionShortcuts(false);
+          done();
         }
       });
       setPermissionShortcuts(true);
@@ -779,13 +851,21 @@ function handleClaudeEvent(ev, res) {
       });
       return;
     }
-    case 'Notification':
-      toIsland('peek', { kind: 'claude', title: 'Claude Code', sub: ev.message || 'Needs your attention' });
+    case 'Notification': {
+      const s = sessionFor(ev);
+      const msg = ev.message || 'Needs your attention';
+      if (/waiting for your input|idle/i.test(msg + ' ' + (ev.notification_type || ''))) { s.state = 'waiting'; sendSessions(); }
+      toIsland('peek', { kind: 'claude', title: 'Claude Code', sub: msg, ms: 4000 });
       return ok();
+    }
     case 'Stop': {
-      const took = Date.now() - (claudeSessions.get(sid)?.start || Date.now());
-      claudeSessions.delete(sid);
-      toIsland('claude', { state: 'done', took });
+      const s = sessionFor(ev);
+      s.state = 'done';
+      s.took = Date.now() - s.start;
+      s.detail = 'Finished';
+      sendSessions();
+      if (!workingSessions().length) toIsland('claude', { state: 'done', took: s.took, steps: s.stepCount });
+      else announceWorking(workingSessions()[0]);
       return ok();
     }
     default:
@@ -880,7 +960,7 @@ function waitForIdleThenInstall() {
   clearInterval(idleWatch);
   idleWatch = setInterval(() => {
     if (update.state !== 'ready') { clearInterval(idleWatch); return; }
-    const claudeBusy = claudeSessions.size > 0 && Date.now() - lastClaudeAt < 3 * 60 * 1000;
+    const claudeBusy = workingSessions().length > 0 && Date.now() - lastClaudeAt < 3 * 60 * 1000;
     const busy = islandOpen || pendingPermissions.size > 0 || claudeBusy;
     if (busy || powerMonitor.getSystemIdleTime() < IDLE_BEFORE_INSTALL_S) return;
     clearInterval(idleWatch);
@@ -920,6 +1000,7 @@ ipcMain.handle('claude-snippet', () => claudeSettingsSnippet());
 ipcMain.handle('claude-status', () => claudeStatus);
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state }));
+ipcMain.on('claude-sessions-request', () => sendSessions());
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));
