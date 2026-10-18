@@ -68,17 +68,28 @@ function sizeIsland() {
   else if (state === 'open') { w = Math.max(tilesView.offsetWidth, NOTCH_W + 80); h = NOTCH_H + tilesView.offsetHeight; }
   island.style.width = w + 'px';
   island.style.height = h + 'px';
+  fitWindow(w, h, state === 'open' || state === 'peek' || state === 'perm');
 }
 
-// ------------------------------------------------------------------ mouse
-let ignoring = true;
-document.addEventListener('mousemove', e => {
-  const over = island.contains(e.target);
-  if (over === !ignoring) return;
-  ignoring = !over;
-  api.send('mouse-ignore', ignoring);
-});
-document.addEventListener('mouseleave', () => { if (!ignoring) { ignoring = true; api.send('mouse-ignore', true); } });
+// ------------------------------------------------------------------ window size
+// The window hugs the island: it grows before the island animates bigger,
+// and shrinks after the island has finished animating smaller.
+const EAR = 10;
+let winW = 0, winH = 0, shrinkTimer = null;
+function fitWindow(w, h, shadow) {
+  const padX = shadow ? 40 : 0, padB = shadow ? 56 : 0;
+  const W = w + 2 * EAR + 2 * padX, H = h + padB;
+  clearTimeout(shrinkTimer);
+  if (W > winW || H > winH) {
+    winW = Math.max(W, winW); winH = Math.max(H, winH);
+    api.send('island-size', { w: winW, h: winH });
+  }
+  shrinkTimer = setTimeout(() => {
+    if (W === winW && H === winH) return;
+    winW = W; winH = H;
+    api.send('island-size', { w: W, h: H });
+  }, 650);
+}
 
 island.addEventListener('mouseenter', () => {
   hovering = true;

@@ -15,8 +15,9 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const CLAUDE_PORT = 47821;
-const WIN_W = 1000;
-const WIN_H = 360;
+// The window is sized to the island itself (the renderer reports its size), so it
+// catches clicks normally and never covers the apps around it.
+let winSize = { w: 240, h: 40 };
 
 // ---------------------------------------------------------------- single instance
 if (!app.requestSingleInstanceLock()) { app.quit(); }
@@ -122,7 +123,7 @@ function targetDisplay() {
 let placedOn = null;
 function islandBounds(d = targetDisplay()) {
   const b = d.bounds;
-  return { x: Math.round(b.x + (b.width - WIN_W) / 2), y: b.y, width: WIN_W, height: WIN_H };
+  return { x: Math.round(b.x + (b.width - winSize.w) / 2), y: b.y, width: winSize.w, height: winSize.h };
 }
 
 function placeIsland(force = false) {
@@ -189,7 +190,6 @@ function createIsland() {
     },
   });
   island.setAlwaysOnTop(true, 'screen-saver');
-  island.setIgnoreMouseEvents(true, { forward: true });
   island.setMenu(null);
   island.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   island.once('ready-to-show', () => island.showInactive());
@@ -883,8 +883,14 @@ function installUpdate() {
 }
 
 // ---------------------------------------------------------------- IPC
-ipcMain.on('mouse-ignore', (_e, ignore) => {
-  if (island && !island.isDestroyed()) island.setIgnoreMouseEvents(!!ignore, { forward: true });
+ipcMain.on('island-size', (_e, size) => {
+  if (!island || island.isDestroyed() || !size) return;
+  const w = Math.max(60, Math.min(2000, Math.round(size.w / 2) * 2));   // even width keeps it centred on the pixel
+  const h = Math.max(20, Math.min(1000, Math.round(size.h)));
+  if (w === winSize.w && h === winSize.h) return;
+  winSize = { w, h };
+  const d = screen.getAllDisplays().find(x => x.id === placedOn) || targetDisplay();
+  island.setBounds(islandBounds(d));
 });
 ipcMain.on('island-open', (_e, open) => {
   islandOpen = !!open;
