@@ -1,0 +1,47 @@
+// Small line icons (currentColor). Drawn for FJBC Notch.
+'use strict';
+const I = (() => {
+  const s = (d, vb = 24, extra = '') =>
+    `<svg viewBox="0 0 ${vb} ${vb}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
+  const f = (d, vb = 24) => `<svg viewBox="0 0 ${vb} ${vb}" fill="currentColor">${d}</svg>`;
+  return {
+    prev: f('<path d="M11.5 6.5v11L4 12zM20 6.5v11L12.5 12z"/>'),
+    next: f('<path d="M12.5 6.5v11L20 12zM4 6.5v11L11.5 12z"/>'),
+    play: f('<path d="M7 5v14l12-7z"/>'),
+    pause: f('<rect x="6.5" y="5" width="3.6" height="14" rx="1"/><rect x="13.9" y="5" width="3.6" height="14" rx="1"/>'),
+    note: s('<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'),
+    wifi: s('<path d="M2.5 9a14 14 0 0 1 19 0"/><path d="M5.5 12.5a9.5 9.5 0 0 1 13 0"/><path d="M8.7 15.8a5 5 0 0 1 6.6 0"/><circle cx="12" cy="19" r=".9" fill="currentColor"/>'),
+    bt: s('<path d="M7 7l10 10-5 4V3l5 4L7 17"/>'),
+    contrast: s('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'),
+    volume: s('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/>'),
+    mute: s('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>'),
+    sun: s('<circle cx="12" cy="12" r="3.6"/><path d="M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M5.6 18.4l1.3-1.3M17.1 6.9l1.3-1.3"/>'),
+    grid: s('<rect x="4" y="4" width="4" height="4" rx="1"/><rect x="10" y="4" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="4" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="16" y="10" width="4" height="4" rx="1"/><rect x="4" y="16" width="4" height="4" rx="1"/><rect x="10" y="16" width="4" height="4" rx="1"/><rect x="16" y="16" width="4" height="4" rx="1"/>'),
+    chevron: s('<path d="M9.5 6l6 6-6 6"/>'),
+    pin: s('<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>'),
+    chat: s('<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/>'),
+    calendar: s('<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+    timer: s('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5"/>'),
+    reset: s('<path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/>'),
+    bolt: f('<path d="M13 2L5 13.5h6L10 22l9-12h-6z"/>'),
+    battery: s('<rect x="2.5" y="7" width="17" height="10" rx="2.5"/><path d="M22 10.5v3"/>'),
+    check: s('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 24, 'stroke-width="2.2"'),
+    download: s('<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19.5h14"/>'),
+    bell: s('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+    // Claude Code steps
+    read: s('<path d="M4 5.5h6a2 2 0 0 1 2 2V20a1.5 1.5 0 0 0-1.5-1.5H4z"/><path d="M20 5.5h-6a2 2 0 0 0-2 2V20a1.5 1.5 0 0 1 1.5-1.5H20z"/>'),
+    edit: s('<path d="M15 4.5l4.5 4.5L9 19.5H4.5V15z"/><path d="M13 6.5l4.5 4.5"/>'),
+    run: s('<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7 9.5l3 2.5-3 2.5M12.5 15h4.5"/>'),
+    search: s('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'),
+    think: s('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>'),
+    // weather (still icons)
+    w_sun: '<svg viewBox="0 0 48 48"><g stroke="var(--sun)" stroke-width="2.6" stroke-linecap="round"><path d="M24 5v4M24 39v4M5 24h4M39 24h4M10.6 10.6l2.8 2.8M34.6 34.6l2.8 2.8M10.6 37.4l2.8-2.8M34.6 13.4l2.8-2.8"/></g><circle cx="24" cy="24" r="8.5" fill="var(--sun)"/></svg>',
+    w_partly: '<svg viewBox="0 0 48 48"><g stroke="var(--sun)" stroke-width="2.4" stroke-linecap="round"><path d="M30 5v3.5M41.5 16.5H45M38.1 8.9l-2.5 2.5M21.9 8.9l2.5 2.5"/></g><circle cx="30" cy="17" r="7" fill="var(--sun)"/><path d="M14 40h20a8 8 0 0 0 .8-16 10.5 10.5 0 0 0-20.2 3A6.5 6.5 0 0 0 14 40z" fill="var(--cloud)"/></svg>',
+    w_cloud: '<svg viewBox="0 0 48 48"><path d="M13 38h22a8.5 8.5 0 0 0 .9-17A11 11 0 0 0 14.6 24 7 7 0 0 0 13 38z" fill="var(--cloud)"/></svg>',
+    w_fog: '<svg viewBox="0 0 48 48"><path d="M13 30h22a8.5 8.5 0 0 0 .9-17A11 11 0 0 0 14.6 16 7 7 0 0 0 13 30z" fill="var(--cloud)"/><g stroke="var(--cloud-dark)" stroke-width="2.6" stroke-linecap="round"><path d="M9 36h28M14 42h24"/></g></svg>',
+    w_rain: '<svg viewBox="0 0 48 48"><path d="M13 30h22a8.5 8.5 0 0 0 .9-17A11 11 0 0 0 14.6 16 7 7 0 0 0 13 30z" fill="var(--cloud)"/><g stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"><path d="M17 35l-2 5M25 35l-2 5M33 35l-2 5"/></g></svg>',
+    w_snow: '<svg viewBox="0 0 48 48"><path d="M13 30h22a8.5 8.5 0 0 0 .9-17A11 11 0 0 0 14.6 16 7 7 0 0 0 13 30z" fill="var(--cloud)"/><g fill="var(--accent)"><circle cx="16" cy="37" r="2"/><circle cx="24" cy="40" r="2"/><circle cx="32" cy="37" r="2"/></g></svg>',
+    w_storm: '<svg viewBox="0 0 48 48"><path d="M13 30h22a8.5 8.5 0 0 0 .9-17A11 11 0 0 0 14.6 16 7 7 0 0 0 13 30z" fill="var(--cloud-dark)"/><path d="M25 31l-5 8h5l-2 6 7-9h-5l2-5z" fill="var(--sun)"/></svg>',
+    w_moon: '<svg viewBox="0 0 48 48"><path d="M30 8a15 15 0 1 0 10 25A13 13 0 0 1 30 8z" fill="var(--moon)"/></svg>',
+  };
+})();

@@ -1,0 +1,72 @@
+{
+  "name": "fjbc-notch",
+  "version": "1.1.0",
+  "description": "A Dynamic Island for Windows",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never",
+    "release": "electron-builder --win --x64 --publish always"
+  },
+  "keywords": [],
+  "author": "FJBC",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "productName": "FJBC Notch",
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/paramtric-design-3/Notch-setup.git"
+  },
+  "build": {
+    "appId": "com.fjbc.notch",
+    "productName": "FJBC Notch",
+    "asar": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**",
+      "helper/**",
+      "assets/**",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "FJBC-Notch-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FJBC Notch",
+      "uninstallDisplayName": "FJBC Notch",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "paramtric-design-3",
+        "repo": "Notch-setup",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

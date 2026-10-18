@@ -1,0 +1,856 @@
+// FJBC Notch — a Dynamic Island for Windows.
+// Main process: island window, tray menu, settings, Windows helper, weather,
+// lyrics, messages, calendar and the local endpoint for Claude Code hooks.
+'use strict';
+
+const {
+  app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage,
+  globalShortcut, clipboard, shell, nativeTheme
+} = require('electron');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const http = require('http');
+const crypto = require('crypto');
+const { spawn } = require('child_process');
+
+const CLAUDE_PORT = 47821;
+const WIN_W = 1000;
+const WIN_H = 360;
+
+// ---------------------------------------------------------------- single instance
+if (!app.requestSingleInstanceLock()) { app.quit(); }
+app.setAppUserModelId('com.fjbc.notch');
+
+// ---------------------------------------------------------------- settings
+const DEFAULT_SETTINGS = {
+  theme: 'white',               // 'white' | 'dark'
+  city: 'Amsterdam',
+  launchAtLogin: false,
+  display: 'primary',          // 'primary' | 'mouse' | a display id
+  displayLabel: '',             // remembered name, used if the id changes
+  calendarUrl: '',              // ICS link (Outlook: Settings > Calendar > Shared calendars > Publish)
+  messageApps: 'WhatsApp, Telegram, Signal, Teams, Discord, Messenger, Slack, Instagram, Phone Link, YourPhone, Mail, Outlook',
+  messageAllApps: false,
+  peeks: { apps: true, power: true },
+  tiles: [
+    { id: 'music', show: true, size: 3 },
+    { id: 'weather', show: true, size: 2 },
+    { id: 'messages', show: true, size: 3 },
+    { id: 'controls', show: true, size: 2 },
+    { id: 'calendar', show: false, size: 2 },
+    { id: 'timer', show: false, size: 2 },
+  ],
+};
+
+let settingsPath;
+let settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+
+function loadSettings() {
+  settingsPath = path.join(app.getPath('userData'), 'settings.json');
+  try {
+    const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) } };
+    // keep any tile added in a newer version
+    const ids = new Set(settings.tiles.map(t => t.id));
+    for (const t of DEFAULT_SETTINGS.tiles) if (!ids.has(t.id)) settings.tiles.push({ ...t });
+    settings.tiles = settings.tiles.filter(t => DEFAULT_SETTINGS.tiles.some(d => d.id === t.id));
+  } catch { /* first run */ }
+}
+
+function saveSettings() {
+  try {
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  } catch (e) { console.error('save settings', e); }
+}
+
+function applySettings(next, { fromSettingsWindow = false } = {}) {
+  const prevCity = settings.city;
+  const prevCal = settings.calendarUrl;
+  const prevDisplay = settings.display;
+  settings = { ...settings, ...next };
+  if (settings.display !== prevDisplay) {
+    const d = screen.getAllDisplays().find(x => String(x.id) === String(settings.display));
+    settings.displayLabel = d ? displayName(d, 0, true) : '';
+    placeIsland(true);
+  }
+  saveSettings();
+  app.setLoginItemSettings({ openAtLogin: !!settings.launchAtLogin });
+  broadcast('settings', settings);
+  if (settings.city !== prevCity) refreshWeather(true);
+  if (settings.calendarUrl !== prevCal) refreshCalendar(true);
+  refreshMessages();
+  buildTrayMenu();
+  if (!fromSettingsWindow && settingsWin) settingsWin.webContents.send('settings', settings);
+}
+
+// ---------------------------------------------------------------- windows
+let island = null;
+let settingsWin = null;
+let tray = null;
+let islandOpen = false;
+
+// ---------------------------------------------------------------- which screen
+function displayName(d, index, bare = false) {
+  const primary = d.id === screen.getPrimaryDisplay().id;
+  const size = `${Math.round(d.size.width * d.scaleFactor)}×${Math.round(d.size.height * d.scaleFactor)}`;
+  const name = (d.label && d.label.trim()) || (d.internal ? 'Built-in screen' : `Screen ${index + 1}`);
+  if (bare) return `${name} ${size}`;
+  return `${name} · ${size}${primary ? ' (main)' : ''}`;
+}
+
+function listDisplays() {
+  const all = screen.getAllDisplays();
+  return all.map((d, i) => ({ id: String(d.id), name: displayName(d, i), primary: d.id === screen.getPrimaryDisplay().id }));
+}
+
+function targetDisplay() {
+  const all = screen.getAllDisplays();
+  const want = settings.display || 'primary';
+  if (want === 'mouse') return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  if (want !== 'primary') {
+    const byId = all.find(d => String(d.id) === String(want));
+    if (byId) return byId;
+    // The id can change after a driver update or replugging: fall back to the remembered name.
+    const byName = settings.displayLabel && all.find(d => displayName(d, 0, true) === settings.displayLabel);
+    if (byName) return byName;
+  }
+  return screen.getPrimaryDisplay();
+}
+
+let placedOn = null;
+function islandBounds(d = targetDisplay()) {
+  const b = d.bounds;
+  return { x: Math.round(b.x + (b.width - WIN_W) / 2), y: b.y, width: WIN_W, height: WIN_H };
+}
+
+function placeIsland(force = false) {
+  if (!island || island.isDestroyed()) return;
+  const d = targetDisplay();
+  if (!force && placedOn === d.id) return;
+  placedOn = d.id;
+  const b = islandBounds(d);
+  island.setBounds(b);
+  island.setBounds(b);   // second call settles size when moving between screens with different scaling
+}
+
+// "Screen with the mouse": move over while the island is closed.
+setInterval(() => {
+  if (settings.display === 'mouse' && !islandOpen) placeIsland();
+}, 600);
+
+let identifyWins = [];
+function identifyScreens() {
+  for (const w of identifyWins) if (!w.isDestroyed()) w.close();
+  identifyWins = screen.getAllDisplays().map((d, i) => {
+    const w = new BrowserWindow({
+      x: Math.round(d.bounds.x + d.bounds.width / 2 - 170), y: Math.round(d.bounds.y + d.bounds.height / 2 - 110),
+      width: 340, height: 220, frame: false, transparent: true, resizable: false, skipTaskbar: true,
+      focusable: false, alwaysOnTop: true, show: false, hasShadow: false,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    w.setAlwaysOnTop(true, 'screen-saver');
+    w.setIgnoreMouseEvents(true);
+    const dark = settings.theme === 'dark';
+    const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;display:grid;place-items:center;height:100vh;background:transparent;font-family:'Segoe UI Variable Display','Segoe UI',sans-serif">
+      <div style="background:${dark ? '#16181F' : '#F7F8FA'};color:${dark ? '#E3E7EF' : '#1E2129'};border-radius:24px;padding:22px 34px;text-align:center;box-shadow:0 14px 34px rgba(0,0,0,.25)">
+      <div style="font-size:84px;font-weight:300;line-height:1">${i + 1}</div>
+      <div style="font-size:14px;color:${dark ? '#A4ABBA' : '#545A69'};margin-top:8px">${displayName(d, i).replace(/[<>&]/g, '')}</div></div></body>`;
+    w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    w.once('ready-to-show', () => w.showInactive());
+    return w;
+  });
+  setTimeout(() => { for (const w of identifyWins) if (!w.isDestroyed()) w.close(); identifyWins = []; }, 2500);
+}
+
+function createIsland() {
+  island = new BrowserWindow({
+    ...islandBounds(),
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    focusable: false,          // never steals focus
+    hasShadow: false,
+    alwaysOnTop: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+      spellcheck: false,
+    },
+  });
+  island.setAlwaysOnTop(true, 'screen-saver');
+  island.setIgnoreMouseEvents(true, { forward: true });
+  island.setMenu(null);
+  island.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  island.once('ready-to-show', () => island.showInactive());
+
+  // Some full-screen apps push themselves on top; re-assert gently.
+  setInterval(() => {
+    if (!island || island.isDestroyed()) return;
+    island.setAlwaysOnTop(true, 'screen-saver');
+    island.moveTop();
+  }, 3000);
+
+  const reposition = () => { placeIsland(true); buildTrayMenu(); broadcast('displays', listDisplays()); };
+  screen.on('display-metrics-changed', reposition);
+  screen.on('display-added', reposition);
+  screen.on('display-removed', reposition);
+  placedOn = targetDisplay().id;
+}
+
+function openSettings() {
+  if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
+  settingsWin = new BrowserWindow({
+    width: 520, height: 720, minWidth: 460, minHeight: 520,
+    title: 'FJBC Notch settings',
+    backgroundColor: settings.theme === 'dark' ? '#16181F' : '#F7F8FA',
+    autoHideMenuBar: true,
+    icon: trayImage(),
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+  });
+  settingsWin.setMenu(null);
+  settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  settingsWin.on('closed', () => { settingsWin = null; });
+}
+
+function broadcast(channel, data) {
+  for (const w of [island, settingsWin]) {
+    if (w && !w.isDestroyed()) w.webContents.send(channel, data);
+  }
+}
+function toIsland(channel, data) {
+  if (island && !island.isDestroyed()) island.webContents.send(channel, data);
+}
+
+// ---------------------------------------------------------------- tray
+function trayImage() {
+  return nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
+}
+
+const TILE_NAMES = {
+  music: 'Music', weather: 'Weather', messages: 'Messages',
+  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer',
+};
+
+function buildTrayMenu() {
+  if (!tray) return;
+  const menu = Menu.buildFromTemplate([
+    { label: `FJBC Notch ${app.getVersion()}`, enabled: false },
+    { type: 'separator' },
+    {
+      label: 'Tiles', submenu: settings.tiles.map(t => ({
+        label: TILE_NAMES[t.id], type: 'checkbox', checked: t.show,
+        click: () => applySettings({ tiles: settings.tiles.map(x => x.id === t.id ? { ...x, show: !x.show } : x) }),
+      })),
+    },
+    {
+      label: 'Screen', submenu: [
+        { label: 'Main screen', type: 'radio', checked: (settings.display || 'primary') === 'primary', click: () => applySettings({ display: 'primary' }) },
+        { label: 'Screen with the mouse', type: 'radio', checked: settings.display === 'mouse', click: () => applySettings({ display: 'mouse' }) },
+        { type: 'separator' },
+        ...listDisplays().map(d => ({
+          label: d.name, type: 'radio', checked: String(settings.display) === d.id,
+          click: () => applySettings({ display: d.id }),
+        })),
+        { type: 'separator' },
+        { label: 'Identify screens', click: identifyScreens },
+      ],
+    },
+    {
+      label: 'Theme', submenu: [
+        { label: 'White Matte', type: 'radio', checked: settings.theme === 'white', click: () => applySettings({ theme: 'white' }) },
+        { label: 'Dark Matte', type: 'radio', checked: settings.theme === 'dark', click: () => applySettings({ theme: 'dark' }) },
+      ],
+    },
+    { label: `Weather city: ${settings.city || '—'}…`, click: openSettings },
+    { label: 'Launch at login', type: 'checkbox', checked: !!settings.launchAtLogin, click: () => applySettings({ launchAtLogin: !settings.launchAtLogin }) },
+    { type: 'separator' },
+    updateMenuItem(),
+    { label: 'Settings…', click: openSettings },
+    { label: 'Quit', click: () => app.quit() },
+  ]);
+  tray.setContextMenu(menu);
+}
+
+function createTray() {
+  tray = new Tray(trayImage());
+  tray.setToolTip('FJBC Notch');
+  tray.on('click', openSettings);
+  buildTrayMenu();
+}
+
+// ---------------------------------------------------------------- Windows helper (PowerShell)
+let helper = null;
+let helperBuf = '';
+let helperRestarts = 0;
+const state = { media: null, radios: {}, volume: null, brightness: null, dark: null };
+
+function helperPath() {
+  // Not inside asar (packaged with asar disabled), so PowerShell can read it.
+  return path.join(__dirname, 'helper', 'helper.ps1');
+}
+
+function startHelper() {
+  if (process.platform !== 'win32') return;
+  helper = spawn('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
+    '-File', helperPath(),
+  ], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+
+  helper.stdout.setEncoding('utf8');
+  helper.stdout.on('data', chunk => {
+    helperBuf += chunk;
+    let i;
+    while ((i = helperBuf.indexOf('\n')) >= 0) {
+      const line = helperBuf.slice(0, i).trim();
+      helperBuf = helperBuf.slice(i + 1);
+      if (line) { try { onHelperMessage(JSON.parse(line)); } catch { /* ignore partial */ } }
+    }
+  });
+  helper.stderr.on('data', d => console.error('[helper]', String(d).trim()));
+  helper.on('exit', code => {
+    helper = null;
+    if (quitting) return;
+    if (helperRestarts++ < 5) setTimeout(startHelper, 2000 * helperRestarts);
+  });
+  sendHelper({ c: 'mode', open: islandOpen });
+}
+
+function sendHelper(cmd) {
+  if (helper && helper.stdin.writable) helper.stdin.write(JSON.stringify(cmd) + '\n');
+}
+
+let lastTrackKey = '';
+let appsBaselineDone = false;
+
+async function onHelperMessage(m) {
+  switch (m.t) {
+    case 'media': {
+      state.media = m.data;
+      toIsland('media', m.data);
+      const key = m.data ? `${m.data.artist}|${m.data.title}` : '';
+      if (key && key !== lastTrackKey) {
+        lastTrackKey = key;
+        const lyr = await getLyrics(m.data);
+        if (`${state.media?.artist}|${state.media?.title}` === key) toIsland('lyrics', { key, lines: lyr });
+      }
+      break;
+    }
+    case 'art': toIsland('art', m.data); break;
+    case 'radios': state.radios = m.data; toIsland('radios', m.data); break;
+    case 'volume': state.volume = m.data; toIsland('volume', m.data); break;
+    case 'brightness': state.brightness = m.data; toIsland('brightness', m.data); break;
+    case 'dark': state.dark = m.data; toIsland('dark', m.data); break;
+    case 'apps': {
+      if (!appsBaselineDone) { appsBaselineDone = true; break; }  // no peeks for apps already open
+      if (!settings.peeks.apps) break;
+      for (const a of (m.data.opened || []).slice(0, 2)) peekApp(a, 'opened');
+      for (const a of (m.data.closed || []).slice(0, 2)) peekApp(a, 'closed');
+      break;
+    }
+    case 'log': console.log('[helper]', m.data); break;
+  }
+}
+
+async function peekApp(a, verb) {
+  let icon = null;
+  try {
+    if (a.path) icon = (await app.getFileIcon(a.path, { size: 'normal' })).toDataURL();
+  } catch { /* no icon */ }
+  toIsland('peek', { kind: 'app', title: a.name, sub: verb === 'opened' ? 'Opened' : 'Closed', icon });
+}
+
+// ---------------------------------------------------------------- HTTP helper
+async function getJSON(url, timeoutMs = 10000) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: ctl.signal, headers: { 'User-Agent': 'FJBC-Notch/1.0 (personal desktop app)' } });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
+// ---------------------------------------------------------------- weather (Open-Meteo, no key)
+let weatherTimer = null;
+let geoCache = { city: null, loc: null };
+
+async function refreshWeather(force) {
+  clearTimeout(weatherTimer);
+  weatherTimer = setTimeout(() => refreshWeather(), 15 * 60 * 1000);
+  const city = (settings.city || '').trim();
+  if (!city) { toIsland('weather', { error: 'Set a city in Settings' }); return; }
+  try {
+    if (force || geoCache.city !== city) {
+      const g = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&name=${encodeURIComponent(city)}`);
+      const r = g && g.results && g.results[0];
+      if (!r) { toIsland('weather', { error: `City not found: ${city}` }); return; }
+      geoCache = { city, loc: { lat: r.latitude, lon: r.longitude, name: r.name } };
+    }
+    const { lat, lon, name } = geoCache.loc;
+    const w = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`);
+    toIsland('weather', {
+      city: name,
+      temp: Math.round(w.current.temperature_2m),
+      code: w.current.weather_code,
+      isDay: !!w.current.is_day,
+      hi: Math.round(w.daily.temperature_2m_max[0]),
+      lo: Math.round(w.daily.temperature_2m_min[0]),
+    });
+  } catch (e) {
+    toIsland('weather', { error: 'Weather unavailable' });
+    clearTimeout(weatherTimer);
+    weatherTimer = setTimeout(() => refreshWeather(), 2 * 60 * 1000);
+  }
+}
+
+// ---------------------------------------------------------------- lyrics (LRCLIB, no key, cached)
+function lyricsCacheDir() {
+  const d = path.join(app.getPath('userData'), 'lyrics');
+  fs.mkdirSync(d, { recursive: true });
+  return d;
+}
+
+function parseLrc(text) {
+  const out = [];
+  for (const line of String(text || '').split(/\r?\n/)) {
+    const tags = [...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    if (!tags.length) continue;
+    const words = line.replace(/\[[^\]]*\]/g, '').trim();
+    for (const t of tags) out.push({ t: (parseInt(t[1], 10) * 60 + parseFloat(t[2])) * 1000, l: words });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
+async function getLyrics(m) {
+  if (!m || !m.title) return [];
+  const key = crypto.createHash('sha1').update(`${m.artist}|${m.title}`.toLowerCase()).digest('hex');
+  const file = path.join(lyricsCacheDir(), key + '.json');
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* not cached */ }
+  let lines = [];
+  try {
+    const q = new URLSearchParams({ track_name: m.title, artist_name: m.artist || '' });
+    if (m.album) q.set('album_name', m.album);
+    if (m.durMs > 0) q.set('duration', String(Math.round(m.durMs / 1000)));
+    let r = await getJSON('https://lrclib.net/api/get?' + q.toString());
+    if (!r || !r.syncedLyrics) {
+      const s = await getJSON('https://lrclib.net/api/search?' + new URLSearchParams({ track_name: m.title, artist_name: m.artist || '' }));
+      r = Array.isArray(s) ? s.find(x => x.syncedLyrics) : null;
+    }
+    lines = r && r.syncedLyrics ? parseLrc(r.syncedLyrics) : [];
+    fs.writeFileSync(file, JSON.stringify(lines));   // also caches "no lyrics"
+  } catch { /* offline: try again next time */ }
+  return lines;
+}
+
+// ---------------------------------------------------------------- messages (Windows notification database, read-only, local)
+let messagesTimer = null;
+
+function appLabel(primaryId) {
+  const id = String(primaryId || '');
+  const known = [
+    [/whatsapp/i, 'WhatsApp'], [/telegram/i, 'Telegram'], [/signal/i, 'Signal'], [/teams/i, 'Teams'],
+    [/discord/i, 'Discord'], [/messenger/i, 'Messenger'], [/slack/i, 'Slack'], [/instagram/i, 'Instagram'],
+    [/yourphone|phonelink/i, 'Phone Link'], [/outlook|olk/i, 'Outlook'], [/windowscommunicationsapps|mail/i, 'Mail'],
+  ];
+  for (const [re, n] of known) if (re.test(id)) return n;
+  const base = id.split('!')[0].split('\\').pop().split('_')[0].split('.').pop();
+  return base || 'App';
+}
+
+function decodeXml(s) {
+  return s.replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&amp;/g, '&').trim();
+}
+
+function filetimeToMs(ft) {
+  // FILETIME: 100-ns ticks since 1601-01-01
+  const n = typeof ft === 'bigint' ? ft : BigInt(ft);
+  return Number(n / 10000n - 11644473600000n);
+}
+
+function readNotifications() {
+  if (process.platform !== 'win32') return { error: 'Windows only' };
+  const src = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'Windows', 'Notifications', 'wpndatabase.db');
+  if (!fs.existsSync(src)) return { error: 'No notification database found' };
+  // Copy the database (and its WAL) so we never lock the one Windows is using.
+  const tmp = path.join(os.tmpdir(), 'fjbc-notch-wpn');
+  fs.mkdirSync(tmp, { recursive: true });
+  const dst = path.join(tmp, 'wpn.db');
+  for (const ext of ['', '-wal', '-shm']) {
+    try { fs.copyFileSync(src + ext, dst + ext); } catch { try { fs.rmSync(dst + ext, { force: true }); } catch {} }
+  }
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(dst, { readOnly: false });   // needs write to replay the WAL copy
+  try {
+    db.exec('PRAGMA query_only = 1');
+    const stmt = db.prepare(`
+      SELECT n.Payload AS payload, n.ArrivalTime AS arrival, h.PrimaryId AS appId
+      FROM Notification n JOIN NotificationHandler h ON h.RecordId = n.HandlerId
+      WHERE n.Type = 'toast'
+      ORDER BY n.ArrivalTime DESC LIMIT 300`);
+    stmt.setReadBigInts(true);   // FILETIME values are larger than 2^53
+    const rows = stmt.all();
+    return { rows };
+  } finally { db.close(); }
+}
+
+function refreshMessages() {
+  clearTimeout(messagesTimer);
+  messagesTimer = setTimeout(refreshMessages, islandOpen ? 15000 : 60000);
+  const tile = settings.tiles.find(t => t.id === 'messages');
+  if (!tile || !tile.show) return;
+  try {
+    const res = readNotifications();
+    if (res.error) { toIsland('messages', { error: res.error }); return; }
+    const allowed = settings.messageApps.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    const convos = new Map();
+    for (const r of res.rows) {
+      const appName = appLabel(r.appId);
+      if (!settings.messageAllApps && !allowed.some(a => appName.toLowerCase().includes(a) || String(r.appId).toLowerCase().includes(a.replace(/\s/g, '')))) continue;
+      const xml = Buffer.isBuffer(r.payload) || r.payload instanceof Uint8Array ? Buffer.from(r.payload).toString('utf8') : String(r.payload || '');
+      const texts = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/gi)].map(x => decodeXml(x[1])).filter(Boolean);
+      if (!texts.length) continue;
+      const name = texts[0];
+      const line = texts.slice(1).join(' · ') || '';
+      const k = appName + '|' + name;
+      const at = filetimeToMs(r.arrival);
+      const c = convos.get(k);
+      if (c) c.count++;
+      else convos.set(k, { app: appName, name, line, at, count: 1 });
+    }
+    toIsland('messages', { items: [...convos.values()].sort((a, b) => b.at - a.at).slice(0, 6) });
+  } catch (e) {
+    toIsland('messages', { error: 'Could not read notifications' });
+    console.error('messages', e);
+  }
+}
+
+// ---------------------------------------------------------------- calendar (ICS link, optional)
+let calTimer = null;
+
+function icsDate(v) {
+  // 20261017T090000Z | 20261017T090000 | 20261017
+  const m = String(v).match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?/);
+  if (!m) return null;
+  const [, y, mo, d, h = '00', mi = '00', s = '00', z] = m;
+  if (z) return Date.UTC(+y, +mo - 1, +d, +h, +mi, +s);
+  return new Date(+y, +mo - 1, +d, +h, +mi, +s).getTime();
+}
+
+function parseIcs(text) {
+  const unfolded = String(text).replace(/\r?\n[ \t]/g, '');
+  const events = [];
+  for (const block of unfolded.split('BEGIN:VEVENT').slice(1)) {
+    const body = block.split('END:VEVENT')[0];
+    const get = k => { const m = body.match(new RegExp('^' + k + '(?:;[^:\\n]*)?:(.*)$', 'm')); return m ? m[1].trim() : null; };
+    const start = icsDate(get('DTSTART'));
+    if (!start) continue;
+    const allDay = /DTSTART;VALUE=DATE:/.test(body);
+    const rrule = get('RRULE');
+    let ev = { title: (get('SUMMARY') || 'Event').replace(/\\,/g, ',').replace(/\\n/g, ' '), start, allDay, location: (get('LOCATION') || '').replace(/\\,/g, ',') };
+    // Simple weekly/daily recurrences: move to the next occurrence.
+    if (rrule) {
+      const freq = (rrule.match(/FREQ=(\w+)/) || [])[1];
+      const until = icsDate((rrule.match(/UNTIL=([^;]+)/) || [])[1] || '');
+      const step = freq === 'DAILY' ? 864e5 : freq === 'WEEKLY' ? 7 * 864e5 : 0;
+      if (step) {
+        const now = Date.now();
+        let t = start;
+        if (t < now) t += Math.ceil((now - t) / step) * step;
+        if (!until || t <= until) ev.start = t;
+      }
+    }
+    events.push(ev);
+  }
+  return events;
+}
+
+async function refreshCalendar() {
+  clearTimeout(calTimer);
+  calTimer = setTimeout(refreshCalendar, 10 * 60 * 1000);
+  const url = (settings.calendarUrl || '').trim().replace(/^webcal:/i, 'https:');
+  if (!url) { toIsland('calendar', { error: 'Add a calendar link in Settings' }); return; }
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': 'FJBC-Notch/1.0' } });
+    const txt = await r.text();
+    const now = Date.now();
+    const next = parseIcs(txt).filter(e => e.start >= now - 15 * 60000).sort((a, b) => a.start - b.start)[0];
+    toIsland('calendar', next ? { event: next } : { empty: true });
+  } catch { toIsland('calendar', { error: 'Calendar unavailable' }); }
+}
+
+// ---------------------------------------------------------------- Claude Code (HTTP hooks on localhost)
+const claudeSessions = new Map();     // session_id -> { start, step, detail }
+const pendingPermissions = new Map(); // id -> { res, timer }
+let permShortcutsOn = false;
+
+function claudeStep(toolName, input) {
+  const t = String(toolName || '');
+  if (/^(Read|NotebookRead)$/.test(t)) return { step: 'read', detail: shortPath(input.file_path) };
+  if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(t)) return { step: 'edit', detail: shortPath(input.file_path || input.notebook_path) };
+  if (/^(Bash|PowerShell)$/.test(t)) return { step: 'run', detail: String(input.command || '').split('\n')[0] };
+  if (/^(Grep|Glob|WebSearch|WebFetch|ToolSearch)$/.test(t)) return { step: 'search', detail: input.pattern || input.query || input.url || '' };
+  return { step: 'think', detail: t };
+}
+function shortPath(p) { return p ? String(p).split(/[\\/]/).slice(-2).join('/') : ''; }
+
+function fullCommand(toolName, input) {
+  if (input && typeof input.command === 'string') return input.command;
+  if (input && input.file_path && typeof input.content === 'string') return `${input.file_path}\n\n${input.content}`;
+  if (input && input.file_path && typeof input.new_string === 'string') {
+    return `${input.file_path}\n\n- ${input.old_string || ''}\n+ ${input.new_string}`;
+  }
+  return JSON.stringify(input || {}, null, 2);
+}
+
+function setPermissionShortcuts(on) {
+  if (on === permShortcutsOn) return;
+  permShortcutsOn = on;
+  if (on) {
+    globalShortcut.register('CommandOrControl+Alt+Y', () => toIsland('perm-key', 'allow'));
+    globalShortcut.register('CommandOrControl+Alt+N', () => toIsland('perm-key', 'deny'));
+  } else {
+    globalShortcut.unregister('CommandOrControl+Alt+Y');
+    globalShortcut.unregister('CommandOrControl+Alt+N');
+  }
+}
+
+function answerPermission(id, behavior) {
+  const p = pendingPermissions.get(id);
+  if (!p) return;
+  pendingPermissions.delete(id);
+  clearTimeout(p.timer);
+  const decision = behavior === 'allow'
+    ? { behavior: 'allow' }
+    : { behavior: 'deny', message: 'Denied from FJBC Notch' };
+  p.res.writeHead(200, { 'Content-Type': 'application/json' });
+  p.res.end(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } }));
+  if (pendingPermissions.size === 0) setPermissionShortcuts(false);
+}
+
+function startClaudeServer() {
+  const server = http.createServer((req, res) => {
+    // Only accept JSON POSTs without a browser Origin: blocks web pages from talking to it.
+    if (req.method !== 'POST' || req.headers.origin || !/application\/json/i.test(req.headers['content-type'] || '')) {
+      res.writeHead(403); res.end(); return;
+    }
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 2e6) req.destroy(); });
+    req.on('end', () => {
+      let ev;
+      try { ev = JSON.parse(body); } catch { res.writeHead(400); res.end(); return; }
+      handleClaudeEvent(ev, res);
+    });
+  });
+  server.on('error', e => console.error('claude server', e.message));
+  server.listen(CLAUDE_PORT, '127.0.0.1');
+}
+
+function handleClaudeEvent(ev, res) {
+  const name = ev.hook_event_name;
+  const sid = ev.session_id || 'default';
+  const s = claudeSessions.get(sid) || { start: Date.now() };
+  const ok = () => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); };
+
+  switch (name) {
+    case 'UserPromptSubmit':
+      claudeSessions.set(sid, { start: Date.now(), step: 'think', detail: 'Thinking' });
+      toIsland('claude', { state: 'working', step: 'think', detail: 'Thinking' });
+      return ok();
+    case 'PreToolUse': {
+      if (!claudeSessions.has(sid)) claudeSessions.set(sid, s);
+      const st = claudeStep(ev.tool_name, ev.tool_input || {});
+      Object.assign(s, st);
+      toIsland('claude', { state: 'working', ...st });
+      return ok();
+    }
+    case 'PermissionRequest': {
+      const id = crypto.randomUUID();
+      const timer = setTimeout(() => {
+        // No answer: hand the decision back to Claude Code's own prompt.
+        const p = pendingPermissions.get(id);
+        if (!p) return;
+        pendingPermissions.delete(id);
+        p.res.writeHead(200, { 'Content-Type': 'application/json' }); p.res.end('{}');
+        toIsland('claude-perm-cancel', { id });
+        if (pendingPermissions.size === 0) setPermissionShortcuts(false);
+      }, 110 * 1000);
+      pendingPermissions.set(id, { res, timer });
+      res.on('close', () => {
+        if (pendingPermissions.has(id) && !res.writableEnded) {
+          clearTimeout(timer); pendingPermissions.delete(id);
+          toIsland('claude-perm-cancel', { id });
+          if (pendingPermissions.size === 0) setPermissionShortcuts(false);
+        }
+      });
+      setPermissionShortcuts(true);
+      toIsland('claude-perm', {
+        id, tool: ev.tool_name || 'Tool',
+        command: fullCommand(ev.tool_name, ev.tool_input),
+        cwd: ev.cwd || '',
+      });
+      return;
+    }
+    case 'Notification':
+      toIsland('peek', { kind: 'claude', title: 'Claude Code', sub: ev.message || 'Needs your attention' });
+      return ok();
+    case 'Stop': {
+      const took = Date.now() - (claudeSessions.get(sid)?.start || Date.now());
+      claudeSessions.delete(sid);
+      toIsland('claude', { state: 'done', took });
+      return ok();
+    }
+    default:
+      return ok();
+  }
+}
+
+function claudeSettingsSnippet() {
+  const url = `http://127.0.0.1:${CLAUDE_PORT}/claude`;
+  const h = timeout => [{ type: 'http', url, timeout }];
+  return JSON.stringify({
+    hooks: {
+      UserPromptSubmit: [{ hooks: h(5) }],
+      PreToolUse: [{ matcher: '*', hooks: h(5) }],
+      PermissionRequest: [{ matcher: '*', hooks: h(120) }],
+      Notification: [{ hooks: h(5) }],
+      Stop: [{ hooks: h(5) }],
+    },
+  }, null, 2);
+}
+
+// ---------------------------------------------------------------- auto-update (GitHub releases)
+// Checks paramtric-design-3/Notch-setup releases at start and every 4 hours, downloads quietly,
+// installs when the app quits (or right away from the tray).
+const update = { state: 'idle', version: null, percent: 0, error: null, manual: false };
+let autoUpdater = null;
+
+function setUpdate(patch) {
+  Object.assign(update, patch);
+  buildTrayMenu();
+  broadcast('update', { ...update, current: app.getVersion(), packaged: app.isPackaged });
+}
+
+function updateMenuItem() {
+  switch (update.state) {
+    case 'checking': return { label: 'Checking for updates…', enabled: false };
+    case 'downloading': return { label: `Downloading update ${update.percent}%…`, enabled: false };
+    case 'ready': return { label: `Restart to update to ${update.version}`, click: installUpdate };
+    default: return { label: 'Check for updates', click: () => checkForUpdates(true), enabled: app.isPackaged };
+  }
+}
+
+function setupUpdater() {
+  if (!app.isPackaged) return;            // only the installed app updates itself
+  ({ autoUpdater } = require('electron-updater'));
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.logger = null;
+  autoUpdater.on('checking-for-update', () => setUpdate({ state: 'checking', error: null }));
+  autoUpdater.on('update-available', info => setUpdate({ state: 'downloading', version: info.version, percent: 0 }));
+  autoUpdater.on('download-progress', p => {
+    const pct = Math.round(p.percent || 0);
+    if (pct !== update.percent) setUpdate({ percent: pct });
+  });
+  autoUpdater.on('update-not-available', () => {
+    if (update.manual) toIsland('peek', { kind: 'update', title: 'FJBC Notch is up to date', sub: `Version ${app.getVersion()}` });
+    setUpdate({ state: 'idle', manual: false });
+  });
+  autoUpdater.on('update-downloaded', info => {
+    setUpdate({ state: 'ready', version: info.version, manual: false });
+    toIsland('peek', { kind: 'update', title: `Update ${info.version} ready`, sub: 'Installs when you quit, or restart from the tray', ms: 5000 });
+  });
+  autoUpdater.on('error', e => {
+    if (update.manual) toIsland('peek', { kind: 'update', title: 'Could not check for updates', sub: 'Try again later' });
+    setUpdate({ state: update.state === 'ready' ? 'ready' : 'idle', error: String(e && e.message || e).slice(0, 200), manual: false });
+  });
+  setTimeout(() => checkForUpdates(false), 15 * 1000);
+  setInterval(() => checkForUpdates(false), 4 * 60 * 60 * 1000);
+}
+
+function checkForUpdates(manual) {
+  if (!autoUpdater || update.state === 'checking' || update.state === 'downloading') return;
+  if (update.state === 'ready') { if (manual) installUpdate(); return; }
+  update.manual = !!manual;
+  autoUpdater.checkForUpdates().catch(() => { /* reported through 'error' */ });
+}
+
+function installUpdate() {
+  if (!autoUpdater || update.state !== 'ready') return;
+  quitting = true;
+  setImmediate(() => autoUpdater.quitAndInstall(true, true));   // silent install, start again afterwards
+}
+
+// ---------------------------------------------------------------- IPC
+ipcMain.on('mouse-ignore', (_e, ignore) => {
+  if (island && !island.isDestroyed()) island.setIgnoreMouseEvents(!!ignore, { forward: true });
+});
+ipcMain.on('island-open', (_e, open) => {
+  islandOpen = !!open;
+  sendHelper({ c: 'mode', open: islandOpen });
+  if (islandOpen) refreshMessages();
+});
+ipcMain.on('helper', (_e, cmd) => sendHelper(cmd));
+ipcMain.on('perm-answer', (_e, { id, behavior }) => answerPermission(id, behavior));
+ipcMain.on('open-settings', () => openSettings());
+ipcMain.on('open-url', (_e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
+ipcMain.handle('get-settings', () => settings);
+ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSettingsWindow: true }); return settings; });
+ipcMain.handle('claude-snippet', () => claudeSettingsSnippet());
+ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
+ipcMain.handle('initial-state', () => ({ settings, state }));
+ipcMain.handle('get-displays', () => listDisplays());
+ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
+ipcMain.on('check-updates', () => checkForUpdates(true));
+ipcMain.on('install-update', () => installUpdate());
+ipcMain.on('identify-screens', () => identifyScreens());
+ipcMain.on('refresh-all', () => { refreshWeather(); refreshMessages(); refreshCalendar(); });
+
+// ---------------------------------------------------------------- lifecycle
+let quitting = false;
+
+app.whenReady().then(() => {
+  loadSettings();
+  app.setLoginItemSettings({ openAtLogin: !!settings.launchAtLogin });
+  createIsland();
+  createTray();
+  startHelper();
+  startClaudeServer();
+  setupUpdater();
+  island.webContents.once('did-finish-load', () => {
+    toIsland('settings', settings);
+    refreshWeather(true);
+    refreshMessages();
+    refreshCalendar();
+  });
+  nativeTheme.on('updated', () => toIsland('dark', { on: nativeTheme.shouldUseDarkColors }));
+});
+
+app.on('second-instance', openSettings);
+app.on('window-all-closed', e => e.preventDefault());
+app.on('before-quit', () => {
+  quitting = true;
+  for (const id of [...pendingPermissions.keys()]) {
+    const p = pendingPermissions.get(id);
+    try { p.res.writeHead(200, { 'Content-Type': 'application/json' }); p.res.end('{}'); } catch {}
+  }
+  globalShortcut.unregisterAll();
+  if (helper) { try { helper.kill(); } catch {} }
+});

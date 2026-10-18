@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" data-theme="white">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>FJBC Notch settings</title>
+  <style>
+    html[data-theme="white"] { --bg:#F7F8FA; --tile:#FBFBFC; --text:#1E2129; --text-2:#545A69; --accent:#3B82D0; --line:rgba(30,33,41,.09); --btn:rgba(30,33,41,.05); --btn-h:rgba(30,33,41,.09); --on:rgba(59,130,208,.14); --mono:#F1F3F6; }
+    html[data-theme="dark"]  { --bg:#16181F; --tile:#21242D; --text:#E3E7EF; --text-2:#A4ABBA; --accent:#8FC7FF; --line:rgba(227,231,239,.08); --btn:rgba(227,231,239,.06); --btn-h:rgba(227,231,239,.11); --on:rgba(143,199,255,.16); --mono:#191B22; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:13.5px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+    main { padding: 22px 22px 28px; max-width: 640px; margin: 0 auto; }
+    h1 { font: 600 20px "Segoe UI Variable Display","Segoe UI",system-ui; margin: 0 0 2px; letter-spacing: -.2px; }
+    .lead { color: var(--text-2); margin: 0 0 18px; font-size: 13px; }
+    section { background: var(--tile); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+    h2 { font-size: 12px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--text-2); margin: 0 0 10px; }
+    .row { display: flex; align-items: center; gap: 10px; min-height: 36px; }
+    .row + .row { border-top: 1px solid var(--line); }
+    .row label.grow, .grow { flex: 1; min-width: 0; }
+    .sub { color: var(--text-2); font-size: 12px; }
+    input[type=text] { width: 100%; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 11px; font: inherit; outline: none; }
+    input[type=text]:focus { border-color: var(--accent); }
+    .seg { display: inline-flex; background: var(--btn); border-radius: 10px; padding: 3px; gap: 2px; }
+    .seg button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
+    .seg button.on { background: var(--tile); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+    html[data-theme="dark"] .seg button.on { background: #2B2F39; }
+    .switch { position: relative; width: 38px; height: 22px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .switch span { position: absolute; inset: 0; border-radius: 11px; background: var(--btn-h); transition: background .15s; cursor: pointer; }
+    .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .18s cubic-bezier(.3,1.3,.5,1); }
+    .switch input:checked + span { background: var(--accent); }
+    .switch input:checked + span::after { transform: translateX(16px); }
+    .arrow { border: 0; background: var(--btn); color: var(--text-2); width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .arrow:hover { background: var(--btn-h); color: var(--text); }
+    .arrow:disabled { opacity: .3; cursor: default; }
+    .btn { border: 0; background: var(--btn); color: var(--text); font: inherit; font-weight: 600; font-size: 12.5px; height: 32px; padding: 0 14px; border-radius: 10px; cursor: pointer; }
+    .btn:hover { background: var(--btn-h); }
+    .btn.primary { background: var(--accent); color: #fff; }
+    .btn:disabled { opacity: .45; cursor: default; }
+    html[data-theme="dark"] .btn.primary { color: #10233A; }
+    pre { background: var(--mono); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: 11.5px/1.5 "Cascadia Mono", Consolas, monospace; overflow: auto; max-height: 220px; margin: 8px 0; user-select: text; }
+    p { margin: 6px 0; }
+    .note { color: var(--text-2); font-size: 12px; }
+    code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; background: var(--btn); padding: 1px 5px; border-radius: 5px; }
+    .saved { color: var(--accent); font-size: 12px; opacity: 0; transition: opacity .2s; }
+    .saved.show { opacity: 1; }
+    select { height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 10px; font: inherit; outline: none; min-width: 0; flex: 1; }
+    select:focus { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>FJBC Notch</h1>
+  <p class="lead">Hover the notch at the top of your screen to open it. Click it to keep it open. Right-click it to come back here.</p>
+
+  <section>
+    <h2>Look</h2>
+    <div class="row"><span class="grow">Theme</span>
+      <div class="seg" id="theme"><button data-v="white">White Matte</button><button data-v="dark">Dark Matte</button></div>
+    </div>
+    <div class="row"><span class="grow">Launch at login</span><label class="switch"><input type="checkbox" id="login"><span></span></label></div>
+  </section>
+
+  <section>
+    <h2>Screen</h2>
+    <div class="row"><select id="display"></select><button class="btn" id="identify">Identify</button></div>
+    <p class="note">"Screen with the mouse" moves the notch to whichever screen your pointer is on. Identify shows each screen's number for a moment.</p>
+  </section>
+
+  <section>
+    <h2>Tiles</h2>
+    <div id="tiles"></div>
+    <p class="note">Size is in cells: 1 is a small square, 3 is the widest.</p>
+  </section>
+
+  <section>
+    <h2>Weather</h2>
+    <div class="row"><input type="text" id="city" placeholder="City, e.g. Amsterdam"><span class="saved" id="citySaved">Saved</span></div>
+    <p class="note">From Open-Meteo. Only the city name and its coordinates are sent.</p>
+  </section>
+
+  <section>
+    <h2>Messages</h2>
+    <div class="row"><span class="grow">Show notifications from every app</span><label class="switch"><input type="checkbox" id="msgAll"><span></span></label></div>
+    <div class="row"><input type="text" id="msgApps" placeholder="WhatsApp, Telegram, Teams…"><span class="saved" id="appsSaved">Saved</span></div>
+    <p class="note">Reads the notifications Windows is still holding for these apps, on this PC only. Clear them in the notification center and they disappear here too.</p>
+  </section>
+
+  <section>
+    <h2>Next event</h2>
+    <div class="row"><input type="text" id="cal" placeholder="Calendar link ending in .ics"><span class="saved" id="calSaved">Saved</span></div>
+    <p class="note">In Outlook.com: Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link. Turn the tile on above.</p>
+  </section>
+
+  <section>
+    <h2>Peeks</h2>
+    <div class="row"><span class="grow">Apps opening and closing</span><label class="switch"><input type="checkbox" id="peekApps"><span></span></label></div>
+    <div class="row"><span class="grow">Charger and battery</span><label class="switch"><input type="checkbox" id="peekPower"><span></span></label></div>
+    <p class="note">Do Not Disturb has no public Windows API, so there is no peek for it.</p>
+  </section>
+
+  <section>
+    <h2>Claude Code</h2>
+    <p>Add these lines to <code>%USERPROFILE%\.claude\settings.json</code>. If the file already has a <code>"hooks"</code> block, merge them into it.</p>
+    <pre id="snippet"></pre>
+    <div class="row"><button class="btn primary" id="copy">Copy</button><span class="saved" id="copied">Copied</span></div>
+    <p class="note">When Claude asks for permission, the notch opens with the full command. Allow becomes active once you've seen all of it. Shortcuts: <code>Ctrl+Alt+Y</code> allow, <code>Ctrl+Alt+N</code> deny. If you don't answer within 110 seconds, Claude Code asks in the terminal as usual.</p>
+  </section>
+
+  <section>
+    <h2>Updates</h2>
+    <div class="row"><span class="grow" id="upText">Version …</span><button class="btn" id="upBtn">Check now</button></div>
+    <p class="note">FJBC Notch checks for a new version when it starts and every 4 hours, downloads it in the background and installs it when you quit.</p>
+  </section>
+
+  <section>
+    <h2>Privacy</h2>
+    <p class="note">Nothing leaves this PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), update checks (GitHub) and your calendar link if you add one. No accounts, no analytics.</p>
+  </section>
+</main>
+<script src="settings.js"></script>
+</body>
+</html>
