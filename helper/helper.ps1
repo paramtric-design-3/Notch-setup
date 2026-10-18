@@ -147,25 +147,67 @@ function Poll-Media {
     $sig = "$($data.title)|$($data.artist)|$($data.playing)|$($data.updatedAt)|$($data.durMs)"
     if ($sig -ne $script:lastMediaSig) { $script:lastMediaSig = $sig; Emit 'media' $data }
 
+    # Album art. Players often fill in the thumbnail a moment after the title,
+    # so keep trying for ~10 seconds before telling the app there is none.
     $artKey = "$($data.artist)|$($data.title)"
     if ($artKey -ne $script:lastArtKey) {
         $script:lastArtKey = $artKey
-        $src = $null
-        try {
-            if ($props.Thumbnail) {
-                $ras = Await ($props.Thumbnail.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
-                if ($ras -and $ras.Size -lt 4MB) {
-                    $net = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($ras)
-                    $ms = New-Object System.IO.MemoryStream
-                    $net.CopyTo($ms)
-                    $ct = if ($ras.ContentType) { $ras.ContentType } else { 'image/png' }
-                    $src = "data:$ct;base64," + [Convert]::ToBase64String($ms.ToArray())
-                    $net.Dispose(); $ms.Dispose()
-                }
-            }
-        } catch { }
-        Emit 'art' ([ordered]@{ key = $artKey; src = $src })
+        $script:artTries = 0
+        $script:artDone = $false
     }
+    if (-not $script:artDone) {
+        $script:artTries++
+        $src = Read-Thumbnail $props
+        if ($src) {
+            $script:artDone = $true
+            Emit 'art' ([ordered]@{ key = $artKey; src = $src; final = $true })
+        } elseif ($script:artTries -ge 8) {
+            $script:artDone = $true
+            Emit 'art' ([ordered]@{ key = $artKey; src = $null; final = $true })
+        }
+    }
+}
+
+$null = [Windows.Storage.Streams.DataReader, Windows.Storage.Streams, ContentType=WindowsRuntime]
+
+function Read-Thumbnail($props) {
+    if (-not $props.Thumbnail) { return $null }
+    $ras = $null
+    try {
+        $ras = Await ($props.Thumbnail.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
+    } catch { Log "art open: $($_.Exception.Message)"; return $null }
+    if (-not $ras) { return $null }
+    $size = [uint64]$ras.Size
+    if ($size -eq 0 -or $size -gt 8MB) { return $null }
+    $bytes = $null
+    # 1) Plain WinRT: DataReader
+    try {
+        $reader = [Windows.Storage.Streams.DataReader]::new($ras.GetInputStreamAt(0))
+        $loaded = Await ($reader.LoadAsync([uint32]$size)) ([uint32])
+        if ($loaded -gt 0) {
+            $bytes = New-Object byte[] $loaded
+            $reader.ReadBytes($bytes)
+        }
+        $reader.Dispose()
+    } catch { Log "art reader: $($_.Exception.Message)"; $bytes = $null }
+    # 2) .NET bridge
+    if (-not $bytes) {
+        try {
+            $ras.Seek(0)
+            $net = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($ras)
+            $ms = New-Object System.IO.MemoryStream
+            $net.CopyTo($ms)
+            $bytes = $ms.ToArray()
+            $net.Dispose(); $ms.Dispose()
+        } catch { Log "art stream: $($_.Exception.Message)"; $bytes = $null }
+    }
+    try { $ras.Dispose() } catch { }
+    if (-not $bytes -or $bytes.Length -lt 64) { return $null }
+    $ct = 'image/jpeg'
+    if ($bytes[0] -eq 0x89 -and $bytes[1] -eq 0x50) { $ct = 'image/png' }
+    elseif ($bytes[0] -eq 0x52 -and $bytes[1] -eq 0x49) { $ct = 'image/webp' }
+    elseif ($bytes[0] -eq 0x42 -and $bytes[1] -eq 0x4D) { $ct = 'image/bmp' }
+    return "data:$ct;base64," + [Convert]::ToBase64String($bytes)
 }
 
 function Media-Command($a) {

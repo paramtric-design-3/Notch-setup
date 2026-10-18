@@ -346,7 +346,16 @@ async function onHelperMessage(m) {
       }
       break;
     }
-    case 'art': toIsland('art', m.data); break;
+    case 'art': {
+      const a = m.data || {};
+      if (a.src) { toIsland('art', a); break; }
+      // The player gave no cover: look it up online by artist and title.
+      const want = a.key;
+      const media = state.media;
+      const src = media && `${media.artist}|${media.title}` === want ? await lookupCover(media) : null;
+      if (`${state.media?.artist}|${state.media?.title}` === want) toIsland('art', { key: want, src });
+      break;
+    }
     case 'radios': state.radios = m.data; toIsland('radios', m.data); break;
     case 'volume': state.volume = m.data; toIsland('volume', m.data); break;
     case 'brightness': state.brightness = m.data; toIsland('brightness', m.data); break;
@@ -358,7 +367,7 @@ async function onHelperMessage(m) {
       for (const a of (m.data.closed || []).slice(0, 2)) peekApp(a, 'closed');
       break;
     }
-    case 'log': console.log('[helper]', m.data); break;
+    case 'log': helperLog(m.data); break;
   }
 }
 
@@ -413,6 +422,56 @@ async function refreshWeather(force) {
     toIsland('weather', { error: 'Weather unavailable' });
     clearTimeout(weatherTimer);
     weatherTimer = setTimeout(() => refreshWeather(), 2 * 60 * 1000);
+  }
+}
+
+// ---------------------------------------------------------------- helper log (for troubleshooting)
+function helperLog(msg) {
+  try {
+    const f = path.join(app.getPath('userData'), 'helper.log');
+    try { if (fs.statSync(f).size > 256 * 1024) fs.renameSync(f, f + '.old'); } catch { /* no log yet */ }
+    fs.appendFileSync(f, `${new Date().toISOString()} ${msg}\n`);
+  } catch { /* never let logging break the app */ }
+}
+
+// ---------------------------------------------------------------- album covers (fallback when the player has none)
+// Uses the iTunes Search API (free, no key, no account). Cached on disk, including "not found".
+function coverCacheDir() {
+  const d = path.join(app.getPath('userData'), 'covers');
+  fs.mkdirSync(d, { recursive: true });
+  return d;
+}
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\(.*?\)|\[.*?\]/g, ' ').replace(/\s+-\s+.*$/, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+async function lookupCover(m) {
+  if (!m || !m.title) return null;
+  const key = crypto.createHash('sha1').update(`${m.artist}|${m.title}`.toLowerCase()).digest('hex');
+  const dir = coverCacheDir();
+  const img = path.join(dir, key + '.jpg');
+  const miss = path.join(dir, key + '.none');
+  try { return 'data:image/jpeg;base64,' + fs.readFileSync(img).toString('base64'); } catch { /* not cached */ }
+  try { if (Date.now() - fs.statSync(miss).mtimeMs < 7 * 864e5) return null; } catch { /* not marked missing */ }
+  try {
+    // Players sometimes put "Artist - Title" in the title, or the album artist in the artist field.
+    const artist = String(m.artist || '').split(/,|&| feat\.? | ft\.? /i)[0].trim();
+    const term = `${artist} ${String(m.title).replace(/\(.*?\)|\[.*?\]/g, '')}`.trim();
+    const r = await getJSON('https://itunes.apple.com/search?' + new URLSearchParams({ term, media: 'music', entity: 'song', limit: '10' }));
+    const results = (r && r.results) || [];
+    const t = norm(m.title), a = norm(artist);
+    const pick = results.find(x => norm(x.trackName) === t && (!a || norm(x.artistName).includes(a) || a.includes(norm(x.artistName))))
+      || results.find(x => norm(x.trackName).startsWith(t) && (!a || norm(x.artistName).includes(a)))
+      || results.find(x => a && norm(x.artistName).includes(a) && m.album && norm(x.collectionName) === norm(m.album));
+    if (!pick || !pick.artworkUrl100) { fs.writeFileSync(miss, ''); return null; }
+    const url = pick.artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.');
+    const res = await fetch(url, { headers: { 'User-Agent': 'FJBC-Notch/1.0' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buf = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(img, buf);
+    return 'data:image/jpeg;base64,' + buf.toString('base64');
+  } catch (e) {
+    helperLog('cover lookup: ' + e.message);
+    return null;
   }
 }
 

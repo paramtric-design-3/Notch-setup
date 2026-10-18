@@ -28,7 +28,7 @@ Tray icon → **Screen**, or Settings → **Screen**:
 
 | Tile | Where the data comes from |
 |---|---|
-| Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key), cached on your PC. |
+| Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key). If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
 | Messages | The notifications Windows is still holding (WhatsApp, Telegram, Teams…). Read-only and local. |
 | Quick controls | Wi-Fi, Bluetooth, dark mode, volume (click mutes, scroll changes), brightness (laptop screens only; click cycles, scroll changes), Start menu. |
@@ -79,7 +79,7 @@ These are Claude Code's built-in HTTP hooks, so no script is needed. The app onl
 
 ## Privacy
 
-Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB) and your calendar link if you add one. There are no accounts and no analytics. Settings and the lyrics cache live in `%APPDATA%\FJBC Notch`.
+Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), cover lookups (iTunes Search) when a player shares no cover, update checks (GitHub) and your calendar link if you add one. There are no accounts and no analytics. Settings, the lyrics and cover caches, and a small troubleshooting log (`helper.log`) live in `%APPDATA%\FJBC Notch`.
 
 ## Updates
 
