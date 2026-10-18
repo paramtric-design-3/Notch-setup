@@ -41,6 +41,7 @@ function wantCompact() {
   return null;
 }
 
+let lastOpenSent = null;
 function setState(next) {
   if (D.perms.length) next = 'perm';
   state = next;
@@ -48,7 +49,8 @@ function setState(next) {
   if (next === 'open') renderTiles();
   if (next === 'compact' || next === 'rest') renderCompact();
   sizeIsland();
-  api.send('island-open', next === 'open' || next === 'perm');
+  const open = next === 'open' || next === 'perm';
+  if (open !== lastOpenSent) { lastOpenSent = open; api.send('island-open', open); }   // only real changes reach the helper
   startTicker();
 }
 
@@ -342,21 +344,38 @@ function timerToggle() {
 function timerReset() { Object.assign(D.timer, { running: false, left: D.timer.total }); rerenderTile('timer'); if (state !== 'open') settle(); }
 
 // ------------------------------------------------------------------ compact
+// The compact parts are built once per kind and then only updated in place,
+// so the spinning cover and the bars keep moving smoothly instead of restarting.
+let compactKind = null, compactArt = null, compactStep = null;
 function renderCompact() {
   const kind = wantCompact();
+  if (kind !== compactKind) {
+    compactKind = kind; compactArt = null; compactStep = null;
+    if (kind === 'claude') {
+      compactL.innerHTML = '<div class="ico" data-step></div>';
+      compactR.innerHTML = `<div class="workgrid">${'<i></i>'.repeat(9)}</div>`;
+    } else if (kind === 'timer') {
+      compactL.innerHTML = `<div class="ico">${I.timer}</div>`;
+      compactR.innerHTML = '<span class="ctext" data-ctimer></span>';
+    } else if (kind === 'music') {
+      compactL.innerHTML = '<div class="mini-art spin" data-art></div>';
+      compactR.innerHTML = '<div class="eq" data-eq><i></i><i></i><i></i><i></i></div>';
+    } else {
+      compactL.innerHTML = ''; compactR.innerHTML = '';
+    }
+  }
   if (kind === 'claude') {
-    compactL.innerHTML = `<div class="ico">${I[D.claude.step] || I.think}</div>`;
-    compactR.innerHTML = `<div class="workgrid">${'<i></i>'.repeat(9)}</div>`;
+    const step = D.claude.step || 'think';
+    if (step !== compactStep) { compactStep = step; compactL.querySelector('[data-step]').innerHTML = I[step] || I.think; }
   } else if (kind === 'timer') {
-    compactL.innerHTML = `<div class="ico">${I.timer}</div>`;
-    compactR.innerHTML = `<span class="ctext" data-ctimer>${fmtTime(timerLeft())}</span>`;
+    compactR.querySelector('[data-ctimer]').textContent = fmtTime(timerLeft());
   } else if (kind === 'music') {
     const m = D.media;
     const art = D.art && m && D.art.key === `${m.artist}|${m.title}` ? D.art.src : null;
-    compactL.innerHTML = `<div class="mini-art spin" ${art ? `style="background-image:url('${art}')"` : ''}></div>`;
-    compactR.innerHTML = `<div class="eq ${m.playing ? '' : 'paused'}"><i></i><i></i><i></i><i></i></div>`;
-  } else {
-    compactL.innerHTML = ''; compactR.innerHTML = '';
+    const disc = compactL.querySelector('[data-art]');
+    if (art !== compactArt) { compactArt = art; disc.style.backgroundImage = art ? `url('${art}')` : ''; }
+    disc.style.animationPlayState = m && m.playing ? 'running' : 'paused';   // freeze where it is, no snap back
+    compactR.querySelector('[data-eq]').classList.toggle('paused', !(m && m.playing));
   }
 }
 
@@ -493,7 +512,11 @@ api.on('media', m => {
   if (state === 'open') {
     // keep DOM stable during playback; only rebuild when something visible changed
     if (trackChanged || was !== (m && m.playing)) rerenderTile('music');
-  } else if (state === 'compact' || state === 'rest') settle();
+  } else if (state === 'compact' || state === 'rest') {
+    // Only change state when compact should appear or go away; otherwise update it in place.
+    if ((state === 'compact') !== !!wantCompact()) settle();
+    else if (state === 'compact') renderCompact();
+  }
   startTicker();
 });
 api.on('art', a => { D.art = a; rerenderTile('music'); if (state === 'compact') renderCompact(); });

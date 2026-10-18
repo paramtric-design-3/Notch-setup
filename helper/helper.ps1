@@ -344,7 +344,10 @@ $script:due = @{}
 function Handle-Command($line) {
     $c = $line | ConvertFrom-Json
     switch ($c.c) {
-        'mode' { $script:open = [bool]$c.open; $script:due = @{} }
+        'mode' {
+            $new = [bool]$c.open
+            if ($new -ne $script:open) { $script:open = $new; $script:due = @{} }
+        }
         'media' { Media-Command $c.a; $script:due['media'] = 0 }
         'radio' { Toggle-Radio $c.kind; $script:lastRadios = ''; $script:due['radios'] = 0 }
         'vol' {
