@@ -717,13 +717,24 @@ function startClaudeServer() {
       handleClaudeEvent(ev, res);
     });
   });
-  server.on('error', e => console.error('claude server', e.message));
+  server.on('error', e => {
+    claudeStatus.listening = false;
+    claudeStatus.error = e.code === 'EADDRINUSE' ? `Port ${CLAUDE_PORT} is already in use by another program` : e.message;
+    helperLog('claude server: ' + e.message);
+    broadcast('claude-status', claudeStatus);
+  });
+  server.on('listening', () => { claudeStatus.listening = true; claudeStatus.error = null; broadcast('claude-status', claudeStatus); });
   server.listen(CLAUDE_PORT, '127.0.0.1');
 }
 
 let lastClaudeAt = 0;   // last hook event, so updates wait while Claude Code is working
+const claudeStatus = { listening: false, error: null, lastAt: 0, lastEvent: null, counts: {} };
 function handleClaudeEvent(ev, res) {
   lastClaudeAt = Date.now();
+  claudeStatus.lastAt = lastClaudeAt;
+  claudeStatus.lastEvent = ev.hook_event_name || 'unknown';
+  claudeStatus.counts[claudeStatus.lastEvent] = (claudeStatus.counts[claudeStatus.lastEvent] || 0) + 1;
+  broadcast('claude-status', claudeStatus);
   const name = ev.hook_event_name;
   const sid = ev.session_id || 'default';
   const s = claudeSessions.get(sid) || { start: Date.now() };
@@ -850,6 +861,8 @@ function setupUpdater() {
   const soon = () => setTimeout(() => checkForUpdates(false), 5000);
   powerMonitor.on('resume', soon);
   powerMonitor.on('unlock-screen', soon);
+  // Locking the PC is a good moment to install a waiting update.
+  powerMonitor.on('lock-screen', () => { if (update.state === 'ready' && pendingPermissions.size === 0) installUpdate(); });
 }
 
 function checkForUpdates(manual) {
@@ -904,6 +917,7 @@ ipcMain.on('open-url', (_e, url) => { if (/^https?:\/\//.test(url)) shell.openEx
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSettingsWindow: true }); return settings; });
 ipcMain.handle('claude-snippet', () => claudeSettingsSnippet());
+ipcMain.handle('claude-status', () => claudeStatus);
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state }));
 ipcMain.handle('get-displays', () => listDisplays());
