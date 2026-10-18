@@ -110,14 +110,10 @@ npm run dist         # build the installer into dist/ (on Linux or macOS this ne
 ## Publish a new version
 
 1. Raise `"version"` in `package.json`, for example from `1.1.0` to `1.2.0`.
-2. Commit, then tag and push:
-   ```
-   git tag v1.2.0
-   git push origin main --tags
-   ```
-3. The **Release** GitHub Action builds the installer on Windows and publishes it as a release. Installed copies pick it up within 4 hours.
+2. Commit and push to `main`.
+3. The **Release** GitHub Action sees the new version, builds the installer on Windows and publishes it as release `v1.2.0`. Installed copies pick it up within 4 hours.
 
-Without the Action you can publish from your own PC: set a `GH_TOKEN` environment variable with a GitHub token that can write to this repo, then run `npm run release`.
+Pushes that don't change the version don't publish anything. You can also start the Action by hand from the repo's **Actions** tab.
 
 ### Files
 
