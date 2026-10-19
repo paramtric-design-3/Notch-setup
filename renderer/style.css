@@ -367,3 +367,5 @@ html[data-theme="dark"] .pbtn.allow { color: #2A1606; }
 @keyframes dotwave { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-3px); opacity: 1; } }
 .claude .capmsg .dots { height: 16px; }
 .tile.claude.w1 .dots { height: 26px; }
+.claude .capmsg.muted { color: var(--text-2); }
+.claude .cico.quiet, .claude .cbig.quiet { color: var(--text-2); }

@@ -41,7 +41,7 @@ function openClaude() {
   api.send('open-claude', (D.capp[0] || {}).appId);
   D.capp = [];                     // dealt with: clear right away
   pinned = false;
-  if (state === 'open') renderTiles();
+  rerenderTile('claude');
   if (state === 'compact' || state === 'peek') { clearTimeout(peekTimer); currentPeek = null; peekQueue.length = 0; settle(); }
 }
 function wantCompact() {
@@ -131,7 +131,7 @@ island.addEventListener('click', e => {
   // Claude: the pill, the bubble and the tile open the Claude app.
   if (state === 'compact' && wantCompact() === 'claude-app') return openClaude();
   if (state === 'peek' && currentPeek && currentPeek.action === 'claude') return openClaude();
-  if (state === 'open' && e.target.closest('.tile.claude') && D.capp.length) return openClaude();
+  if (state === 'open' && e.target.closest('.tile.claude')) return openClaude();
   if (state === 'open') { pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
   else { pinned = true; setState('open'); }
 });
@@ -311,6 +311,15 @@ const TILE = {
         <div class="capmsg"><span class="dots go"><i></i><i></i><i></i></span></div>`;
       return t;
     }
+    if (!a) {
+      // Quiet: nothing waiting and Claude isn't busy.
+      if (size === 1) { t.innerHTML = `<div class="cbig quiet">${I.chat}</div><div class="cstate">Quiet</div>`; return t; }
+      t.innerHTML = `
+        <div class="chead"><span class="cstatus"><span class="cdot"></span>Claude</span></div>
+        <div class="cnow"><span class="cico quiet">${I.chat}</span><span class="ctext2">Nothing waiting</span></div>
+        <div class="capmsg muted">Chats and Cowork show up here</div>`;
+      return t;
+    }
     const more = D.capp.length - 1;
     if (size === 1) {
       t.innerHTML = `<div class="cbig">${I.chat}</div><div class="cstate">${a.kind === 'input' ? 'Needs you' : 'Done'}</div>`;
@@ -353,8 +362,7 @@ function layoutWidth(shown) {
 }
 function renderTiles() {
   if (!D.settings) return;
-  // The Claude tile only appears while a chat needs you or just finished.
-  const shown = D.settings.tiles.filter(x => x.show && (x.id !== 'claude' || D.capp.length || D.claudeBusy));
+  const shown = D.settings.tiles.filter(x => x.show);
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
@@ -562,8 +570,7 @@ api.on('claude-busy', b => {
   D.claudeBusy = !!(b && b.busy);
   D.claudeSince = (b && b.since) || Date.now();
   D.claudeChat = (b && b.chat) || '';
-  if (state === 'open' && wasBusy !== D.claudeBusy) renderTiles();
-  else rerenderTile('claude');
+  rerenderTile('claude');
   startTicker();
   if (state === 'compact' || state === 'rest') {
     if ((state === 'compact') !== !!wantCompact() || (state === 'compact' && compactKind !== wantCompact())) settle();
@@ -572,7 +579,7 @@ api.on('claude-busy', b => {
 });
 api.on('claude-app', items => {
   D.capp = items || [];
-  if (state === 'open') renderTiles();
+  rerenderTile('claude');
   if (state === 'compact' || state === 'rest') {
     if ((state === 'compact') !== !!wantCompact()) settle();
     else if (state === 'compact') { renderCompact(); sizeIsland(); }
