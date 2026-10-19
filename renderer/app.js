@@ -24,6 +24,7 @@ const D = {
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
   claude: null,           // { state, step, detail, start, at }
   cc: { connected: false, sessions: [] },   // Claude Code sessions for the tile
+  capp: [],                // Claude app (chats, Cowork) notifications, newest first
   perms: [],              // queue of { id, tool, command, cwd }
 };
 
@@ -35,8 +36,10 @@ let hoverTimer = null, leaveTimer = null, peekTimer = null;
 const peekQueue = [];
 let currentPeek = null;
 
+const appWaiting = () => D.capp.find(i => i.kind === 'input' && Date.now() - i.at < 30 * 60 * 1000);
 function wantCompact() {
   if (D.claude && D.claude.state === 'working') return 'claude';
+  if (appWaiting()) return 'claude-app';
   if (D.timer.running) return 'timer';
   if (D.media && D.media.playing) return 'music';
   return null;
@@ -65,7 +68,7 @@ function settle() {
 
 function sizeIsland() {
   let w = NOTCH_W, h = NOTCH_H;
-  if (state === 'compact') w = wantCompact() === 'claude' ? COMPACT_CLAUDE_W : COMPACT_W;
+  if (state === 'compact') w = (wantCompact() === 'claude' || wantCompact() === 'claude-app') ? COMPACT_CLAUDE_W : COMPACT_W;
   else if (state === 'peek') { w = PEEK_W; h = NOTCH_H + peekView.offsetHeight; }
   else if (state === 'perm') { w = PERM_W; h = NOTCH_H + permView.offsetHeight; }
   else if (state === 'open') { w = Math.max(tilesView.offsetWidth, NOTCH_W + 80); h = NOTCH_H + tilesView.offsetHeight; }
@@ -277,8 +280,28 @@ const TILE = {
     const t = el('div', `tile claude w${size}`);
     const { connected, sessions } = D.cc;
     const s = sessions[0];
+    const app = D.capp.filter(i => Date.now() - i.at < 12 * 3600 * 1000);
+    const codeActive = s && (s.state === 'working' || s.state === 'waiting');
+    // Show the Claude app's chats unless a Claude Code task is running or finished more recently.
+    if (app.length && !codeActive && !(s && s.lastAt > app[0].at)) {
+      const a = app[0];
+      const appStatus = a.kind === 'input' ? '<span class="cdot wait"></span>Needs you' : a.kind === 'done' ? '<span class="cdot"></span>Done' : '<span class="cdot"></span>Update';
+      if (size === 1) {
+        t.innerHTML = `<div class="cbig">${I.chat}</div><div class="cstate">${a.kind === 'input' ? 'Needs you' : 'Done'}</div>`;
+        return t;
+      }
+      const rest = app.slice(1, 4).map(r => `<div class="crecent ellipsis"><span class="cico">${I.chat}</span><b>${esc(r.title)}</b>&nbsp;· ${r.kind === 'input' ? 'needs you' : r.kind === 'done' ? 'done' : esc(r.message)} · ${hhmm(r.at)}</div>`).join('');
+      t.innerHTML = `
+        <div class="cmain">
+          <div class="chead"><span class="cstatus">${appStatus}</span><span class="cfolder ellipsis">Claude app · ${hhmm(a.at)}</span></div>
+          <div class="cnow"><span class="cico">${I.chat}</span><span class="ctext2">${esc(a.title)}</span></div>
+          <div class="capmsg ellipsis">${esc(a.message)}</div>
+        </div>
+        ${size >= 3 ? `<div class="cside"><div class="clabel">Recent chats</div>${rest || '<div class="crecent">—</div>'}</div>` : ''}`;
+      return t;
+    }
     if (!connected && !s) {
-      t.innerHTML = `<div class="empty"><div class="ico">${I.run}</div>${size > 1 ? 'Claude Code isn\'t connected yet. Right-click → Settings → Claude Code.' : 'Not connected'}</div>`;
+      t.innerHTML = `<div class="empty"><div class="ico">${I.think}</div>${size > 1 ? 'Nothing from Claude yet. Chats and Cowork show up when the Claude app notifies; Claude Code after you connect it in Settings.' : 'Quiet'}</div>`;
       return t;
     }
     if (!s) {
@@ -408,6 +431,9 @@ function renderCompact() {
     if (kind === 'claude') {
       compactL.innerHTML = '<div class="ico" data-step></div><span class="ctext cstep" data-cstep></span>';
       compactR.innerHTML = `<span class="ctext" data-celapsed></span><div class="workgrid">${'<i></i>'.repeat(9)}</div>`;
+    } else if (kind === 'claude-app') {
+      compactL.innerHTML = '<span class="cdot wait"></span><span class="ctext cstep" data-capp></span>';
+      compactR.innerHTML = `<span class="ctext">Needs you</span><div class="ico">${I.chat}</div>`;
     } else if (kind === 'timer') {
       compactL.innerHTML = `<div class="ico">${I.timer}</div>`;
       compactR.innerHTML = '<span class="ctext" data-ctimer></span>';
@@ -424,6 +450,10 @@ function renderCompact() {
     const label = compactL.querySelector('[data-cstep]');
     if (label.textContent !== (D.claude.detail || 'Working')) label.textContent = D.claude.detail || 'Working';
     compactR.querySelector('[data-celapsed]').textContent = fmtTime(Date.now() - (D.claude.start || Date.now()));
+  } else if (kind === 'claude-app') {
+    const w = appWaiting();
+    const el = compactL.querySelector('[data-capp]');
+    if (w && el.textContent !== w.title) el.textContent = w.title;
   } else if (kind === 'timer') {
     compactR.querySelector('[data-ctimer]').textContent = fmtTime(timerLeft());
   } else if (kind === 'music') {
@@ -595,12 +625,21 @@ api.on('calendar', c => { D.calendar = c; rerenderTile('calendar'); });
 api.on('peek', p => {
   if (p.kind === 'app') peek({ img: p.icon, icon: I.grid, title: p.title, sub: p.sub });
   else if (p.kind === 'claude') peek({ icon: I.bell, title: p.title, sub: p.sub, ms: 4000 });
+  else if (p.kind === 'claude-app') peek({ icon: I.chat, title: p.title, sub: p.sub, ms: p.ms || 4000 });
   else if (p.kind === 'claude-start') peek({ icon: I.think, title: p.title, sub: p.sub, ms: p.ms || 3000 });
   else if (p.kind === 'update') peek({ icon: I.download, title: p.title, sub: p.sub, ms: p.ms || 3500 });
   else peek(p);
 });
 
 let claudeIdle = null;
+api.on('claude-app', items => {
+  D.capp = items || [];
+  rerenderTile('claude');
+  if (state === 'compact' || state === 'rest') {
+    if ((state === 'compact') !== !!wantCompact()) settle();
+    else if (state === 'compact') { renderCompact(); sizeIsland(); }
+  }
+});
 api.on('claude-sessions', cc => { D.cc = cc; rerenderTile('claude'); startTicker(); });
 api.on('claude', c => {
   clearTimeout(claudeIdle);

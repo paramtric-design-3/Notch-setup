@@ -96,11 +96,12 @@
     <h2>Peeks</h2>
     <div class="row"><span class="grow">Apps opening and closing</span><label class="switch"><input type="checkbox" id="peekApps"><span></span></label></div>
     <div class="row"><span class="grow">Charger and battery</span><label class="switch"><input type="checkbox" id="peekPower"><span></span></label></div>
+    <div class="row"><span class="grow">Claude app: chats and Cowork<br><span class="sub">When Claude needs you or finishes. Uses the Claude app's Windows notifications, so keep those on.</span></span><label class="switch"><input type="checkbox" id="peekClaudeApp"><span></span></label></div>
     <p class="note">Do Not Disturb has no public Windows API, so there is no peek for it.</p>
   </section>
 
   <section>
-    <h2>Claude Code</h2>
+    <h2>Claude Code (live steps)</h2>
     <p>Add these lines to <code>%USERPROFILE%\.claude\settings.json</code>. If the file already has a <code>"hooks"</code> block, merge them into it.</p>
     <pre id="snippet"></pre>
     <div class="row"><button class="btn primary" id="copy">Copy</button><span class="saved" id="copied">Copied</span></div>

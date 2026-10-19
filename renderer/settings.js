@@ -1,7 +1,7 @@
 'use strict';
 const api = window.notch;
 const $ = s => document.querySelector(s);
-const NAMES = { claude: 'Claude Code', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer' };
+const NAMES = { claude: 'Claude', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer' };
 let S = null;
 
 const save = async patch => { S = await api.invoke('set-settings', patch); render(); };
@@ -40,6 +40,7 @@ function render() {
   $('#msgAll').checked = !!S.messageAllApps;
   $('#peekApps').checked = !!S.peeks.apps;
   $('#peekPower').checked = !!S.peeks.power;
+  $('#peekClaudeApp').checked = S.peeks.claudeApp !== false;
   if (document.activeElement !== $('#city')) $('#city').value = S.city || '';
   if (document.activeElement !== $('#msgApps')) $('#msgApps').value = S.messageApps || '';
   if (document.activeElement !== $('#cal')) $('#cal').value = S.calendarUrl || '';
@@ -89,6 +90,7 @@ function bindText(id, key, savedId) {
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
   $('#peekApps').onchange = e => save({ peeks: { ...S.peeks, apps: e.target.checked } });
   $('#peekPower').onchange = e => save({ peeks: { ...S.peeks, power: e.target.checked } });
+  $('#peekClaudeApp').onchange = e => save({ peeks: { ...S.peeks, claudeApp: e.target.checked } });
   bindText('#city', 'city', '#citySaved');
   bindText('#msgApps', 'messageApps', '#appsSaved');
   bindText('#cal', 'calendarUrl', '#calSaved');

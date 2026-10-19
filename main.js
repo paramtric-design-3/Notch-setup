@@ -33,7 +33,7 @@ const DEFAULT_SETTINGS = {
   calendarUrl: '',              // ICS link (Outlook: Settings > Calendar > Shared calendars > Publish)
   messageApps: 'WhatsApp, Telegram, Signal, Teams, Discord, Messenger, Slack, Instagram, Phone Link, YourPhone, Mail, Outlook',
   messageAllApps: false,
-  peeks: { apps: false, power: true },
+  peeks: { apps: false, power: true, claudeApp: true },
   schema: 2,
   tiles: [
     { id: 'claude', show: true, size: 3 },
@@ -247,7 +247,7 @@ function trayImage() {
 }
 
 const TILE_NAMES = {
-  claude: 'Claude Code', music: 'Music', weather: 'Weather', messages: 'Messages',
+  claude: 'Claude', music: 'Music', weather: 'Weather', messages: 'Messages',
   controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer',
 };
 
@@ -568,7 +568,7 @@ function readNotifications() {
   try {
     db.exec('PRAGMA query_only = 1');
     const stmt = db.prepare(`
-      SELECT n.Payload AS payload, n.ArrivalTime AS arrival, h.PrimaryId AS appId
+      SELECT n.Id AS id, n.Payload AS payload, n.ArrivalTime AS arrival, h.PrimaryId AS appId
       FROM Notification n JOIN NotificationHandler h ON h.RecordId = n.HandlerId
       WHERE n.Type = 'toast'
       ORDER BY n.ArrivalTime DESC LIMIT 300`);
@@ -576,6 +576,51 @@ function readNotifications() {
     const rows = stmt.all();
     return { rows };
   } finally { db.close(); }
+}
+
+// ---------------------------------------------------------------- Claude desktop app (chats and Cowork)
+// Chats and Cowork run on Anthropic's servers, so the only local signal is the Windows
+// notifications the Claude app sends ("<chat name>: Claude needs your input to continue").
+// Watch the notification database and turn Claude's toasts into bubbles and tile entries.
+let claudeAppSeen = null;
+let claudeAppSig = '';
+let claudeAppItems = [];
+const isClaudeApp = id => /^Claude_[a-z0-9]+!Claude$/i.test(String(id)) || /anthropic/i.test(String(id));
+
+function classifyClaude(msg) {
+  if (/needs? your (input|approval|permission)|waiting for you|approve|permission/i.test(msg)) return 'input';
+  if (/finished|done|complete|ready|replied|responded/i.test(msg)) return 'done';
+  return 'info';
+}
+
+function pollClaudeApp(force = false) {
+  if (process.platform !== 'win32' || settings.peeks.claudeApp === false) return;
+  const base = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'Windows', 'Notifications', 'wpndatabase.db');
+  let sig = '';
+  try { sig = ['', '-wal'].map(e => { try { const st = fs.statSync(base + e); return st.mtimeMs + ':' + st.size; } catch { return '-'; } }).join('|'); } catch {}
+  if (!force && sig === claudeAppSig) return;
+  claudeAppSig = sig;
+  let res;
+  try { res = readNotifications(); } catch (e) { helperLog('claude app: ' + e.message); return; }
+  if (!res || res.error) return;
+  const items = [];
+  for (const r of res.rows) {
+    if (!isClaudeApp(r.appId)) continue;
+    const xml = Buffer.isBuffer(r.payload) || ArrayBuffer.isView(r.payload) ? Buffer.from(r.payload).toString('utf8') : String(r.payload || '');
+    const texts = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/gi)].map(x => decodeXml(x[1])).filter(Boolean);
+    if (!texts.length) continue;
+    const title = texts.length > 1 ? texts[0] : 'Claude';
+    const message = texts.length > 1 ? texts.slice(1).join(' · ') : texts[0];
+    items.push({ id: String(r.id), title, message, kind: classifyClaude(message), at: filetimeToMs(r.arrival) });
+  }
+  items.sort((a, b) => b.at - a.at);
+  const fresh = claudeAppSeen ? items.filter(i => !claudeAppSeen.has(i.id)) : [];
+  claudeAppSeen = new Set([...(claudeAppSeen || []), ...items.map(i => i.id)]);
+  for (const i of fresh.slice(0, 3).reverse()) {
+    toIsland('peek', { kind: 'claude-app', title: i.title, sub: i.message, tone: i.kind, ms: i.kind === 'input' ? 6000 : 4000 });
+  }
+  claudeAppItems = items.slice(0, 6);
+  toIsland('claude-app', claudeAppItems);
 }
 
 function refreshMessages() {
@@ -591,7 +636,7 @@ function refreshMessages() {
     for (const r of res.rows) {
       const appName = appLabel(r.appId);
       if (!settings.messageAllApps && !allowed.some(a => appName.toLowerCase().includes(a) || String(r.appId).toLowerCase().includes(a.replace(/\s/g, '')))) continue;
-      const xml = Buffer.isBuffer(r.payload) || r.payload instanceof Uint8Array ? Buffer.from(r.payload).toString('utf8') : String(r.payload || '');
+      const xml = Buffer.isBuffer(r.payload) || ArrayBuffer.isView(r.payload) ? Buffer.from(r.payload).toString('utf8') : String(r.payload || '');
       const texts = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/gi)].map(x => decodeXml(x[1])).filter(Boolean);
       if (!texts.length) continue;
       const name = texts[0];
@@ -999,7 +1044,7 @@ ipcMain.handle('claude-snippet', () => claudeSettingsSnippet());
 ipcMain.handle('claude-status', () => claudeStatus);
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state }));
-ipcMain.on('claude-sessions-request', () => sendSessions());
+ipcMain.on('claude-sessions-request', () => { sendSessions(); toIsland('claude-app', claudeAppItems); });
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));
@@ -1023,7 +1068,9 @@ app.whenReady().then(() => {
     refreshWeather(true);
     refreshMessages();
     refreshCalendar();
+    pollClaudeApp(true);
   });
+  setInterval(() => pollClaudeApp(false), 2000);
   nativeTheme.on('updated', () => toIsland('dark', { on: nativeTheme.shouldUseDarkColors }));
 });
 
