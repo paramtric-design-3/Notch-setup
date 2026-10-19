@@ -13,7 +13,7 @@ const compactL = $('.compact-l');
 const compactR = $('.compact-r');
 
 // No camera on this screen: no dead space in the middle, and no black band when open.
-const NOTCH_W = 120, NOTCH_H = 30, COMPACT_W = 132, COMPACT_TIMER_W = 140, COMPACT_CLAUDE_W = 330, PEEK_W = 360, PERM_W = 580;
+const NOTCH_W = 120, NOTCH_H = 30, COMPACT_W = 132, COMPACT_TIMER_W = 140, PEEK_W = 360, PERM_W = 580;
 
 // ------------------------------------------------------------------ data
 const D = {
@@ -22,10 +22,7 @@ const D = {
   radios: {}, volume: null, brightness: null, dark: null,
   weather: null, messages: null, calendar: null,
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
-  claudeBusy: false,      // Claude app looks busy (reply or task in progress)
-  claudeSince: 0, claudeChat: '',
-  capp: [],
-  outputs: [], outPicker: false,   // sound output devices and whether the picker is open                // Claude app (chats, Cowork) notifications, newest first
+  outputs: [], outPicker: false,   // sound output devices and whether the picker is open
 };
 
 // ------------------------------------------------------------------ state machine
@@ -36,20 +33,9 @@ let hoverTimer = null, leaveTimer = null, peekTimer = null;
 const peekQueue = [];
 let currentPeek = null;
 
-// D.capp only holds chats that still matter (the main process drops ones you've dealt with).
-const appWaiting = () => D.capp.find(i => i.kind === 'input');
-function openClaude() {
-  api.send('open-claude', (D.capp[0] || {}).appId);
-  D.capp = [];                     // dealt with: clear right away
-  pinned = false;
-  rerenderTile('claude');
-  if (state === 'compact' || state === 'peek') { clearTimeout(peekTimer); currentPeek = null; peekQueue.length = 0; settle(); }
-}
 function wantCompact() {
-  if (appWaiting()) return 'claude-app';
   if (D.timer.running) return 'timer';
   if (D.media && D.media.playing) return 'music';
-  if (D.claudeBusy) return 'claude-busy';
   return null;
 }
 
@@ -75,7 +61,7 @@ function settle() {
 
 function sizeIsland() {
   let w = NOTCH_W, h = NOTCH_H;
-  if (state === 'compact') { const k = wantCompact(); w = k === 'claude-app' ? COMPACT_CLAUDE_W : k === 'timer' ? COMPACT_TIMER_W : COMPACT_W; }
+  if (state === 'compact') { const k = wantCompact(); w = k === 'timer' ? COMPACT_TIMER_W : COMPACT_W; }
   else if (state === 'peek') { w = PEEK_W; h = peekView.offsetHeight; }
   else if (state === 'open') { w = Math.max(tilesView.offsetWidth, NOTCH_W + 80); h = tilesView.offsetHeight; }
   island.style.width = w + 'px';
@@ -130,10 +116,6 @@ api.on('pointer', p => {
 
 island.addEventListener('click', e => {
   if (e.target.closest('button, pre, a')) return;
-  // Claude: the pill, the bubble and the tile open the Claude app.
-  if (state === 'compact' && wantCompact() === 'claude-app') return openClaude();
-  if (state === 'peek' && currentPeek && currentPeek.action === 'claude') return openClaude();
-  if (state === 'open' && e.target.closest('.tile.claude')) return openClaude();
   if (state === 'open') { pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
   else { pinned = true; setState('open'); }
 });
@@ -304,42 +286,6 @@ const TILE = {
     return t;
   },
 
-  claude(size) {
-    const t = el('div', `tile claude has-chats w${size}`);
-    t.title = 'Open the Claude app';
-    const a = D.capp[0];
-    // Working (and nothing waiting for you): show that Claude is busy, with a timer.
-    if (D.claudeBusy && !(a && a.kind === 'input')) {
-      const since = `<span data-since="${D.claudeSince}">${fmtTime(Date.now() - D.claudeSince)}</span>`;
-      if (size === 1) { t.innerHTML = `<div class="dots go"><i></i><i></i><i></i></div><div class="cstate">${since}</div>`; return t; }
-      t.innerHTML = `
-        <div class="chead"><span class="cstatus"><span class="cdot on"></span>Working · ${since}</span></div>
-        <div class="cnow"><span class="cico">${I.chat}</span><span class="ctext2">${esc(D.claudeChat || 'Claude')}</span></div>
-        <div class="capmsg"><span class="dots go"><i></i><i></i><i></i></span></div>`;
-      return t;
-    }
-    if (!a) {
-      // Quiet: nothing waiting and Claude isn't busy.
-      if (size === 1) { t.innerHTML = `<div class="cbig quiet">${I.chat}</div><div class="cstate">Quiet</div>`; return t; }
-      t.innerHTML = `
-        <div class="chead"><span class="cstatus"><span class="cdot"></span>Claude</span></div>
-        <div class="cnow"><span class="cico quiet">${I.chat}</span><span class="ctext2">Nothing waiting</span></div>
-        <div class="capmsg muted">Chats and Cowork show up here</div>`;
-      return t;
-    }
-    const more = D.capp.length - 1;
-    if (size === 1) {
-      t.innerHTML = `<div class="cbig">${I.chat}</div><div class="cstate">${a.kind === 'input' ? 'Needs you' : 'Done'}</div>`;
-      return t;
-    }
-    const status = a.kind === 'input' ? '<span class="cdot wait"></span>Needs you' : '<span class="cdot"></span>Done';
-    t.innerHTML = `
-      <div class="chead"><span class="cstatus">${status}</span><span class="cfolder">${more > 0 ? `+${more} more` : hhmm(a.at)}</span></div>
-      <div class="cnow"><span class="cico">${I.chat}</span><span class="ctext2">${esc(a.title)}</span></div>
-      <div class="capmsg ellipsis">${esc(a.message)}</div>`;
-    return t;
-  },
-
   timer(size) {
     const t = el('div', `tile timer w${size}`);
     const T = D.timer;
@@ -356,7 +302,7 @@ const TILE = {
 
 const CELL = 84, GAP = 8, PAD = 12, MAX_CELLS = 10;
 function layoutWidth(shown) {
-  // Rows of at most 10 cells; the Claude tile always sits on a row of its own.
+  // Rows of at most 10 cells.
   const rows = []; let cur = 0;
   for (const x of shown) {
     const size = Math.max(1, Math.min(3, x.size || 2));
@@ -459,27 +405,17 @@ function renderCompact() {
   const kind = wantCompact();
   if (kind !== compactKind) {
     compactKind = kind; compactArt = null; compactStep = null;
-    if (kind === 'claude-app') {
-      compactL.innerHTML = '<span class="cdot wait"></span><span class="ctext cstep" data-capp></span>';
-      compactR.innerHTML = `<span class="ctext">Needs you</span><div class="ico">${I.chat}</div>`;
-    } else if (kind === 'claude-busy') {
-      compactL.innerHTML = `<div class="ico">${I.chat}</div>`;
-      compactR.innerHTML = '<div class="dots go" data-dots><i></i><i></i><i></i></div>';
-    } else if (kind === 'timer') {
+    if (kind === 'timer') {
       compactL.innerHTML = `<div class="ico">${I.timer}</div>`;
       compactR.innerHTML = '<span class="ctext" data-ctimer></span>';
     } else if (kind === 'music') {
       compactL.innerHTML = '<div class="mini-art spin" data-art></div>';
-      compactR.innerHTML = '<div class="dots" data-dots><i></i><i></i><i></i></div>';
+      compactR.innerHTML = '<div class="eq" data-eq><i></i><i></i><i></i><i></i></div>';
     } else {
       compactL.innerHTML = ''; compactR.innerHTML = '';
     }
   }
-  if (kind === 'claude-app') {
-    const w = appWaiting();
-    const el = compactL.querySelector('[data-capp]');
-    if (w && el.textContent !== w.title) el.textContent = w.title;
-  } else if (kind === 'timer') {
+  if (kind === 'timer') {
     compactR.querySelector('[data-ctimer]').textContent = fmtTime(timerLeft());
   } else if (kind === 'music') {
     const m = D.media;
@@ -487,14 +423,14 @@ function renderCompact() {
     const disc = compactL.querySelector('[data-art]');
     if (art !== compactArt) { compactArt = art; disc.style.backgroundImage = art ? `url('${art}')` : ''; }
     disc.style.animationPlayState = m && m.playing ? 'running' : 'paused';   // freeze where it is, no snap back
-    compactR.querySelector('[data-dots]').classList.toggle('go', !!D.claudeBusy);   // dots move while Claude works
+    compactR.querySelector('[data-eq]').classList.toggle('paused', !(m && m.playing));
   }
 }
 
 // ------------------------------------------------------------------ ticker (only while something on screen moves)
 let ticker = null;
 function startTicker() {
-  const need = (state === 'open' && (D.media || D.timer.running || D.claudeBusy)) || D.timer.running;
+  const need = (state === 'open' && (D.media || D.timer.running)) || D.timer.running;
   if (need && !ticker) ticker = setInterval(tick, 500);
   if (!need && ticker) { clearInterval(ticker); ticker = null; }
 }
@@ -592,33 +528,11 @@ api.on('messages', m => { D.messages = m; rerenderTile('messages'); });
 api.on('calendar', c => { D.calendar = c; rerenderTile('calendar'); });
 api.on('peek', p => {
   if (p.kind === 'app') peek({ img: p.icon, icon: I.grid, title: p.title, sub: p.sub });
-  else if (p.kind === 'claude-app') peek({ icon: I.chat, title: p.title, sub: p.sub, ms: p.ms || 4000, action: 'claude' });
   else if (p.kind === 'update') peek({ icon: I.download, title: p.title, sub: p.sub, ms: p.ms || 3500 });
   else peek(p);
 });
 
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
-api.on('claude-busy', b => {
-  const wasBusy = D.claudeBusy;
-  D.claudeBusy = !!(b && b.busy);
-  D.claudeSince = (b && b.since) || Date.now();
-  D.claudeChat = (b && b.chat) || '';
-  rerenderTile('claude');
-  startTicker();
-  if (state === 'compact' || state === 'rest') {
-    if ((state === 'compact') !== !!wantCompact() || (state === 'compact' && compactKind !== wantCompact())) settle();
-    else if (state === 'compact') renderCompact();
-  }
-});
-api.on('claude-app', items => {
-  D.capp = items || [];
-  rerenderTile('claude');
-  if (state === 'compact' || state === 'rest') {
-    if ((state === 'compact') !== !!wantCompact()) settle();
-    else if (state === 'compact') { renderCompact(); sizeIsland(); }
-  }
-});
-
 // ------------------------------------------------------------------ boot
 (async () => {
   try {
@@ -630,5 +544,4 @@ api.on('claude-app', items => {
   applyTheme();
   settle();
   watchBattery();
-  api.send('claude-app-request');
 })();

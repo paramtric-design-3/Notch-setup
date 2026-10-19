@@ -3,9 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const ON = new Set([
   'settings', 'media', 'art', 'lyrics', 'radios', 'volume', 'brightness', 'dark',
-  'weather', 'messages', 'calendar', 'peek', 'displays', 'update', 'claude-app', 'pointer', 'claude-busy', 'outputs',
+  'weather', 'messages', 'calendar', 'peek', 'displays', 'update', 'pointer', 'outputs',
 ]);
-const SEND = new Set(['island-size', 'island-open', 'helper', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update', 'claude-app-request', 'open-claude']);
+const SEND = new Set(['island-size', 'island-open', 'helper', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update']);
 const INVOKE = new Set(['get-settings', 'set-settings', 'copy-text', 'initial-state', 'get-displays', 'get-update']);
 
 contextBridge.exposeInMainWorld('notch', {

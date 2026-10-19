@@ -28,7 +28,6 @@ Tray icon → **Screen**, or Settings → **Screen**:
 
 | Tile | Where the data comes from |
 |---|---|
-| Claude | Chats and Cowork tasks in the Claude desktop app: "Working" with a timer while Claude is busy, and chats that need you or just finished, from the app's Windows notifications. When it's quiet the tile says "Nothing waiting". A chat counts as dealt with once you switch to the Claude app or click it in the notch; "needs you" expires after an hour, "done" after 10 minutes. |
 | Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key). If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
 | Sound output | The speaker button on the music tile (top right) lists your playback devices; click one to make it the default. Also in the tray menu under **Sound output**. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
@@ -39,13 +38,9 @@ Tray icon → **Screen**, or Settings → **Screen**:
 
 Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in Settings.
 
-**Peeks** are small bubbles that appear for a few seconds: a Claude chat or Cowork task that needs you or has finished, the charger connected or disconnected, and battery at 20% and 10%. Bubbles for apps opening and closing are off by default (Settings → Peeks).
+**Peeks** are small bubbles that appear for a few seconds: the charger connected or disconnected, and battery at 20% and 10%. Bubbles for apps opening and closing are off by default (Settings → Peeks).
 
-**Compact state**: while music plays, Claude is working, a Claude chat needs you or the focus timer counts down, the pill widens a little to show it. Its three orange dots ripple while Claude is working. Because chats and Cowork run in the cloud, "working" is estimated from how busy the Claude app is on this PC, so scrolling or typing in Claude can also make them move briefly.
-
-## Claude in the notch
-
-**Chats and Cowork (Claude desktop app):** nothing to set up. Click the "Needs you" pill, the bubble or the Claude tile to bring up the Claude app (its notifications don't say which chat, so it opens the app rather than one specific chat). When the Claude app sends a Windows notification, for example "Claude needs your input to continue", the notch shows a bubble with the chat's name, the small notch shows "Needs you" until you open it, and the Claude tile lists recent chats. Keep notifications for Claude turned on in Windows. These chats run on Anthropic's servers, so the notch can't show their individual steps; it only knows what the app announces.
+**Compact state**: while music plays or the focus timer counts down, the pill widens a little to show it.
 
 ## Differences from the Mac version
 
@@ -97,7 +92,7 @@ Pushes that don't change the version don't publish anything. You can also start 
 
 ### Files
 
-- `main.js`: the window, tray, settings, weather, lyrics, messages, calendar and the Claude app watcher.
+- `main.js`: the window, tray, settings, weather, lyrics, messages and calendar.
 - `preload.js`: the small bridge between the window and the main process.
 - `helper/helper.ps1`: a hidden Windows PowerShell helper for media, Wi-Fi/Bluetooth, volume, brightness, dark mode and app peeks.
 - `renderer/`: the island (`index.html`, `style.css`, `app.js`, `icons.js`) and the settings window.

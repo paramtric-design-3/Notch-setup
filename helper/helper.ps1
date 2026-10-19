@@ -39,13 +39,6 @@ public static class NotchNative {
         keybd_event(0x5B, 0, 0, UIntPtr.Zero);
         keybd_event(0x5B, 0, 2, UIntPtr.Zero);
     }
-    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
-    public static uint ForegroundPid() {
-        uint p = 0;
-        GetWindowThreadProcessId(GetForegroundWindow(), out p);
-        return p;
-    }
     public static void BroadcastTheme() {
         UIntPtr r;
         SendMessageTimeout((IntPtr)0xffff, 0x1A, UIntPtr.Zero, "ImmersiveColorSet", 2, 200, out r);
@@ -414,54 +407,6 @@ function Poll-Apps {
     }
 }
 
-# ------------------------------------------------------------------ app in front (so the notch knows when you went to Claude)
-$script:lastFg = 0
-function Poll-Foreground {
-    $fpid = [NotchNative]::ForegroundPid()
-    if ($fpid -eq $script:lastFg) { return }
-    $script:lastFg = $fpid
-    $name = ''
-    try { $name = (Get-Process -Id $fpid -ErrorAction Stop).ProcessName } catch { }
-    Emit 'fg' ([ordered]@{ name = $name })
-}
-
-# ------------------------------------------------------------------ is Claude working? (estimated from the Claude app's activity)
-# Chats and Cowork run in the cloud; the only local sign is the Claude app being busy while
-# it streams a reply or a task's progress. Measure its processor use (in % of one core).
-$script:ccLastCpu = $null
-$script:ccLastAt = $null
-$script:ccBusy = $false
-$script:ccHigh = 0
-$script:ccLow = 0
-$script:ccTitle = $null
-function Poll-ClaudeActivity {
-    $procs = @(Get-Process -Name 'claude' -ErrorAction SilentlyContinue)
-    $now = [DateTime]::UtcNow
-    if (-not $procs.Count) {
-        $script:ccLastCpu = $null
-        if ($script:ccBusy) { $script:ccBusy = $false; Emit 'claudebusy' ([ordered]@{ busy = $false; pct = 0 }) }
-        return
-    }
-    $cpu = 0.0
-    foreach ($p in $procs) { try { $cpu += $p.TotalProcessorTime.TotalMilliseconds } catch { } }
-    if ($null -eq $script:ccLastCpu) { $script:ccLastCpu = $cpu; $script:ccLastAt = $now; return }
-    $ms = ($now - $script:ccLastAt).TotalMilliseconds
-    $pct = if ($ms -gt 0) { [math]::Round(100 * ($cpu - $script:ccLastCpu) / $ms, 1) } else { 0 }
-    $script:ccLastCpu = $cpu; $script:ccLastAt = $now
-    if ($pct -ge 6) { $script:ccHigh++; $script:ccLow = 0 } elseif ($pct -lt 3) { $script:ccLow++; $script:ccHigh = 0 }
-    # The Claude window's title (may hold the open chat's name)
-    $title = ''
-    foreach ($p in $procs) { try { if ($p.MainWindowTitle) { $title = $p.MainWindowTitle; break } } catch { } }
-    if ($title -ne $script:ccTitle) { $script:ccTitle = $title; Emit 'claudetitle' ([ordered]@{ title = $title }) }
-    if (-not $script:ccBusy -and $script:ccHigh -ge 2) {
-        $script:ccBusy = $true
-        Emit 'claudebusy' ([ordered]@{ busy = $true; pct = $pct })
-    } elseif ($script:ccBusy -and $script:ccLow -ge 3) {
-        $script:ccBusy = $false
-        Emit 'claudebusy' ([ordered]@{ busy = $false; pct = $pct })
-    }
-}
-
 # ------------------------------------------------------------------ commands from the app
 $script:open = $false
 $script:due = @{}
@@ -514,8 +459,6 @@ while (-not [NotchPump]::Closed) {
         Every 'bright' 4000 { Poll-Brightness }
         Every 'dark' 5000 { Poll-Dark }
         Every 'apps' 2000 { Poll-Apps }
-        Every 'fg' 1000 { Poll-Foreground }
-        Every 'claude' 2000 { Poll-ClaudeActivity }
         Every 'outputs' 5000 { Poll-Outputs }
     } else {
         Every 'media' 1500 { Poll-Media }
@@ -523,8 +466,6 @@ while (-not [NotchPump]::Closed) {
         Every 'radios' 20000 { Poll-Radios }
         Every 'dark' 20000 { Poll-Dark }
         Every 'apps' 2500 { Poll-Apps }
-        Every 'fg' 1000 { Poll-Foreground }
-        Every 'claude' 2000 { Poll-ClaudeActivity }
         Every 'outputs' 30000 { Poll-Outputs }
     }
     Start-Sleep -Milliseconds 200
