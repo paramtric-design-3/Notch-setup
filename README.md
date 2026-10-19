@@ -66,7 +66,7 @@ FJBC Notch updates itself from this repo's [releases](https://github.com/paramtr
 
 - It checks when it starts, every 5 minutes, and whenever your PC wakes from sleep or is unlocked.
 - A new version downloads quietly in the background.
-- Once it's downloaded, it installs by itself the next time you've left the PC alone for a minute while the notch is closed. The notch shows "Updating to x.y.z" and is back a few seconds later.
+- Once it's downloaded, it installs by itself straight away while the notch is closed. The notch shows "Updating to x.y.z" and is back a few seconds later.
 - To install straight away instead: tray icon → **Restart to update**.
 - Tray icon → **Check for updates**, or Settings → **Updates**, checks right away.
 

@@ -792,7 +792,7 @@ function setupUpdater() {
   });
   autoUpdater.on('update-downloaded', info => {
     setUpdate({ state: 'ready', version: info.version, manual: false });
-    toIsland('peek', { kind: 'update', title: `Update ${info.version} ready`, sub: 'Installs as soon as you take a short break', ms: 5000 });
+    toIsland('peek', { kind: 'update', title: `Update ${info.version} ready`, sub: 'Installing now, back in a few seconds', ms: 3000 });
     waitForIdleThenInstall();
   });
   autoUpdater.on('error', e => {
@@ -817,19 +817,19 @@ function checkForUpdates(manual) {
 }
 
 const UPDATE_EVERY_MS = 5 * 60 * 1000;
-const IDLE_BEFORE_INSTALL_S = 60;
 let idleWatch = null;
 
 function waitForIdleThenInstall() {
   clearInterval(idleWatch);
   idleWatch = setInterval(() => {
     if (update.state !== 'ready') { clearInterval(idleWatch); return; }
-    const busy = islandOpen;
-    if (busy || powerMonitor.getSystemIdleTime() < IDLE_BEFORE_INSTALL_S) return;
+    // Install as soon as the notch is closed: the restart takes a few seconds and
+    // waiting for an idle minute meant updates sat there while you worked.
+    if (islandOpen) return;
     clearInterval(idleWatch);
     toIsland('peek', { kind: 'update', title: `Updating to ${update.version}`, sub: 'Back in a few seconds', ms: 2500 });
     setTimeout(installUpdate, 2500);
-  }, 10 * 1000);
+  }, 3 * 1000);
 }
 
 function installUpdate() {
