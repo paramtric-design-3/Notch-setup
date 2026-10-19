@@ -389,6 +389,11 @@ async function onHelperMessage(m) {
       for (const a of (m.data.closed || []).slice(0, 2)) peekApp(a, 'closed');
       break;
     }
+    case 'fg': {
+      // You switched to the Claude app: everything it announced before now counts as dealt with.
+      if (/^claude$/i.test(String(m.data && m.data.name || ''))) markClaudeHandled();
+      break;
+    }
     case 'log': helperLog(m.data); break;
   }
 }
@@ -632,9 +637,26 @@ function pollClaudeApp(force = false) {
   for (const i of fresh.slice(0, 3).reverse()) {
     toIsland('peek', { kind: 'claude-app', title: i.title, sub: i.message, tone: i.kind, ms: i.kind === 'input' ? 6000 : 4000 });
   }
-  claudeAppItems = items.slice(0, 6);
-  toIsland('claude-app', claudeAppItems);
+  claudeAppItems = items.slice(0, 10);
+  sendClaudeApp();
 }
+
+// Only what still matters: not dealt with, a 'needs you' from the last hour,
+// or a 'done' from the last 10 minutes.
+function relevantClaudeItems() {
+  const now = Date.now();
+  const handledAt = settings.claudeHandledAt || 0;
+  return claudeAppItems.filter(i => i.at > handledAt &&
+    (i.kind === 'input' ? now - i.at < 60 * 60 * 1000 : now - i.at < 10 * 60 * 1000));
+}
+function sendClaudeApp() { toIsland('claude-app', relevantClaudeItems()); }
+function markClaudeHandled() {
+  const before = relevantClaudeItems().length;
+  settings.claudeHandledAt = Date.now();
+  saveSettings();
+  if (before) sendClaudeApp();
+}
+setInterval(sendClaudeApp, 60 * 1000);   // let old ones expire
 
 function refreshMessages() {
   clearTimeout(messagesTimer);
@@ -834,6 +856,7 @@ ipcMain.handle('initial-state', () => ({ settings, state }));
 // Bring the Claude desktop app to the front. Its notifications carry no link to a
 // specific chat, so this opens the app; the waiting chat is at the top of its list.
 ipcMain.on('open-claude', (_e, appId) => {
+  markClaudeHandled();
   const id = isClaudeApp(appId) ? String(appId) : (claudeAppItems[0] && claudeAppItems[0].appId);
   if (process.platform === 'win32' && id && /^[\w.!-]+$/.test(id)) {
     spawn('explorer.exe', [`shell:AppsFolder\\${id}`], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
@@ -841,7 +864,7 @@ ipcMain.on('open-claude', (_e, appId) => {
     shell.openExternal('claude://').catch(() => {});
   }
 });
-ipcMain.on('claude-app-request', () => toIsland('claude-app', claudeAppItems));
+ipcMain.on('claude-app-request', () => sendClaudeApp());
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));

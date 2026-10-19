@@ -39,6 +39,13 @@ public static class NotchNative {
         keybd_event(0x5B, 0, 0, UIntPtr.Zero);
         keybd_event(0x5B, 0, 2, UIntPtr.Zero);
     }
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+    public static uint ForegroundPid() {
+        uint p = 0;
+        GetWindowThreadProcessId(GetForegroundWindow(), out p);
+        return p;
+    }
     public static void BroadcastTheme() {
         UIntPtr r;
         SendMessageTimeout((IntPtr)0xffff, 0x1A, UIntPtr.Zero, "ImmersiveColorSet", 2, 200, out r);
@@ -337,6 +344,17 @@ function Poll-Apps {
     }
 }
 
+# ------------------------------------------------------------------ app in front (so the notch knows when you went to Claude)
+$script:lastFg = 0
+function Poll-Foreground {
+    $fpid = [NotchNative]::ForegroundPid()
+    if ($fpid -eq $script:lastFg) { return }
+    $script:lastFg = $fpid
+    $name = ''
+    try { $name = (Get-Process -Id $fpid -ErrorAction Stop).ProcessName } catch { }
+    Emit 'fg' ([ordered]@{ name = $name })
+}
+
 # ------------------------------------------------------------------ commands from the app
 $script:open = $false
 $script:due = @{}
@@ -387,12 +405,14 @@ while (-not [NotchPump]::Closed) {
         Every 'bright' 4000 { Poll-Brightness }
         Every 'dark' 5000 { Poll-Dark }
         Every 'apps' 2000 { Poll-Apps }
+        Every 'fg' 1000 { Poll-Foreground }
     } else {
         Every 'media' 1500 { Poll-Media }
         Every 'volume' 5000 { Poll-Volume }
         Every 'radios' 20000 { Poll-Radios }
         Every 'dark' 20000 { Poll-Dark }
         Every 'apps' 2500 { Poll-Apps }
+        Every 'fg' 1000 { Poll-Foreground }
     }
     Start-Sleep -Milliseconds 200
 }

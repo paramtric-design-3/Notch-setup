@@ -33,13 +33,13 @@ let hoverTimer = null, leaveTimer = null, peekTimer = null;
 const peekQueue = [];
 let currentPeek = null;
 
-let cappHandled = 0;   // chats you've already clicked through to
-const appWaiting = () => D.capp.find(i => i.kind === 'input' && i.at > cappHandled && Date.now() - i.at < 30 * 60 * 1000);
+// D.capp only holds chats that still matter (the main process drops ones you've dealt with).
+const appWaiting = () => D.capp.find(i => i.kind === 'input');
 function openClaude() {
   api.send('open-claude', (D.capp[0] || {}).appId);
-  cappHandled = Date.now();
+  D.capp = [];                     // dealt with: clear right away
   pinned = false;
-  rerenderTile('claude');
+  if (state === 'open') renderTiles();
   if (state === 'compact' || state === 'peek') { clearTimeout(peekTimer); currentPeek = null; peekQueue.length = 0; settle(); }
 }
 function wantCompact() {
@@ -295,28 +295,19 @@ const TILE = {
   },
 
   claude(size) {
-    const t = el('div', `tile claude w${size}`);
-    const app = D.capp.filter(i => Date.now() - i.at < 12 * 3600 * 1000);
-    if (!app.length) {
-      t.innerHTML = `<div class="empty"><div class="ico">${I.chat}</div>${size > 1 ? 'Nothing from Claude right now. Chats and Cowork tasks show up here when they need you or finish.' : 'Quiet'}</div>`;
-      return t;
-    }
-    t.classList.add('has-chats');
+    const t = el('div', `tile claude has-chats w${size}`);
     t.title = 'Open the Claude app';
-    const a = app[0];
-    const appStatus = a.kind === 'input' ? '<span class="cdot wait"></span>Needs you' : a.kind === 'done' ? '<span class="cdot"></span>Done' : '<span class="cdot"></span>Update';
+    const a = D.capp[0];
+    const more = D.capp.length - 1;
     if (size === 1) {
       t.innerHTML = `<div class="cbig">${I.chat}</div><div class="cstate">${a.kind === 'input' ? 'Needs you' : 'Done'}</div>`;
       return t;
     }
-    const rest = app.slice(1, 4).map(r => `<div class="crecent ellipsis"><span class="cico">${I.chat}</span><b>${esc(r.title)}</b>&nbsp;· ${r.kind === 'input' ? 'needs you' : r.kind === 'done' ? 'done' : esc(r.message)} · ${hhmm(r.at)}</div>`).join('');
+    const status = a.kind === 'input' ? '<span class="cdot wait"></span>Needs you' : '<span class="cdot"></span>Done';
     t.innerHTML = `
-      <div class="cmain">
-        <div class="chead"><span class="cstatus">${appStatus}</span><span class="cfolder ellipsis">Claude · ${hhmm(a.at)}</span></div>
-        <div class="cnow"><span class="cico">${I.chat}</span><span class="ctext2">${esc(a.title)}</span></div>
-        <div class="capmsg ellipsis">${esc(a.message)}</div>
-      </div>
-      ${size >= 3 ? `<div class="cside"><div class="clabel">Recent chats</div>${rest || '<div class="crecent">—</div>'}</div>` : ''}`;
+      <div class="chead"><span class="cstatus">${status}</span><span class="cfolder">${more > 0 ? `+${more} more` : hhmm(a.at)}</span></div>
+      <div class="cnow"><span class="cico">${I.chat}</span><span class="ctext2">${esc(a.title)}</span></div>
+      <div class="capmsg ellipsis">${esc(a.message)}</div>`;
     return t;
   },
 
@@ -335,13 +326,11 @@ const TILE = {
 };
 
 const CELL = 84, GAP = 8, PAD = 12, MAX_CELLS = 10;
-const CLAUDE_CELLS = { 1: 2, 2: 4, 3: 6 };
 function layoutWidth(shown) {
   // Rows of at most 10 cells; the Claude tile always sits on a row of its own.
   const rows = []; let cur = 0;
   for (const x of shown) {
     const size = Math.max(1, Math.min(3, x.size || 2));
-    if (x.id === 'claude') { if (cur) rows.push(cur); rows.push(CLAUDE_CELLS[size]); cur = 0; continue; }
     if (cur && cur + size > MAX_CELLS) { rows.push(cur); cur = 0; }
     cur += size;
   }
@@ -351,7 +340,8 @@ function layoutWidth(shown) {
 }
 function renderTiles() {
   if (!D.settings) return;
-  const shown = D.settings.tiles.filter(x => x.show);
+  // The Claude tile only appears while a chat needs you or just finished.
+  const shown = D.settings.tiles.filter(x => x.show && (x.id !== 'claude' || D.capp.length));
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
@@ -552,7 +542,7 @@ api.on('peek', p => {
 
 api.on('claude-app', items => {
   D.capp = items || [];
-  rerenderTile('claude');
+  if (state === 'open') renderTiles();
   if (state === 'compact' || state === 'rest') {
     if ((state === 'compact') !== !!wantCompact()) settle();
     else if (state === 'compact') { renderCompact(); sizeIsland(); }
