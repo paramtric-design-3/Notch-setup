@@ -394,6 +394,12 @@ async function onHelperMessage(m) {
       if (/^claude$/i.test(String(m.data && m.data.name || ''))) markClaudeHandled();
       break;
     }
+    case 'claudebusy': {
+      claudeBusy = !!(m.data && m.data.busy);
+      helperLog(`claude ${claudeBusy ? 'working' : 'quiet'} (${m.data && m.data.pct}% cpu)`);   // for tuning the threshold
+      toIsland('claude-busy', claudeBusy);
+      break;
+    }
     case 'log': helperLog(m.data); break;
   }
 }
@@ -601,6 +607,7 @@ function readNotifications() {
 // notifications the Claude app sends ("<chat name>: Claude needs your input to continue").
 // Watch the notification database and turn Claude's toasts into bubbles and tile entries.
 let claudeAppSeen = null;
+let claudeBusy = false;
 let claudeAppSig = '';
 let claudeAppItems = [];
 const isClaudeApp = id => /^Claude_[a-z0-9]+!Claude$/i.test(String(id)) || /anthropic/i.test(String(id));
@@ -864,7 +871,7 @@ ipcMain.on('open-claude', (_e, appId) => {
     shell.openExternal('claude://').catch(() => {});
   }
 });
-ipcMain.on('claude-app-request', () => sendClaudeApp());
+ipcMain.on('claude-app-request', () => { sendClaudeApp(); toIsland('claude-busy', claudeBusy); });
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));

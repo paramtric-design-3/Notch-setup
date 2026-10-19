@@ -40,7 +40,7 @@ Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in S
 
 **Peeks** are small bubbles that appear for a few seconds: a Claude chat or Cowork task that needs you or has finished, the charger connected or disconnected, and battery at 20% and 10%. Bubbles for apps opening and closing are off by default (Settings → Peeks).
 
-**Compact state**: while music plays, a Claude chat needs you or the focus timer counts down, the pill widens a little to show it.
+**Compact state**: while music plays, Claude is working, a Claude chat needs you or the focus timer counts down, the pill widens a little to show it. Its three orange dots ripple while Claude is working. Because chats and Cowork run in the cloud, "working" is estimated from how busy the Claude app is on this PC, so scrolling or typing in Claude can also make them move briefly.
 
 ## Claude in the notch
 

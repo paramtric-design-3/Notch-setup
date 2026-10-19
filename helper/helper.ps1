@@ -355,6 +355,38 @@ function Poll-Foreground {
     Emit 'fg' ([ordered]@{ name = $name })
 }
 
+# ------------------------------------------------------------------ is Claude working? (estimated from the Claude app's activity)
+# Chats and Cowork run in the cloud; the only local sign is the Claude app being busy while
+# it streams a reply or a task's progress. Measure its processor use (in % of one core).
+$script:ccLastCpu = $null
+$script:ccLastAt = $null
+$script:ccBusy = $false
+$script:ccHigh = 0
+$script:ccLow = 0
+function Poll-ClaudeActivity {
+    $procs = @(Get-Process -Name 'claude' -ErrorAction SilentlyContinue)
+    $now = [DateTime]::UtcNow
+    if (-not $procs.Count) {
+        $script:ccLastCpu = $null
+        if ($script:ccBusy) { $script:ccBusy = $false; Emit 'claudebusy' ([ordered]@{ busy = $false; pct = 0 }) }
+        return
+    }
+    $cpu = 0.0
+    foreach ($p in $procs) { try { $cpu += $p.TotalProcessorTime.TotalMilliseconds } catch { } }
+    if ($null -eq $script:ccLastCpu) { $script:ccLastCpu = $cpu; $script:ccLastAt = $now; return }
+    $ms = ($now - $script:ccLastAt).TotalMilliseconds
+    $pct = if ($ms -gt 0) { [math]::Round(100 * ($cpu - $script:ccLastCpu) / $ms, 1) } else { 0 }
+    $script:ccLastCpu = $cpu; $script:ccLastAt = $now
+    if ($pct -ge 6) { $script:ccHigh++; $script:ccLow = 0 } elseif ($pct -lt 3) { $script:ccLow++; $script:ccHigh = 0 }
+    if (-not $script:ccBusy -and $script:ccHigh -ge 2) {
+        $script:ccBusy = $true
+        Emit 'claudebusy' ([ordered]@{ busy = $true; pct = $pct })
+    } elseif ($script:ccBusy -and $script:ccLow -ge 3) {
+        $script:ccBusy = $false
+        Emit 'claudebusy' ([ordered]@{ busy = $false; pct = $pct })
+    }
+}
+
 # ------------------------------------------------------------------ commands from the app
 $script:open = $false
 $script:due = @{}
@@ -406,6 +438,7 @@ while (-not [NotchPump]::Closed) {
         Every 'dark' 5000 { Poll-Dark }
         Every 'apps' 2000 { Poll-Apps }
         Every 'fg' 1000 { Poll-Foreground }
+        Every 'claude' 2000 { Poll-ClaudeActivity }
     } else {
         Every 'media' 1500 { Poll-Media }
         Every 'volume' 5000 { Poll-Volume }
@@ -413,6 +446,7 @@ while (-not [NotchPump]::Closed) {
         Every 'dark' 20000 { Poll-Dark }
         Every 'apps' 2500 { Poll-Apps }
         Every 'fg' 1000 { Poll-Foreground }
+        Every 'claude' 2000 { Poll-ClaudeActivity }
     }
     Start-Sleep -Milliseconds 200
 }

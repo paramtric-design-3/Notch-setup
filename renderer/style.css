@@ -357,3 +357,11 @@ html[data-theme="dark"] .pbtn.allow { color: #2A1606; }
 /* things that open the Claude app */
 .tile.claude.has-chats { cursor: pointer; }
 .tile.claude.has-chats:hover { border-color: var(--accent); }
+
+/* Claude's three dots: still when idle, a soft wave while Claude works */
+.dots { display: flex; align-items: center; gap: 4px; height: 14px; }
+.dots i { width: 5px; height: 5px; border-radius: 50%; background: #F29A4A; opacity: .9; }
+.dots.go i { animation: dotwave 1.2s ease-in-out infinite; }
+.dots.go i:nth-child(2) { animation-delay: .15s; }
+.dots.go i:nth-child(3) { animation-delay: .3s; }
+@keyframes dotwave { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-3px); opacity: 1; } }

@@ -22,6 +22,7 @@ const D = {
   radios: {}, volume: null, brightness: null, dark: null,
   weather: null, messages: null, calendar: null,
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
+  claudeBusy: false,      // Claude app looks busy (reply or task in progress)
   capp: [],                // Claude app (chats, Cowork) notifications, newest first
 };
 
@@ -46,6 +47,7 @@ function wantCompact() {
   if (appWaiting()) return 'claude-app';
   if (D.timer.running) return 'timer';
   if (D.media && D.media.playing) return 'music';
+  if (D.claudeBusy) return 'claude-busy';
   return null;
 }
 
@@ -409,12 +411,15 @@ function renderCompact() {
     if (kind === 'claude-app') {
       compactL.innerHTML = '<span class="cdot wait"></span><span class="ctext cstep" data-capp></span>';
       compactR.innerHTML = `<span class="ctext">Needs you</span><div class="ico">${I.chat}</div>`;
+    } else if (kind === 'claude-busy') {
+      compactL.innerHTML = `<div class="ico">${I.chat}</div>`;
+      compactR.innerHTML = '<div class="dots go" data-dots><i></i><i></i><i></i></div>';
     } else if (kind === 'timer') {
       compactL.innerHTML = `<div class="ico">${I.timer}</div>`;
       compactR.innerHTML = '<span class="ctext" data-ctimer></span>';
     } else if (kind === 'music') {
       compactL.innerHTML = '<div class="mini-art spin" data-art></div>';
-      compactR.innerHTML = '<div class="eq" data-eq><i></i><i></i><i></i><i></i></div>';
+      compactR.innerHTML = '<div class="dots" data-dots><i></i><i></i><i></i></div>';
     } else {
       compactL.innerHTML = ''; compactR.innerHTML = '';
     }
@@ -431,7 +436,7 @@ function renderCompact() {
     const disc = compactL.querySelector('[data-art]');
     if (art !== compactArt) { compactArt = art; disc.style.backgroundImage = art ? `url('${art}')` : ''; }
     disc.style.animationPlayState = m && m.playing ? 'running' : 'paused';   // freeze where it is, no snap back
-    compactR.querySelector('[data-eq]').classList.toggle('paused', !(m && m.playing));
+    compactR.querySelector('[data-dots]').classList.toggle('go', !!D.claudeBusy);   // dots move while Claude works
   }
 }
 
@@ -540,6 +545,13 @@ api.on('peek', p => {
   else peek(p);
 });
 
+api.on('claude-busy', busy => {
+  D.claudeBusy = !!busy;
+  if (state === 'compact' || state === 'rest') {
+    if ((state === 'compact') !== !!wantCompact() || (state === 'compact' && compactKind !== wantCompact())) settle();
+    else if (state === 'compact') renderCompact();
+  }
+});
 api.on('claude-app', items => {
   D.capp = items || [];
   if (state === 'open') renderTiles();
