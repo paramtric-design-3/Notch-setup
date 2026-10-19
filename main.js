@@ -395,9 +395,17 @@ async function onHelperMessage(m) {
       break;
     }
     case 'claudebusy': {
+      const was = claudeBusy;
       claudeBusy = !!(m.data && m.data.busy);
+      if (claudeBusy && !was) claudeBusySince = Date.now();
       helperLog(`claude ${claudeBusy ? 'working' : 'quiet'} (${m.data && m.data.pct}% cpu)`);   // for tuning the threshold
-      toIsland('claude-busy', claudeBusy);
+      sendClaudeBusy();
+      break;
+    }
+    case 'claudetitle': {
+      claudeTitle = String(m.data && m.data.title || '');
+      helperLog(`claude window title: "${claudeTitle}"`);
+      sendClaudeBusy();
       break;
     }
     case 'log': helperLog(m.data); break;
@@ -608,6 +616,11 @@ function readNotifications() {
 // Watch the notification database and turn Claude's toasts into bubbles and tile entries.
 let claudeAppSeen = null;
 let claudeBusy = false;
+let claudeBusySince = 0;
+let claudeTitle = '';
+// The window title only helps when it names the chat (not just "Claude").
+const chatFromTitle = t => { const x = String(t || '').replace(/\s*[-–—|·]\s*Claude\s*$/i, '').trim(); return /^claude$/i.test(x) ? '' : x; };
+function sendClaudeBusy() { toIsland('claude-busy', { busy: claudeBusy, since: claudeBusySince, chat: chatFromTitle(claudeTitle) }); }
 let claudeAppSig = '';
 let claudeAppItems = [];
 const isClaudeApp = id => /^Claude_[a-z0-9]+!Claude$/i.test(String(id)) || /anthropic/i.test(String(id));
@@ -871,7 +884,7 @@ ipcMain.on('open-claude', (_e, appId) => {
     shell.openExternal('claude://').catch(() => {});
   }
 });
-ipcMain.on('claude-app-request', () => { sendClaudeApp(); toIsland('claude-busy', claudeBusy); });
+ipcMain.on('claude-app-request', () => { sendClaudeApp(); sendClaudeBusy(); });
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));

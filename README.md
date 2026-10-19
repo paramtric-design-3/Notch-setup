@@ -28,7 +28,7 @@ Tray icon → **Screen**, or Settings → **Screen**:
 
 | Tile | Where the data comes from |
 |---|---|
-| Claude | Chats and Cowork tasks in the Claude desktop app that need you or just finished, from the app's Windows notifications. Only shows up while something is open: a chat counts as dealt with once you switch to the Claude app or click it in the notch; "needs you" expires after an hour, "done" after 10 minutes. |
+| Claude | Chats and Cowork tasks in the Claude desktop app: "Working" with a timer while Claude is busy, and chats that need you or just finished, from the app's Windows notifications. Only shows up while something is open: a chat counts as dealt with once you switch to the Claude app or click it in the notch; "needs you" expires after an hour, "done" after 10 minutes. |
 | Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key). If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
 | Messages | The notifications Windows is still holding (WhatsApp, Telegram, Teams…). Read-only and local. |

@@ -363,6 +363,7 @@ $script:ccLastAt = $null
 $script:ccBusy = $false
 $script:ccHigh = 0
 $script:ccLow = 0
+$script:ccTitle = $null
 function Poll-ClaudeActivity {
     $procs = @(Get-Process -Name 'claude' -ErrorAction SilentlyContinue)
     $now = [DateTime]::UtcNow
@@ -378,6 +379,10 @@ function Poll-ClaudeActivity {
     $pct = if ($ms -gt 0) { [math]::Round(100 * ($cpu - $script:ccLastCpu) / $ms, 1) } else { 0 }
     $script:ccLastCpu = $cpu; $script:ccLastAt = $now
     if ($pct -ge 6) { $script:ccHigh++; $script:ccLow = 0 } elseif ($pct -lt 3) { $script:ccLow++; $script:ccHigh = 0 }
+    # The Claude window's title (may hold the open chat's name)
+    $title = ''
+    foreach ($p in $procs) { try { if ($p.MainWindowTitle) { $title = $p.MainWindowTitle; break } } catch { } }
+    if ($title -ne $script:ccTitle) { $script:ccTitle = $title; Emit 'claudetitle' ([ordered]@{ title = $title }) }
     if (-not $script:ccBusy -and $script:ccHigh -ge 2) {
         $script:ccBusy = $true
         Emit 'claudebusy' ([ordered]@{ busy = $true; pct = $pct })

@@ -23,6 +23,7 @@ const D = {
   weather: null, messages: null, calendar: null,
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
   claudeBusy: false,      // Claude app looks busy (reply or task in progress)
+  claudeSince: 0, claudeChat: '',
   capp: [],                // Claude app (chats, Cowork) notifications, newest first
 };
 
@@ -300,6 +301,16 @@ const TILE = {
     const t = el('div', `tile claude has-chats w${size}`);
     t.title = 'Open the Claude app';
     const a = D.capp[0];
+    // Working (and nothing waiting for you): show that Claude is busy, with a timer.
+    if (D.claudeBusy && !(a && a.kind === 'input')) {
+      const since = `<span data-since="${D.claudeSince}">${fmtTime(Date.now() - D.claudeSince)}</span>`;
+      if (size === 1) { t.innerHTML = `<div class="dots go"><i></i><i></i><i></i></div><div class="cstate">${since}</div>`; return t; }
+      t.innerHTML = `
+        <div class="chead"><span class="cstatus"><span class="cdot on"></span>Working · ${since}</span></div>
+        <div class="cnow"><span class="cico">${I.chat}</span><span class="ctext2">${esc(D.claudeChat || 'Claude')}</span></div>
+        <div class="capmsg"><span class="dots go"><i></i><i></i><i></i></span></div>`;
+      return t;
+    }
     const more = D.capp.length - 1;
     if (size === 1) {
       t.innerHTML = `<div class="cbig">${I.chat}</div><div class="cstate">${a.kind === 'input' ? 'Needs you' : 'Done'}</div>`;
@@ -343,7 +354,7 @@ function layoutWidth(shown) {
 function renderTiles() {
   if (!D.settings) return;
   // The Claude tile only appears while a chat needs you or just finished.
-  const shown = D.settings.tiles.filter(x => x.show && (x.id !== 'claude' || D.capp.length));
+  const shown = D.settings.tiles.filter(x => x.show && (x.id !== 'claude' || D.capp.length || D.claudeBusy));
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
@@ -443,12 +454,13 @@ function renderCompact() {
 // ------------------------------------------------------------------ ticker (only while something on screen moves)
 let ticker = null;
 function startTicker() {
-  const need = (state === 'open' && (D.media || D.timer.running)) || D.timer.running;
+  const need = (state === 'open' && (D.media || D.timer.running || D.claudeBusy)) || D.timer.running;
   if (need && !ticker) ticker = setInterval(tick, 500);
   if (!need && ticker) { clearInterval(ticker); ticker = null; }
 }
 
 function tick() {
+  for (const el of document.querySelectorAll('[data-since]')) el.textContent = fmtTime(Date.now() - +el.dataset.since);
   if (D.timer.running && timerLeft() <= 0) {
     D.timer.running = false; D.timer.left = 0;
     peek({ icon: I.timer, title: 'Focus session done', sub: '25 minutes — take a short break' });
@@ -545,8 +557,14 @@ api.on('peek', p => {
   else peek(p);
 });
 
-api.on('claude-busy', busy => {
-  D.claudeBusy = !!busy;
+api.on('claude-busy', b => {
+  const wasBusy = D.claudeBusy;
+  D.claudeBusy = !!(b && b.busy);
+  D.claudeSince = (b && b.since) || Date.now();
+  D.claudeChat = (b && b.chat) || '';
+  if (state === 'open' && wasBusy !== D.claudeBusy) renderTiles();
+  else rerenderTile('claude');
+  startTicker();
   if (state === 'compact' || state === 'rest') {
     if ((state === 'compact') !== !!wantCompact() || (state === 'compact' && compactKind !== wantCompact())) settle();
     else if (state === 'compact') renderCompact();
