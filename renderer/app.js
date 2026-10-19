@@ -98,18 +98,31 @@ function fitWindow(w, h, shadow) {
   }, 650);
 }
 
-island.addEventListener('mouseenter', () => {
+// Hover. The app tracks the pointer itself (see 'pointer' below) because Windows doesn't
+// always tell this window that the mouse left, e.g. while Settings is in front.
+function pointerEnter() {
+  if (hovering) return;
   hovering = true;
   clearTimeout(leaveTimer);
   clearTimeout(hoverTimer);
   if (state !== 'open') hoverTimer = setTimeout(() => { if (hovering) setState('open'); }, 250);
-});
-island.addEventListener('mouseleave', () => {
+}
+function pointerLeave() {
+  if (!hovering) return;
   hovering = false;
   clearTimeout(hoverTimer);
   clearTimeout(leaveTimer);
   leaveTimer = setTimeout(() => { if (!hovering && !pinned && state === 'open') settle(); }, 180);
+}
+island.addEventListener('mouseenter', pointerEnter);
+island.addEventListener('mouseleave', pointerLeave);
+api.on('pointer', p => {
+  if (!p) return pointerLeave();                 // pointer is outside the window
+  const r = island.getBoundingClientRect();
+  const inside = p.x >= r.left - EAR && p.x <= r.right + EAR && p.y >= r.top && p.y <= r.bottom;
+  inside ? pointerEnter() : pointerLeave();
 });
+
 island.addEventListener('click', e => {
   if (e.target.closest('button, pre, a')) return;
   // Claude: the pill, the bubble and the tile open the Claude app.

@@ -201,6 +201,21 @@ function createIsland() {
   island.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   island.once('ready-to-show', () => island.showInactive());
 
+  // Follow the pointer from here rather than relying on the window's mouse events,
+  // which Windows can drop while another window of this app (Settings) is in front.
+  let lastPointer = '';
+  setInterval(() => {
+    if (!island || island.isDestroyed()) return;
+    const c = screen.getCursorScreenPoint();
+    const b = island.getBounds();
+    const inside = c.x >= b.x && c.x < b.x + b.width && c.y >= b.y && c.y < b.y + b.height;
+    const msg = inside ? { x: c.x - b.x, y: c.y - b.y } : null;
+    const key = msg ? `${msg.x},${msg.y}` : 'out';
+    if (key === lastPointer) return;
+    lastPointer = key;
+    island.webContents.send('pointer', msg);
+  }, 100);
+
   // Some full-screen apps push themselves on top; re-assert gently.
   setInterval(() => {
     if (!island || island.isDestroyed()) return;
