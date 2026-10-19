@@ -353,3 +353,7 @@ html[data-theme="dark"] .badge { color: #2A1606; }
 html[data-theme="dark"] .pbtn.allow { color: #2A1606; }
 .pbtn[disabled] { opacity: .4; pointer-events: none; }
 .pbtn kbd { font: 10.5px var(--font); opacity: .7; font-weight: 500; }
+
+/* things that open the Claude app */
+.tile.claude.has-chats { cursor: pointer; }
+.tile.claude.has-chats:hover { border-color: var(--accent); }

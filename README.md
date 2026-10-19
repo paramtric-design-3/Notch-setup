@@ -44,7 +44,7 @@ Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in S
 
 ## Claude in the notch
 
-**Chats and Cowork (Claude desktop app):** nothing to set up. When the Claude app sends a Windows notification, for example "Claude needs your input to continue", the notch shows a bubble with the chat's name, the small notch shows "Needs you" until you open it, and the Claude tile lists recent chats. Keep notifications for Claude turned on in Windows. These chats run on Anthropic's servers, so the notch can't show their individual steps; it only knows what the app announces.
+**Chats and Cowork (Claude desktop app):** nothing to set up. Click the "Needs you" pill, the bubble or the Claude tile to bring up the Claude app (its notifications don't say which chat, so it opens the app rather than one specific chat). When the Claude app sends a Windows notification, for example "Claude needs your input to continue", the notch shows a bubble with the chat's name, the small notch shows "Needs you" until you open it, and the Claude tile lists recent chats. Keep notifications for Claude turned on in Windows. These chats run on Anthropic's servers, so the notch can't show their individual steps; it only knows what the app announces.
 
 ## Differences from the Mac version
 
@@ -66,7 +66,7 @@ FJBC Notch updates itself from this repo's [releases](https://github.com/paramtr
 
 - It checks when it starts, every 5 minutes, and whenever your PC wakes from sleep or is unlocked.
 - A new version downloads quietly in the background.
-- Once it's downloaded, it installs by itself the next time you've left the PC alone for a minute while the notch is closed and Claude Code isn't busy. The notch shows "Updating to x.y.z" and is back a few seconds later.
+- Once it's downloaded, it installs by itself the next time you've left the PC alone for a minute while the notch is closed. The notch shows "Updating to x.y.z" and is back a few seconds later.
 - To install straight away instead: tray icon → **Restart to update**.
 - Tray icon → **Check for updates**, or Settings → **Updates**, checks right away.
 
@@ -96,7 +96,7 @@ Pushes that don't change the version don't publish anything. You can also start 
 
 ### Files
 
-- `main.js`: the window, tray, settings, weather, lyrics, messages, calendar and the Claude Code endpoint.
+- `main.js`: the window, tray, settings, weather, lyrics, messages, calendar and the Claude app watcher.
 - `preload.js`: the small bridge between the window and the main process.
 - `helper/helper.ps1`: a hidden Windows PowerShell helper for media, Wi-Fi/Bluetooth, volume, brightness, dark mode and app peeks.
 - `renderer/`: the island (`index.html`, `style.css`, `app.js`, `icons.js`) and the settings window.

@@ -609,7 +609,7 @@ function pollClaudeApp(force = false) {
     if (!texts.length) continue;
     const title = texts.length > 1 ? texts[0] : 'Claude';
     const message = texts.length > 1 ? texts.slice(1).join(' · ') : texts[0];
-    items.push({ id: String(r.id), title, message, kind: classifyClaude(message), at: filetimeToMs(r.arrival) });
+    items.push({ id: String(r.id), appId: String(r.appId), title, message, kind: classifyClaude(message), at: filetimeToMs(r.arrival) });
   }
   items.sort((a, b) => b.at - a.at);
   const fresh = claudeAppSeen ? items.filter(i => !claudeAppSeen.has(i.id)) : [];
@@ -632,6 +632,7 @@ function refreshMessages() {
     const allowed = settings.messageApps.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     const convos = new Map();
     for (const r of res.rows) {
+      if (isClaudeApp(r.appId)) continue;   // Claude has its own tile
       const appName = appLabel(r.appId);
       if (!settings.messageAllApps && !allowed.some(a => appName.toLowerCase().includes(a) || String(r.appId).toLowerCase().includes(a.replace(/\s/g, '')))) continue;
       const xml = Buffer.isBuffer(r.payload) || ArrayBuffer.isView(r.payload) ? Buffer.from(r.payload).toString('utf8') : String(r.payload || '');
@@ -815,6 +816,16 @@ ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSettingsWindow: true }); return settings; });
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state }));
+// Bring the Claude desktop app to the front. Its notifications carry no link to a
+// specific chat, so this opens the app; the waiting chat is at the top of its list.
+ipcMain.on('open-claude', (_e, appId) => {
+  const id = isClaudeApp(appId) ? String(appId) : (claudeAppItems[0] && claudeAppItems[0].appId);
+  if (process.platform === 'win32' && id && /^[\w.!-]+$/.test(id)) {
+    spawn('explorer.exe', [`shell:AppsFolder\\${id}`], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  } else {
+    shell.openExternal('claude://').catch(() => {});
+  }
+});
 ipcMain.on('claude-app-request', () => toIsland('claude-app', claudeAppItems));
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));

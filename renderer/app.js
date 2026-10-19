@@ -33,7 +33,15 @@ let hoverTimer = null, leaveTimer = null, peekTimer = null;
 const peekQueue = [];
 let currentPeek = null;
 
-const appWaiting = () => D.capp.find(i => i.kind === 'input' && Date.now() - i.at < 30 * 60 * 1000);
+let cappHandled = 0;   // chats you've already clicked through to
+const appWaiting = () => D.capp.find(i => i.kind === 'input' && i.at > cappHandled && Date.now() - i.at < 30 * 60 * 1000);
+function openClaude() {
+  api.send('open-claude', (D.capp[0] || {}).appId);
+  cappHandled = Date.now();
+  pinned = false;
+  rerenderTile('claude');
+  if (state === 'compact' || state === 'peek') { clearTimeout(peekTimer); currentPeek = null; peekQueue.length = 0; settle(); }
+}
 function wantCompact() {
   if (appWaiting()) return 'claude-app';
   if (D.timer.running) return 'timer';
@@ -104,6 +112,10 @@ island.addEventListener('mouseleave', () => {
 });
 island.addEventListener('click', e => {
   if (e.target.closest('button, pre, a')) return;
+  // Claude: the pill, the bubble and the tile open the Claude app.
+  if (state === 'compact' && wantCompact() === 'claude-app') return openClaude();
+  if (state === 'peek' && currentPeek && currentPeek.action === 'claude') return openClaude();
+  if (state === 'open' && e.target.closest('.tile.claude') && D.capp.length) return openClaude();
   if (state === 'open') { pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
   else { pinned = true; setState('open'); }
 });
@@ -276,6 +288,8 @@ const TILE = {
       t.innerHTML = `<div class="empty"><div class="ico">${I.chat}</div>${size > 1 ? 'Nothing from Claude right now. Chats and Cowork tasks show up here when they need you or finish.' : 'Quiet'}</div>`;
       return t;
     }
+    t.classList.add('has-chats');
+    t.title = 'Open the Claude app';
     const a = app[0];
     const appStatus = a.kind === 'input' ? '<span class="cdot wait"></span>Needs you' : a.kind === 'done' ? '<span class="cdot"></span>Done' : '<span class="cdot"></span>Update';
     if (size === 1) {
@@ -518,7 +532,7 @@ api.on('messages', m => { D.messages = m; rerenderTile('messages'); });
 api.on('calendar', c => { D.calendar = c; rerenderTile('calendar'); });
 api.on('peek', p => {
   if (p.kind === 'app') peek({ img: p.icon, icon: I.grid, title: p.title, sub: p.sub });
-  else if (p.kind === 'claude-app') peek({ icon: I.chat, title: p.title, sub: p.sub, ms: p.ms || 4000 });
+  else if (p.kind === 'claude-app') peek({ icon: I.chat, title: p.title, sub: p.sub, ms: p.ms || 4000, action: 'claude' });
   else if (p.kind === 'update') peek({ icon: I.download, title: p.title, sub: p.sub, ms: p.ms || 3500 });
   else peek(p);
 });
