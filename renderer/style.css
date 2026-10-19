@@ -369,3 +369,20 @@ html[data-theme="dark"] .pbtn.allow { color: #2A1606; }
 .tile.claude.w1 .dots { height: 26px; }
 .claude .capmsg.muted { color: var(--text-2); }
 .claude .cico.quiet, .claude .cbig.quiet { color: var(--text-2); }
+
+/* sound output: button on the music tile, and the picker that replaces it */
+.music .outbtn { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; color: var(--text-2); }
+.music .outbtn svg { width: 15px; height: 15px; }
+html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
+.music .title { padding-right: 26px; }
+.tile.picker { flex-direction: column; align-items: stretch; gap: 3px; padding: 7px 8px 7px 10px; }
+.picker .phead { display: flex; align-items: center; justify-content: space-between; font-size: 11px; letter-spacing: .5px; text-transform: uppercase; color: var(--text-2); font-weight: 600; }
+.picker .phead .ibtn { width: 24px; height: 24px; transform: rotate(180deg); }
+.picker .plist { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; min-height: 0; flex: 1; padding-right: 2px; }
+.picker .plist::-webkit-scrollbar { width: 6px; }
+.picker .plist::-webkit-scrollbar-thumb { background: var(--track); border-radius: 3px; }
+.picker .pitem { display: flex; align-items: center; gap: 9px; height: 22px; padding: 0 8px; border-radius: 8px; text-align: left; font-size: 12.5px; color: var(--text); flex: none; }
+.picker .pitem:hover { background: var(--btn-hover); }
+.picker .pitem.on { color: var(--accent); background: var(--btn-on); }
+.picker .pico, .picker .pcheck { width: 15px; height: 15px; flex: none; }
+.picker .pname { flex: 1; min-width: 0; }

@@ -275,6 +275,12 @@ function buildTrayMenu() {
         click: () => applySettings({ tiles: settings.tiles.map(x => x.id === t.id ? { ...x, show: !x.show } : x) }),
       })),
     },
+    ...(state.outputs.length ? [{
+      label: 'Sound output', submenu: state.outputs.map(d => ({
+        label: d.name || 'Unknown device', type: 'radio', checked: !!d.default,
+        click: () => sendHelper({ c: 'setoutput', id: d.id }),
+      })),
+    }] : []),
     {
       label: 'Screen', submenu: [
         { label: 'Main screen', type: 'radio', checked: (settings.display || 'primary') === 'primary', click: () => applySettings({ display: 'primary' }) },
@@ -315,7 +321,7 @@ function createTray() {
 let helper = null;
 let helperBuf = '';
 let helperRestarts = 0;
-const state = { media: null, radios: {}, volume: null, brightness: null, dark: null };
+const state = { media: null, radios: {}, volume: null, brightness: null, dark: null, outputs: [] };
 
 function helperPath() {
   // Not inside asar (packaged with asar disabled), so PowerShell can read it.
@@ -382,6 +388,7 @@ async function onHelperMessage(m) {
     case 'volume': state.volume = m.data; toIsland('volume', m.data); break;
     case 'brightness': state.brightness = m.data; toIsland('brightness', m.data); break;
     case 'dark': state.dark = m.data; toIsland('dark', m.data); break;
+    case 'outputs': state.outputs = (m.data && m.data.devices) || []; toIsland('outputs', state.outputs); buildTrayMenu(); break;
     case 'apps': {
       if (!appsBaselineDone) { appsBaselineDone = true; break; }  // no peeks for apps already open
       if (!settings.peeks.apps) break;

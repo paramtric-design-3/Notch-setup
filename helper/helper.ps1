@@ -63,12 +63,70 @@ interface IAudioEndpointVolume {
     int GetMute(out bool mute);
 }
 [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IMMDevice { int Activate(ref Guid id, int clsCtx, IntPtr p, out IAudioEndpointVolume aev); }
+interface IMMDevice {
+    int Activate(ref Guid id, int clsCtx, IntPtr p, out IAudioEndpointVolume aev);
+    int OpenPropertyStore(int stgmAccess, out IPropertyStore props);
+    int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
+    int GetState(out int state);
+}
+[Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceCollection { int GetCount(out uint count); int Item(uint index, out IMMDevice device); }
+[StructLayout(LayoutKind.Sequential)] struct PROPERTYKEY { public Guid fmtid; public int pid; }
+[StructLayout(LayoutKind.Explicit, Size = 24)] struct PROPVARIANT { [FieldOffset(0)] public ushort vt; [FieldOffset(8)] public IntPtr ptr; }
+[Guid("886d8eeb-8cf2-4446-8d02-cdba1dbdcf99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IPropertyStore {
+    int GetCount(out uint count);
+    int GetAt(uint index, out PROPERTYKEY key);
+    int GetValue(ref PROPERTYKEY key, out PROPVARIANT value);
+}
+// Undocumented but long-standing Windows interface for setting the default device
+// (the same one SoundSwitch and AudioDeviceCmdlets use).
+[Guid("f8679f50-850a-41cf-9c72-430f290290c8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IPolicyConfig {
+    int _1(); int _2(); int _3(); int _4(); int _5(); int _6(); int _7(); int _8(); int _9(); int _10();
+    int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int role);
+}
+[ComImport, Guid("870af99c-171d-4f9e-af0d-e63df40c2bc9")] class PolicyConfigClientCom { }
 [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IMMDeviceEnumerator { int _a(); int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device); }
+interface IMMDeviceEnumerator {
+    int EnumAudioEndpoints(int dataFlow, int stateMask, out IMMDeviceCollection devices);
+    int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
+}
 [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumeratorCom { }
 
 public static class NotchAudio {
+    [DllImport("ole32.dll")] static extern int PropVariantClear(ref PROPVARIANT pv);
+    static string FriendlyName(IMMDevice d) {
+        IPropertyStore ps;
+        if (d.OpenPropertyStore(0, out ps) != 0) return "";
+        var key = new PROPERTYKEY { fmtid = new Guid("a45c254e-df1c-4efd-8020-67d146a850e0"), pid = 14 };
+        PROPVARIANT pv;
+        if (ps.GetValue(ref key, out pv) != 0) return "";
+        string name = pv.vt == 31 ? Marshal.PtrToStringUni(pv.ptr) : "";
+        PropVariantClear(ref pv);
+        return name ?? "";
+    }
+    // Active playback devices as "id<TAB>name<TAB>1 if default" lines.
+    public static string[] ListOutputs() {
+        var e = (IMMDeviceEnumerator)(new MMDeviceEnumeratorCom());
+        string def = "";
+        IMMDevice dd;
+        if (e.GetDefaultAudioEndpoint(0, 1, out dd) == 0) dd.GetId(out def);
+        IMMDeviceCollection col;
+        Marshal.ThrowExceptionForHR(e.EnumAudioEndpoints(0, 1, out col));
+        uint n; col.GetCount(out n);
+        var list = new System.Collections.Generic.List<string>();
+        for (uint i = 0; i < n; i++) {
+            IMMDevice d; if (col.Item(i, out d) != 0) continue;
+            string id; d.GetId(out id);
+            list.Add(id + "\t" + FriendlyName(d) + "\t" + (id == def ? "1" : "0"));
+        }
+        return list.ToArray();
+    }
+    public static void SetDefaultOutput(string id) {
+        var pc = (IPolicyConfig)(new PolicyConfigClientCom());
+        for (int role = 0; role < 3; role++) Marshal.ThrowExceptionForHR(pc.SetDefaultEndpoint(id, role));
+    }
     static IAudioEndpointVolume Vol() {
         var e = (IMMDeviceEnumerator)(new MMDeviceEnumeratorCom());
         IMMDevice dev; Marshal.ThrowExceptionForHR(e.GetDefaultAudioEndpoint(0, 1, out dev));
@@ -306,6 +364,18 @@ function Toggle-Dark {
     [NotchNative]::BroadcastTheme()
 }
 
+# ------------------------------------------------------------------ sound output devices
+$script:lastOutputs = ''
+function Poll-Outputs {
+    $devs = @()
+    foreach ($line in [NotchAudio]::ListOutputs()) {
+        $f = $line -split "`t"
+        $devs += , ([ordered]@{ id = $f[0]; name = $f[1]; default = ($f[2] -eq '1') })
+    }
+    $sig = ($devs | ForEach-Object { "$($_.id)|$($_.default)" }) -join ';'
+    if ($sig -ne $script:lastOutputs) { $script:lastOutputs = $sig; Emit 'outputs' ([ordered]@{ devices = $devs }) }
+}
+
 # ------------------------------------------------------------------ apps opening and closing
 $script:apps = @{}
 $script:ignore = @('ApplicationFrameHost', 'TextInputHost', 'explorer', 'SearchHost', 'StartMenuExperienceHost',
@@ -416,6 +486,8 @@ function Handle-Command($line) {
             $script:lastBright = ''; $script:due['bright'] = 0
         }
         'dark' { Toggle-Dark; $script:due['dark'] = 0 }
+        'outputs' { $script:lastOutputs = ''; $script:due['outputs'] = 0 }
+        'setoutput' { [NotchAudio]::SetDefaultOutput([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0; $script:lastVol = ''; $script:due['volume'] = 0 }
         'start' { [NotchNative]::PressWin() }
     }
 }
@@ -444,6 +516,7 @@ while (-not [NotchPump]::Closed) {
         Every 'apps' 2000 { Poll-Apps }
         Every 'fg' 1000 { Poll-Foreground }
         Every 'claude' 2000 { Poll-ClaudeActivity }
+        Every 'outputs' 5000 { Poll-Outputs }
     } else {
         Every 'media' 1500 { Poll-Media }
         Every 'volume' 5000 { Poll-Volume }
@@ -452,6 +525,7 @@ while (-not [NotchPump]::Closed) {
         Every 'apps' 2500 { Poll-Apps }
         Every 'fg' 1000 { Poll-Foreground }
         Every 'claude' 2000 { Poll-ClaudeActivity }
+        Every 'outputs' 30000 { Poll-Outputs }
     }
     Start-Sleep -Milliseconds 200
 }

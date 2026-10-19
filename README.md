@@ -30,6 +30,7 @@ Tray icon → **Screen**, or Settings → **Screen**:
 |---|---|
 | Claude | Chats and Cowork tasks in the Claude desktop app: "Working" with a timer while Claude is busy, and chats that need you or just finished, from the app's Windows notifications. When it's quiet the tile says "Nothing waiting". A chat counts as dealt with once you switch to the Claude app or click it in the notch; "needs you" expires after an hour, "done" after 10 minutes. |
 | Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key). If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
+| Sound output | The speaker button on the music tile (top right) lists your playback devices; click one to make it the default. Also in the tray menu under **Sound output**. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
 | Messages | The notifications Windows is still holding (WhatsApp, Telegram, Teams…). Read-only and local. |
 | Quick controls | Wi-Fi, Bluetooth, dark mode, volume (click mutes, scroll changes), brightness (laptop screens only; click cycles, scroll changes), Start menu. |

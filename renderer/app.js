@@ -24,7 +24,8 @@ const D = {
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
   claudeBusy: false,      // Claude app looks busy (reply or task in progress)
   claudeSince: 0, claudeChat: '',
-  capp: [],                // Claude app (chats, Cowork) notifications, newest first
+  capp: [],
+  outputs: [], outPicker: false,   // sound output devices and whether the picker is open                // Claude app (chats, Cowork) notifications, newest first
 };
 
 // ------------------------------------------------------------------ state machine
@@ -56,6 +57,7 @@ let lastOpenSent = null;
 function setState(next) {
   state = next;
   island.className = 's-' + next;
+  if (next !== 'open') D.outPicker = false;
   if (next === 'open') renderTiles();
   if (next === 'compact' || next === 'rest') renderCompact();
   sizeIsland();
@@ -181,6 +183,7 @@ function weatherIcon(code, isDay) {
 // ------------------------------------------------------------------ tiles
 const TILE = {
   music(size) {
+    if (D.outPicker && size > 1) return outputsPicker(size);
     const t = el('div', `tile music w${size}`);
     const m = D.media;
     const art = D.art && m && D.art.key === `${m.artist}|${m.title}` ? D.art.src : null;
@@ -214,6 +217,10 @@ const TILE = {
         </div>`;
     }
     t.append(meta);
+    if (D.outputs.length > 1) {
+      const cur = D.outputs.find(o => o.default);
+      t.insertAdjacentHTML('beforeend', `<button class="ibtn outbtn" data-out title="Sound output: ${esc(cur ? cur.name : '')}">${outputIcon(cur)}</button>`);
+    }
     return t;
   },
 
@@ -384,6 +391,13 @@ function rerenderTile(id) {
 tilesView.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b) return;
+  if (b.dataset.out !== undefined) { D.outPicker = true; api.send('helper', { c: 'outputs' }); rerenderTile('music'); return; }
+  if (b.dataset.outclose !== undefined) { D.outPicker = false; rerenderTile('music'); return; }
+  if (b.dataset.outid) {
+    api.send('helper', { c: 'setoutput', id: b.dataset.outid });
+    D.outputs = D.outputs.map(o => ({ ...o, default: o.id === b.dataset.outid }));   // show it right away
+    D.outPicker = false; rerenderTile('music'); return;
+  }
   if (b.dataset.media) api.send('helper', { c: 'media', a: b.dataset.media });
   if (b.dataset.q) {
     const k = b.dataset.q;
@@ -407,6 +421,24 @@ tilesView.addEventListener('wheel', e => {
   const delta = e.deltaY < 0 ? 4 : -4;
   api.send('helper', b.dataset.q === 'vol' ? { c: 'vol', delta } : { c: 'bright', delta: delta * 2 });
 }, { passive: false });
+
+// ------------------------------------------------------------------ sound output picker
+function outputIcon(o) {
+  const n = String((o && o.name) || '').toLowerCase();
+  if (/head|airpods|buds|earphone|koptelefoon|oortjes|wh-|wf-/.test(n)) return I.headphones;
+  if (/monitor|display|hdmi|nvidia|amd high definition|tv|lg |samsung|dell|msi|mag /.test(n)) return I.monitor;
+  return I.speaker;
+}
+function outputsPicker(size) {
+  const t = el('div', `tile music picker w${size}`);
+  t.innerHTML = `
+    <div class="phead"><span>Sound output</span><button class="ibtn" data-outclose title="Back">${I.chevron}</button></div>
+    <div class="plist">${D.outputs.map(o => `
+      <button class="pitem ${o.default ? 'on' : ''}" data-outid="${esc(o.id)}">
+        <span class="pico">${outputIcon(o)}</span><span class="pname ellipsis">${esc(o.name || 'Unknown device')}</span>${o.default ? `<span class="pcheck">${I.check}</span>` : ''}
+      </button>`).join('')}</div>`;
+  return t;
+}
 
 // ------------------------------------------------------------------ focus timer
 function timerLeft() { const T = D.timer; return T.running ? Math.max(0, T.endsAt - Date.now()) : T.left; }
@@ -565,6 +597,7 @@ api.on('peek', p => {
   else peek(p);
 });
 
+api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
 api.on('claude-busy', b => {
   const wasBusy = D.claudeBusy;
   D.claudeBusy = !!(b && b.busy);
@@ -592,7 +625,7 @@ api.on('claude-app', items => {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.outputs = s.outputs || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();
