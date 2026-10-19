@@ -300,8 +300,7 @@ const TILE = {
     t.innerHTML = `
       <div class="cmain">
         <div class="chead"><span class="cstatus">${status}</span><span class="cfolder ellipsis">${esc(s.folder || '')}</span></div>
-        <div class="cprompt">${esc(s.prompt || 'Task in ' + (s.folder || 'Claude Code'))}</div>
-        <div class="cnow ellipsis"><span class="cico">${I[s.state === 'done' ? 'check' : s.step] || I.think}</span>${esc(s.state === 'done' ? 'Finished' : s.detail)}</div>
+        <div class="cnow"><span class="cico">${I[s.state === 'done' ? 'check' : s.step] || I.think}</span><span class="ctext2">${esc(s.state === 'done' ? 'Finished' : s.state === 'waiting' ? 'Needs your answer' : s.detail)}</span></div>
       </div>
       ${size >= 3 ? `<div class="cside">
         <div class="clabel">${s.stepCount} step${s.stepCount === 1 ? '' : 's'}${others ? ` · +${others} more session${others > 1 ? 's' : ''}` : ''}</div>

@@ -679,7 +679,7 @@ function claudeStep(toolName, input) {
   if (/^(Grep|Glob)$/.test(t)) return { step: 'search', detail: `Searching for ${first(i.pattern, 50)}` };
   if (t === 'WebSearch') return { step: 'search', detail: `Searching the web: ${first(i.query, 50)}` };
   if (t === 'WebFetch') { let h = ''; try { h = new URL(i.url).hostname; } catch {} return { step: 'read', detail: `Reading ${h || 'a web page'}` }; }
-  if (/^(Task|Agent)$/.test(t)) return { step: 'think', detail: `Starting a helper: ${first(i.description || i.prompt, 50)}` };
+  if (/^(Task|Agent)$/.test(t)) return { step: 'think', detail: 'Starting a helper agent' };
   if (t === 'TodoWrite') return { step: 'think', detail: 'Updating its to-do list' };
   const mcp = t.match(/^mcp__([^_]+(?:_[^_]+)*)__(.+)$/);
   if (mcp) return { step: 'think', detail: `Using ${mcp[1].replace(/[-_]/g, ' ')}` };
@@ -751,7 +751,7 @@ function sessionFor(ev) {
   const sid = ev.session_id || 'default';
   let s = claudeSessions.get(sid);
   if (!s) {
-    s = { id: sid, start: Date.now(), prompt: '', cwd: '', state: 'working', step: 'think', detail: 'Thinking', steps: [], stepCount: 0, lastAt: Date.now(), took: 0 };
+    s = { id: sid, start: Date.now(), cwd: '', state: 'working', step: 'think', detail: 'Thinking', steps: [], stepCount: 0, lastAt: Date.now(), took: 0 };
     claudeSessions.set(sid, s);
   }
   if (ev.cwd) s.cwd = ev.cwd;
@@ -761,7 +761,7 @@ function sessionFor(ev) {
 
 function sendSessions() {
   const list = [...claudeSessions.values()].sort((a, b) => b.lastAt - a.lastAt).map(s => ({
-    id: s.id, start: s.start, prompt: s.prompt, cwd: s.cwd, folder: shortPath(s.cwd).split('/').pop(),
+    id: s.id, start: s.start, cwd: s.cwd, folder: shortPath(s.cwd).split('/').pop(),
     state: s.state, step: s.step, detail: s.detail, stepCount: s.stepCount, took: s.took, lastAt: s.lastAt,
     recent: s.steps.slice(-4).reverse(),
   }));
@@ -804,10 +804,9 @@ function handleClaudeEvent(ev, res) {
       const sid = ev.session_id || 'default';
       claudeSessions.delete(sid);                     // a new prompt starts a new task
       const s = sessionFor(ev);
-      s.prompt = String(ev.prompt || '').replace(/\s+/g, ' ').trim().slice(0, 400);
       announceWorking(s);
       sendSessions();
-      toIsland('peek', { kind: 'claude-start', title: 'Claude Code started', sub: s.prompt || shortPath(s.cwd), ms: 3000 });
+      toIsland('peek', { kind: 'claude-start', title: 'Claude Code started', sub: shortPath(s.cwd).split('/').pop() || 'New task', ms: 3000 });
       return ok();
     }
     case 'PreToolUse': {
