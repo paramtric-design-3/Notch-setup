@@ -5,16 +5,14 @@
 
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, powerMonitor,
-  globalShortcut, clipboard, shell, nativeTheme
+  clipboard, shell, nativeTheme
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const CLAUDE_PORT = 47821;
 // The window is sized to the island itself (the renderer reports its size), so it
 // catches clicks normally and never covers the apps around it.
 let winSize = { w: 240, h: 40 };
@@ -708,229 +706,6 @@ async function refreshCalendar() {
   } catch { toIsland('calendar', { error: 'Calendar unavailable' }); }
 }
 
-// ---------------------------------------------------------------- Claude Code (HTTP hooks on localhost)
-const claudeSessions = new Map();     // session_id -> { start, step, detail }
-const pendingPermissions = new Map(); // id -> { res, timer }
-let permShortcutsOn = false;
-
-function claudeStep(toolName, input) {
-  const t = String(toolName || '');
-  const i = input || {};
-  const first = (x, n = 70) => { const l = String(x || '').split('\n')[0].trim(); return l.length > n ? l.slice(0, n - 1) + '…' : l; };
-  if (/^(Read|NotebookRead)$/.test(t)) return { step: 'read', detail: `Reading ${shortPath(i.file_path || i.notebook_path)}` };
-  if (t === 'Write') return { step: 'edit', detail: `Writing ${shortPath(i.file_path)}` };
-  if (/^(Edit|MultiEdit|NotebookEdit)$/.test(t)) return { step: 'edit', detail: `Editing ${shortPath(i.file_path || i.notebook_path)}` };
-  if (/^(Bash|PowerShell)$/.test(t)) return { step: 'run', detail: `Running ${first(i.command)}` };
-  if (/^(Grep|Glob)$/.test(t)) return { step: 'search', detail: `Searching for ${first(i.pattern, 50)}` };
-  if (t === 'WebSearch') return { step: 'search', detail: `Searching the web: ${first(i.query, 50)}` };
-  if (t === 'WebFetch') { let h = ''; try { h = new URL(i.url).hostname; } catch {} return { step: 'read', detail: `Reading ${h || 'a web page'}` }; }
-  if (/^(Task|Agent)$/.test(t)) return { step: 'think', detail: 'Starting a helper agent' };
-  if (t === 'TodoWrite') return { step: 'think', detail: 'Updating its to-do list' };
-  const mcp = t.match(/^mcp__([^_]+(?:_[^_]+)*)__(.+)$/);
-  if (mcp) return { step: 'think', detail: `Using ${mcp[1].replace(/[-_]/g, ' ')}` };
-  return { step: 'think', detail: `Using ${t || 'a tool'}` };
-}
-function shortPath(p) { return p ? String(p).split(/[\\/]/).slice(-2).join('/') : ''; }
-
-function fullCommand(toolName, input) {
-  if (input && typeof input.command === 'string') return input.command;
-  if (input && input.file_path && typeof input.content === 'string') return `${input.file_path}\n\n${input.content}`;
-  if (input && input.file_path && typeof input.new_string === 'string') {
-    return `${input.file_path}\n\n- ${input.old_string || ''}\n+ ${input.new_string}`;
-  }
-  return JSON.stringify(input || {}, null, 2);
-}
-
-function setPermissionShortcuts(on) {
-  if (on === permShortcutsOn) return;
-  permShortcutsOn = on;
-  if (on) {
-    globalShortcut.register('CommandOrControl+Alt+Y', () => toIsland('perm-key', 'allow'));
-    globalShortcut.register('CommandOrControl+Alt+N', () => toIsland('perm-key', 'deny'));
-  } else {
-    globalShortcut.unregister('CommandOrControl+Alt+Y');
-    globalShortcut.unregister('CommandOrControl+Alt+N');
-  }
-}
-
-function answerPermission(id, behavior) {
-  const p = pendingPermissions.get(id);
-  if (!p) return;
-  pendingPermissions.delete(id);
-  clearTimeout(p.timer);
-  setImmediate(() => p.done && p.done());
-  const decision = behavior === 'allow'
-    ? { behavior: 'allow' }
-    : { behavior: 'deny', message: 'Denied from FJBC Notch' };
-  p.res.writeHead(200, { 'Content-Type': 'application/json' });
-  p.res.end(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } }));
-}
-
-function startClaudeServer() {
-  const server = http.createServer((req, res) => {
-    // Only accept JSON POSTs without a browser Origin: blocks web pages from talking to it.
-    if (req.method !== 'POST' || req.headers.origin || !/application\/json/i.test(req.headers['content-type'] || '')) {
-      res.writeHead(403); res.end(); return;
-    }
-    let body = '';
-    req.on('data', c => { body += c; if (body.length > 2e6) req.destroy(); });
-    req.on('end', () => {
-      let ev;
-      try { ev = JSON.parse(body); } catch { res.writeHead(400); res.end(); return; }
-      handleClaudeEvent(ev, res);
-    });
-  });
-  server.on('error', e => {
-    claudeStatus.listening = false;
-    claudeStatus.error = e.code === 'EADDRINUSE' ? `Port ${CLAUDE_PORT} is already in use by another program` : e.message;
-    helperLog('claude server: ' + e.message);
-    broadcast('claude-status', claudeStatus);
-  });
-  server.on('listening', () => { claudeStatus.listening = true; claudeStatus.error = null; broadcast('claude-status', claudeStatus); });
-  server.listen(CLAUDE_PORT, '127.0.0.1');
-}
-
-let lastClaudeAt = 0;   // last hook event, so updates wait while Claude Code is working
-const claudeStatus = { listening: false, error: null, lastAt: 0, lastEvent: null, counts: {} };
-function sessionFor(ev) {
-  const sid = ev.session_id || 'default';
-  let s = claudeSessions.get(sid);
-  if (!s) {
-    s = { id: sid, start: Date.now(), cwd: '', state: 'working', step: 'think', detail: 'Thinking', steps: [], stepCount: 0, lastAt: Date.now(), took: 0 };
-    claudeSessions.set(sid, s);
-  }
-  if (ev.cwd) s.cwd = ev.cwd;
-  s.lastAt = Date.now();
-  return s;
-}
-
-function sendSessions() {
-  const list = [...claudeSessions.values()].sort((a, b) => b.lastAt - a.lastAt).map(s => ({
-    id: s.id, start: s.start, cwd: s.cwd, folder: shortPath(s.cwd).split('/').pop(),
-    state: s.state, step: s.step, detail: s.detail, stepCount: s.stepCount, took: s.took, lastAt: s.lastAt,
-    recent: s.steps.slice(-4).reverse(),
-  }));
-  toIsland('claude-sessions', { connected: claudeStatus.lastAt > 0, sessions: list });
-}
-
-function workingSessions() { return [...claudeSessions.values()].filter(s => s.state === 'working' || s.state === 'waiting'); }
-
-function setClaudeStep(s, st) {
-  Object.assign(s, st, { state: 'working' });
-  s.steps.push({ ...st, at: Date.now() });
-  if (s.steps.length > 20) s.steps.shift();
-  s.stepCount++;
-}
-
-function announceWorking(s) { toIsland('claude', { state: 'working', step: s.step, detail: s.detail, start: s.start }); }
-
-// Forget finished or silent sessions after a while.
-setInterval(() => {
-  let changed = false;
-  for (const [id, s] of claudeSessions) {
-    const quietFor = Date.now() - s.lastAt;
-    if ((s.state === 'done' && quietFor > 30 * 60 * 1000) || quietFor > 60 * 60 * 1000) { claudeSessions.delete(id); changed = true; }
-    else if (s.state === 'working' && quietFor > 15 * 60 * 1000) { s.state = 'idle'; changed = true; }
-  }
-  if (changed) { sendSessions(); if (!workingSessions().length) toIsland('claude', { state: 'idle' }); }
-}, 60 * 1000);
-
-function handleClaudeEvent(ev, res) {
-  lastClaudeAt = Date.now();
-  claudeStatus.lastAt = lastClaudeAt;
-  claudeStatus.lastEvent = ev.hook_event_name || 'unknown';
-  claudeStatus.counts[claudeStatus.lastEvent] = (claudeStatus.counts[claudeStatus.lastEvent] || 0) + 1;
-  broadcast('claude-status', claudeStatus);
-  const name = ev.hook_event_name;
-  const ok = () => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); };
-
-  switch (name) {
-    case 'UserPromptSubmit': {
-      const sid = ev.session_id || 'default';
-      claudeSessions.delete(sid);                     // a new prompt starts a new task
-      const s = sessionFor(ev);
-      announceWorking(s);
-      sendSessions();
-      toIsland('peek', { kind: 'claude-start', title: 'Claude Code started', sub: shortPath(s.cwd).split('/').pop() || 'New task', ms: 3000 });
-      return ok();
-    }
-    case 'PreToolUse': {
-      const s = sessionFor(ev);
-      setClaudeStep(s, claudeStep(ev.tool_name, ev.tool_input || {}));
-      announceWorking(s);
-      sendSessions();
-      return ok();
-    }
-    case 'PermissionRequest': {
-      const s = sessionFor(ev);
-      s.state = 'waiting';
-      sendSessions();
-      const id = crypto.randomUUID();
-      const done = () => {
-        if (pendingPermissions.size === 0) setPermissionShortcuts(false);
-        if (s.state === 'waiting') { s.state = 'working'; sendSessions(); }
-      };
-      const timer = setTimeout(() => {
-        // No answer: hand the decision back to Claude Code's own prompt.
-        const p = pendingPermissions.get(id);
-        if (!p) return;
-        pendingPermissions.delete(id);
-        p.res.writeHead(200, { 'Content-Type': 'application/json' }); p.res.end('{}');
-        toIsland('claude-perm-cancel', { id });
-        done();
-      }, 110 * 1000);
-      pendingPermissions.set(id, { res, timer, done });
-      res.on('close', () => {
-        if (pendingPermissions.has(id) && !res.writableEnded) {
-          clearTimeout(timer); pendingPermissions.delete(id);
-          toIsland('claude-perm-cancel', { id });
-          done();
-        }
-      });
-      setPermissionShortcuts(true);
-      toIsland('claude-perm', {
-        id, tool: ev.tool_name || 'Tool',
-        command: fullCommand(ev.tool_name, ev.tool_input),
-        cwd: ev.cwd || '',
-      });
-      return;
-    }
-    case 'Notification': {
-      const s = sessionFor(ev);
-      const msg = ev.message || 'Needs your attention';
-      if (/waiting for your input|idle/i.test(msg + ' ' + (ev.notification_type || ''))) { s.state = 'waiting'; sendSessions(); }
-      toIsland('peek', { kind: 'claude', title: 'Claude Code', sub: msg, ms: 4000 });
-      return ok();
-    }
-    case 'Stop': {
-      const s = sessionFor(ev);
-      s.state = 'done';
-      s.took = Date.now() - s.start;
-      s.detail = 'Finished';
-      sendSessions();
-      if (!workingSessions().length) toIsland('claude', { state: 'done', took: s.took, steps: s.stepCount });
-      else announceWorking(workingSessions()[0]);
-      return ok();
-    }
-    default:
-      return ok();
-  }
-}
-
-function claudeSettingsSnippet() {
-  const url = `http://127.0.0.1:${CLAUDE_PORT}/claude`;
-  const h = timeout => [{ type: 'http', url, timeout }];
-  return JSON.stringify({
-    hooks: {
-      UserPromptSubmit: [{ hooks: h(5) }],
-      PreToolUse: [{ matcher: '*', hooks: h(5) }],
-      PermissionRequest: [{ matcher: '*', hooks: h(120) }],
-      Notification: [{ hooks: h(5) }],
-      Stop: [{ hooks: h(5) }],
-    },
-  }, null, 2);
-}
-
 // ---------------------------------------------------------------- auto-update (GitHub releases)
 // Checks paramtric-design-3/Notch-setup releases at start, every 5 minutes, and after sleep or unlock.
 // Downloads quietly, then installs by itself as soon as you've been idle for a minute with the notch closed
@@ -986,7 +761,7 @@ function setupUpdater() {
   powerMonitor.on('resume', soon);
   powerMonitor.on('unlock-screen', soon);
   // Locking the PC is a good moment to install a waiting update.
-  powerMonitor.on('lock-screen', () => { if (update.state === 'ready' && pendingPermissions.size === 0) installUpdate(); });
+  powerMonitor.on('lock-screen', () => { if (update.state === 'ready') installUpdate(); });
 }
 
 function checkForUpdates(manual) {
@@ -1004,8 +779,7 @@ function waitForIdleThenInstall() {
   clearInterval(idleWatch);
   idleWatch = setInterval(() => {
     if (update.state !== 'ready') { clearInterval(idleWatch); return; }
-    const claudeBusy = workingSessions().length > 0 && Date.now() - lastClaudeAt < 3 * 60 * 1000;
-    const busy = islandOpen || pendingPermissions.size > 0 || claudeBusy;
+    const busy = islandOpen;
     if (busy || powerMonitor.getSystemIdleTime() < IDLE_BEFORE_INSTALL_S) return;
     clearInterval(idleWatch);
     toIsland('peek', { kind: 'update', title: `Updating to ${update.version}`, sub: 'Back in a few seconds', ms: 2500 });
@@ -1035,16 +809,13 @@ ipcMain.on('island-open', (_e, open) => {
   if (islandOpen) refreshMessages();
 });
 ipcMain.on('helper', (_e, cmd) => sendHelper(cmd));
-ipcMain.on('perm-answer', (_e, { id, behavior }) => answerPermission(id, behavior));
 ipcMain.on('open-settings', () => openSettings());
 ipcMain.on('open-url', (_e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSettingsWindow: true }); return settings; });
-ipcMain.handle('claude-snippet', () => claudeSettingsSnippet());
-ipcMain.handle('claude-status', () => claudeStatus);
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state }));
-ipcMain.on('claude-sessions-request', () => { sendSessions(); toIsland('claude-app', claudeAppItems); });
+ipcMain.on('claude-app-request', () => toIsland('claude-app', claudeAppItems));
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));
@@ -1061,7 +832,6 @@ app.whenReady().then(() => {
   createIsland();
   createTray();
   startHelper();
-  startClaudeServer();
   setupUpdater();
   island.webContents.once('did-finish-load', () => {
     toIsland('settings', settings);
@@ -1078,10 +848,5 @@ app.on('second-instance', openSettings);
 app.on('window-all-closed', e => e.preventDefault());
 app.on('before-quit', () => {
   quitting = true;
-  for (const id of [...pendingPermissions.keys()]) {
-    const p = pendingPermissions.get(id);
-    try { p.res.writeHead(200, { 'Content-Type': 'application/json' }); p.res.end('{}'); } catch {}
-  }
-  globalShortcut.unregisterAll();
   if (helper) { try { helper.kill(); } catch {} }
 });

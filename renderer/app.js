@@ -9,11 +9,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const island = $('#island');
 const tilesView = $('#tiles');
 const peekView = $('#peek');
-const permView = $('#perm');
 const compactL = $('.compact-l');
 const compactR = $('.compact-r');
 
-const NOTCH_W = 200, NOTCH_H = 32, COMPACT_W = 328, COMPACT_CLAUDE_W = 560, PEEK_W = 360, PERM_W = 580;
+// No camera on this screen: no dead space in the middle, and no black band when open.
+const NOTCH_W = 120, NOTCH_H = 30, COMPACT_W = 132, COMPACT_TIMER_W = 140, COMPACT_CLAUDE_W = 330, PEEK_W = 360, PERM_W = 580;
 
 // ------------------------------------------------------------------ data
 const D = {
@@ -22,14 +22,11 @@ const D = {
   radios: {}, volume: null, brightness: null, dark: null,
   weather: null, messages: null, calendar: null,
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
-  claude: null,           // { state, step, detail, start, at }
-  cc: { connected: false, sessions: [] },   // Claude Code sessions for the tile
   capp: [],                // Claude app (chats, Cowork) notifications, newest first
-  perms: [],              // queue of { id, tool, command, cwd }
 };
 
 // ------------------------------------------------------------------ state machine
-let state = 'rest';        // rest | compact | peek | open | perm
+let state = 'rest';        // rest | compact | peek | open
 let pinned = false;
 let hovering = false;
 let hoverTimer = null, leaveTimer = null, peekTimer = null;
@@ -38,7 +35,6 @@ let currentPeek = null;
 
 const appWaiting = () => D.capp.find(i => i.kind === 'input' && Date.now() - i.at < 30 * 60 * 1000);
 function wantCompact() {
-  if (D.claude && D.claude.state === 'working') return 'claude';
   if (appWaiting()) return 'claude-app';
   if (D.timer.running) return 'timer';
   if (D.media && D.media.playing) return 'music';
@@ -47,20 +43,18 @@ function wantCompact() {
 
 let lastOpenSent = null;
 function setState(next) {
-  if (D.perms.length) next = 'perm';
   state = next;
   island.className = 's-' + next;
   if (next === 'open') renderTiles();
   if (next === 'compact' || next === 'rest') renderCompact();
   sizeIsland();
-  const open = next === 'open' || next === 'perm';
+  const open = next === 'open';
   if (open !== lastOpenSent) { lastOpenSent = open; api.send('island-open', open); }   // only real changes reach the helper
   startTicker();
 }
 
 function settle() {
   // Pick the right resting state when nothing is forcing one.
-  if (D.perms.length) return setState('perm');
   if (hovering || pinned) return setState('open');
   if (currentPeek) return setState('peek');
   return setState(wantCompact() ? 'compact' : 'rest');
@@ -68,13 +62,12 @@ function settle() {
 
 function sizeIsland() {
   let w = NOTCH_W, h = NOTCH_H;
-  if (state === 'compact') w = (wantCompact() === 'claude' || wantCompact() === 'claude-app') ? COMPACT_CLAUDE_W : COMPACT_W;
-  else if (state === 'peek') { w = PEEK_W; h = NOTCH_H + peekView.offsetHeight; }
-  else if (state === 'perm') { w = PERM_W; h = NOTCH_H + permView.offsetHeight; }
-  else if (state === 'open') { w = Math.max(tilesView.offsetWidth, NOTCH_W + 80); h = NOTCH_H + tilesView.offsetHeight; }
+  if (state === 'compact') { const k = wantCompact(); w = k === 'claude-app' ? COMPACT_CLAUDE_W : k === 'timer' ? COMPACT_TIMER_W : COMPACT_W; }
+  else if (state === 'peek') { w = PEEK_W; h = peekView.offsetHeight; }
+  else if (state === 'open') { w = Math.max(tilesView.offsetWidth, NOTCH_W + 80); h = tilesView.offsetHeight; }
   island.style.width = w + 'px';
   island.style.height = h + 'px';
-  fitWindow(w, h, state === 'open' || state === 'peek' || state === 'perm');
+  fitWindow(w, h, state === 'open' || state === 'peek');
 }
 
 // ------------------------------------------------------------------ window size
@@ -101,7 +94,7 @@ island.addEventListener('mouseenter', () => {
   hovering = true;
   clearTimeout(leaveTimer);
   clearTimeout(hoverTimer);
-  if (state !== 'open' && state !== 'perm') hoverTimer = setTimeout(() => { if (hovering) setState('open'); }, 250);
+  if (state !== 'open') hoverTimer = setTimeout(() => { if (hovering) setState('open'); }, 250);
 });
 island.addEventListener('mouseleave', () => {
   hovering = false;
@@ -112,7 +105,7 @@ island.addEventListener('mouseleave', () => {
 island.addEventListener('click', e => {
   if (e.target.closest('button, pre, a')) return;
   if (state === 'open') { pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
-  else if (state !== 'perm') { pinned = true; setState('open'); }
+  else { pinned = true; setState('open'); }
 });
 island.addEventListener('contextmenu', e => { e.preventDefault(); api.send('open-settings'); });
 
@@ -278,57 +271,25 @@ const TILE = {
 
   claude(size) {
     const t = el('div', `tile claude w${size}`);
-    const { connected, sessions } = D.cc;
-    const s = sessions[0];
     const app = D.capp.filter(i => Date.now() - i.at < 12 * 3600 * 1000);
-    const codeActive = s && (s.state === 'working' || s.state === 'waiting');
-    // Show the Claude app's chats unless a Claude Code task is running or finished more recently.
-    if (app.length && !codeActive && !(s && s.lastAt > app[0].at)) {
-      const a = app[0];
-      const appStatus = a.kind === 'input' ? '<span class="cdot wait"></span>Needs you' : a.kind === 'done' ? '<span class="cdot"></span>Done' : '<span class="cdot"></span>Update';
-      if (size === 1) {
-        t.innerHTML = `<div class="cbig">${I.chat}</div><div class="cstate">${a.kind === 'input' ? 'Needs you' : 'Done'}</div>`;
-        return t;
-      }
-      const rest = app.slice(1, 4).map(r => `<div class="crecent ellipsis"><span class="cico">${I.chat}</span><b>${esc(r.title)}</b>&nbsp;· ${r.kind === 'input' ? 'needs you' : r.kind === 'done' ? 'done' : esc(r.message)} · ${hhmm(r.at)}</div>`).join('');
-      t.innerHTML = `
-        <div class="cmain">
-          <div class="chead"><span class="cstatus">${appStatus}</span><span class="cfolder ellipsis">Claude app · ${hhmm(a.at)}</span></div>
-          <div class="cnow"><span class="cico">${I.chat}</span><span class="ctext2">${esc(a.title)}</span></div>
-          <div class="capmsg ellipsis">${esc(a.message)}</div>
-        </div>
-        ${size >= 3 ? `<div class="cside"><div class="clabel">Recent chats</div>${rest || '<div class="crecent">—</div>'}</div>` : ''}`;
+    if (!app.length) {
+      t.innerHTML = `<div class="empty"><div class="ico">${I.chat}</div>${size > 1 ? 'Nothing from Claude right now. Chats and Cowork tasks show up here when they need you or finish.' : 'Quiet'}</div>`;
       return t;
     }
-    if (!connected && !s) {
-      t.innerHTML = `<div class="empty"><div class="ico">${I.think}</div>${size > 1 ? 'Nothing from Claude yet. Chats and Cowork show up when the Claude app notifies; Claude Code after you connect it in Settings.' : 'Quiet'}</div>`;
-      return t;
-    }
-    if (!s) {
-      t.innerHTML = `<div class="empty"><div class="ico">${I.think}</div>No task running</div>`;
-      return t;
-    }
-    const others = sessions.filter(x => x !== s && (x.state === 'working' || x.state === 'waiting')).length;
-    const status = {
-      working: `<span class="cdot on"></span>Working · <span data-since="${s.start}">${fmtTime(Date.now() - s.start)}</span>`,
-      waiting: `<span class="cdot wait"></span>Waiting for you`,
-      done: `<span class="cdot"></span>Done in ${fmtDur(s.took)}`,
-      idle: `<span class="cdot"></span>Quiet`,
-    }[s.state] || '';
+    const a = app[0];
+    const appStatus = a.kind === 'input' ? '<span class="cdot wait"></span>Needs you' : a.kind === 'done' ? '<span class="cdot"></span>Done' : '<span class="cdot"></span>Update';
     if (size === 1) {
-      t.innerHTML = `<div class="cbig">${I[s.state === 'done' ? 'check' : s.step] || I.think}</div><div class="cstate">${s.state === 'working' ? `<span data-since="${s.start}">${fmtTime(Date.now() - s.start)}</span>` : s.state === 'waiting' ? 'Waiting' : 'Done'}</div>`;
+      t.innerHTML = `<div class="cbig">${I.chat}</div><div class="cstate">${a.kind === 'input' ? 'Needs you' : 'Done'}</div>`;
       return t;
     }
-    const recent = s.recent.slice(s.state === 'done' ? 0 : 1, 4).map(r => `<div class="crecent ellipsis"><span class="cico">${I[r.step] || I.think}</span>${esc(r.detail)}</div>`).join('');
+    const rest = app.slice(1, 4).map(r => `<div class="crecent ellipsis"><span class="cico">${I.chat}</span><b>${esc(r.title)}</b>&nbsp;· ${r.kind === 'input' ? 'needs you' : r.kind === 'done' ? 'done' : esc(r.message)} · ${hhmm(r.at)}</div>`).join('');
     t.innerHTML = `
       <div class="cmain">
-        <div class="chead"><span class="cstatus">${status}</span><span class="cfolder ellipsis">${esc(s.folder || '')}</span></div>
-        <div class="cnow"><span class="cico">${I[s.state === 'done' ? 'check' : s.step] || I.think}</span><span class="ctext2">${esc(s.state === 'done' ? 'Finished' : s.state === 'waiting' ? 'Needs your answer' : s.detail)}</span></div>
+        <div class="chead"><span class="cstatus">${appStatus}</span><span class="cfolder ellipsis">Claude · ${hhmm(a.at)}</span></div>
+        <div class="cnow"><span class="cico">${I.chat}</span><span class="ctext2">${esc(a.title)}</span></div>
+        <div class="capmsg ellipsis">${esc(a.message)}</div>
       </div>
-      ${size >= 3 ? `<div class="cside">
-        <div class="clabel">${s.stepCount} step${s.stepCount === 1 ? '' : 's'}${others ? ` · +${others} more session${others > 1 ? 's' : ''}` : ''}</div>
-        ${recent || '<div class="crecent">—</div>'}
-      </div>` : ''}`;
+      ${size >= 3 ? `<div class="cside"><div class="clabel">Recent chats</div>${rest || '<div class="crecent">—</div>'}</div>` : ''}`;
     return t;
   },
 
@@ -428,10 +389,7 @@ function renderCompact() {
   const kind = wantCompact();
   if (kind !== compactKind) {
     compactKind = kind; compactArt = null; compactStep = null;
-    if (kind === 'claude') {
-      compactL.innerHTML = '<div class="ico" data-step></div><span class="ctext cstep" data-cstep></span>';
-      compactR.innerHTML = `<span class="ctext" data-celapsed></span><div class="workgrid">${'<i></i>'.repeat(9)}</div>`;
-    } else if (kind === 'claude-app') {
+    if (kind === 'claude-app') {
       compactL.innerHTML = '<span class="cdot wait"></span><span class="ctext cstep" data-capp></span>';
       compactR.innerHTML = `<span class="ctext">Needs you</span><div class="ico">${I.chat}</div>`;
     } else if (kind === 'timer') {
@@ -444,13 +402,7 @@ function renderCompact() {
       compactL.innerHTML = ''; compactR.innerHTML = '';
     }
   }
-  if (kind === 'claude') {
-    const step = D.claude.step || 'think';
-    if (step !== compactStep) { compactStep = step; compactL.querySelector('[data-step]').innerHTML = I[step] || I.think; }
-    const label = compactL.querySelector('[data-cstep]');
-    if (label.textContent !== (D.claude.detail || 'Working')) label.textContent = D.claude.detail || 'Working';
-    compactR.querySelector('[data-celapsed]').textContent = fmtTime(Date.now() - (D.claude.start || Date.now()));
-  } else if (kind === 'claude-app') {
+  if (kind === 'claude-app') {
     const w = appWaiting();
     const el = compactL.querySelector('[data-capp]');
     if (w && el.textContent !== w.title) el.textContent = w.title;
@@ -469,19 +421,12 @@ function renderCompact() {
 // ------------------------------------------------------------------ ticker (only while something on screen moves)
 let ticker = null;
 function startTicker() {
-  const claudeOn = D.cc.sessions.some(x => x.state === 'working' || x.state === 'waiting') || (D.claude && D.claude.state === 'working');
-  const need = (state === 'open' && (D.media || D.timer.running || claudeOn)) || (state === 'compact' && claudeOn) || D.timer.running;
+  const need = (state === 'open' && (D.media || D.timer.running)) || D.timer.running;
   if (need && !ticker) ticker = setInterval(tick, 500);
   if (!need && ticker) { clearInterval(ticker); ticker = null; }
 }
 
 function tick() {
-  // live elapsed times for Claude Code
-  for (const el of document.querySelectorAll('[data-since]')) el.textContent = fmtTime(Date.now() - +el.dataset.since);
-  if (state === 'compact' && wantCompact() === 'claude') {
-    const e = compactR.querySelector('[data-celapsed]');
-    if (e && D.claude) e.textContent = fmtTime(Date.now() - (D.claude.start || Date.now()));
-  }
   if (D.timer.running && timerLeft() <= 0) {
     D.timer.running = false; D.timer.left = 0;
     peek({ icon: I.timer, title: 'Focus session done', sub: '25 minutes — take a short break' });
@@ -521,60 +466,9 @@ function nextPeek() {
   peekView.innerHTML = `
     <div class="picon ${p.tone || ''}">${iconHtml}</div>
     <div class="ptext"><div class="ptitle ellipsis">${esc(p.title)}</div><div class="psub ellipsis">${esc(p.sub || '')}</div></div>`;
-  if (state !== 'open' && state !== 'perm') setState('peek');
+  if (state !== 'open') setState('peek');
   peekTimer = setTimeout(nextPeek, p.ms || 3000);
 }
-
-// ------------------------------------------------------------------ Claude Code permission
-function renderPerm() {
-  const p = D.perms[0];
-  if (!p) { permView.innerHTML = ''; return; }
-  permView.innerHTML = `
-    <div class="phead">
-      <div class="pico">${I.run}</div>
-      <div style="min-width:0"><div class="pt">Claude Code wants to use ${esc(p.tool)}</div>
-      <div class="ps ellipsis">${esc(p.cwd)}</div></div>
-      ${D.perms.length > 1 ? `<span class="more">+${D.perms.length - 1} waiting</span>` : ''}
-    </div>
-    <pre data-cmd></pre>
-    <div class="pfoot">
-      <span class="hint" data-hint></span>
-      <button class="pbtn deny" data-perm="deny">Deny <kbd>Ctrl+Alt+N</kbd></button>
-      <button class="pbtn allow" data-perm="allow" disabled>Allow <kbd>Ctrl+Alt+Y</kbd></button>
-    </div>`;
-  const pre = permView.querySelector('[data-cmd]');
-  pre.textContent = p.command;           // the whole command, never shortened
-  pre.addEventListener('scroll', checkPermRead);
-  requestAnimationFrame(() => { checkPermRead(); sizeIsland(); });
-}
-
-function permFullyShown() {
-  const pre = permView.querySelector('[data-cmd]');
-  return !!pre && pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 2;
-}
-function checkPermRead() {
-  const ok = permFullyShown();
-  const allow = permView.querySelector('[data-perm="allow"]');
-  const hint = permView.querySelector('[data-hint]');
-  if (!allow) return;
-  allow.disabled = !ok;
-  hint.textContent = ok ? 'Whole command shown' : 'Scroll to the end of the command to allow';
-  hint.classList.toggle('need', !ok);
-}
-
-function answerPerm(behavior) {
-  const p = D.perms[0];
-  if (!p) return;
-  if (behavior === 'allow' && !permFullyShown()) return;   // never approve an unseen part
-  api.send('perm-answer', { id: p.id, behavior });
-  D.perms.shift();
-  if (D.perms.length) { renderPerm(); setState('perm'); }
-  else { pinned = false; settle(); }
-}
-permView.addEventListener('click', e => {
-  const b = e.target.closest('[data-perm]');
-  if (b && !b.disabled) answerPerm(b.dataset.perm);
-});
 
 // ------------------------------------------------------------------ battery and charger
 let batt = null, lastBattWarn = 100;
@@ -624,14 +518,11 @@ api.on('messages', m => { D.messages = m; rerenderTile('messages'); });
 api.on('calendar', c => { D.calendar = c; rerenderTile('calendar'); });
 api.on('peek', p => {
   if (p.kind === 'app') peek({ img: p.icon, icon: I.grid, title: p.title, sub: p.sub });
-  else if (p.kind === 'claude') peek({ icon: I.bell, title: p.title, sub: p.sub, ms: 4000 });
   else if (p.kind === 'claude-app') peek({ icon: I.chat, title: p.title, sub: p.sub, ms: p.ms || 4000 });
-  else if (p.kind === 'claude-start') peek({ icon: I.think, title: p.title, sub: p.sub, ms: p.ms || 3000 });
   else if (p.kind === 'update') peek({ icon: I.download, title: p.title, sub: p.sub, ms: p.ms || 3500 });
   else peek(p);
 });
 
-let claudeIdle = null;
 api.on('claude-app', items => {
   D.capp = items || [];
   rerenderTile('claude');
@@ -640,35 +531,6 @@ api.on('claude-app', items => {
     else if (state === 'compact') { renderCompact(); sizeIsland(); }
   }
 });
-api.on('claude-sessions', cc => { D.cc = cc; rerenderTile('claude'); startTicker(); });
-api.on('claude', c => {
-  clearTimeout(claudeIdle);
-  if (c.state === 'idle') { D.claude = null; if (state === 'compact') settle(); startTicker(); return; }
-  if (c.state === 'done') {
-    D.claude = null;
-    peek({ icon: I.check, title: 'Done', sub: `Claude Code finished in ${fmtDur(c.took)}${c.steps ? ` · ${c.steps} steps` : ''}`, ms: 4000 });
-  } else {
-    D.claude = { ...c, at: Date.now() };
-    claudeIdle = setTimeout(() => { D.claude = null; if (state === 'compact') settle(); }, 10 * 60 * 1000);
-    if (state === 'compact') { renderCompact(); sizeIsland(); }
-    else if (state === 'rest') settle();
-  }
-  if (state === 'compact' && !D.claude) settle();
-  startTicker();
-});
-api.on('claude-perm', p => {
-  D.perms.push(p);
-  if (D.perms.length === 1) renderPerm(); else renderPerm();
-  setState('perm');
-});
-api.on('claude-perm-cancel', ({ id }) => {
-  const i = D.perms.findIndex(p => p.id === id);
-  if (i < 0) return;
-  D.perms.splice(i, 1);
-  renderPerm();
-  if (!D.perms.length) settle(); else sizeIsland();
-});
-api.on('perm-key', k => answerPerm(k));
 
 // ------------------------------------------------------------------ boot
 (async () => {
@@ -681,5 +543,5 @@ api.on('perm-key', k => answerPerm(k));
   applyTheme();
   settle();
   watchBattery();
-  api.send('claude-sessions-request');
+  api.send('claude-app-request');
 })();

@@ -28,7 +28,7 @@ Tray icon → **Screen**, or Settings → **Screen**:
 
 | Tile | Where the data comes from |
 |---|---|
-| Claude | Chats and Cowork tasks in the Claude desktop app: which chat needs you or has finished, from the app's Windows notifications. Claude Code on this PC, live: the project folder, the current step, a live timer, the step count and the last few steps. It gets its own row at the top. |
+| Claude | Chats and Cowork tasks in the Claude desktop app: which chat needs you or has finished, from the app's Windows notifications. |
 | Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key). If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
 | Messages | The notifications Windows is still holding (WhatsApp, Telegram, Teams…). Read-only and local. |
@@ -38,39 +38,13 @@ Tray icon → **Screen**, or Settings → **Screen**:
 
 Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in Settings.
 
-**Peeks** are small bubbles that appear for a few seconds: a Claude chat or Cowork task that needs you or has finished, Claude Code starting or finishing a task, the charger connected or disconnected, and battery at 20% and 10%. Bubbles for apps opening and closing are off by default (Settings → Peeks).
+**Peeks** are small bubbles that appear for a few seconds: a Claude chat or Cowork task that needs you or has finished, the charger connected or disconnected, and battery at 20% and 10%. Bubbles for apps opening and closing are off by default (Settings → Peeks).
 
-**Compact state**: while music plays, a Claude Code task runs or the focus timer counts down, the pill widens a little to show it.
+**Compact state**: while music plays, a Claude chat needs you or the focus timer counts down, the pill widens a little to show it.
 
 ## Claude in the notch
 
 **Chats and Cowork (Claude desktop app):** nothing to set up. When the Claude app sends a Windows notification, for example "Claude needs your input to continue", the notch shows a bubble with the chat's name, the small notch shows "Needs you" until you open it, and the Claude tile lists recent chats. Keep notifications for Claude turned on in Windows. These chats run on Anthropic's servers, so the notch can't show their individual steps; it only knows what the app announces.
-
-**Claude Code (live steps):**
-
-Open Settings, scroll to **Claude Code** and click **Copy**. Then paste the lines into `%USERPROFILE%\.claude\settings.json`. If that file already has a `"hooks"` block, merge them into it. Start a new Claude Code session afterwards.
-
-They look like this:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47821/claude", "timeout": 5 }] }],
-    "PreToolUse":       [{ "matcher": "*", "hooks": [{ "type": "http", "url": "http://127.0.0.1:47821/claude", "timeout": 5 }] }],
-    "PermissionRequest":[{ "matcher": "*", "hooks": [{ "type": "http", "url": "http://127.0.0.1:47821/claude", "timeout": 120 }] }],
-    "Notification":     [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47821/claude", "timeout": 5 }] }],
-    "Stop":             [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47821/claude", "timeout": 5 }] }]
-  }
-}
-```
-
-- While Claude works, the pill shows the current step (reading, editing, running a command, searching) and a small animated grid.
-- When Claude asks for permission, the notch opens with the full command. **Allow** stays greyed out until you've scrolled through the whole command. Shortcuts: `Ctrl+Alt+Y` allows, `Ctrl+Alt+N` denies.
-- If you don't answer within 110 seconds, Claude Code falls back to asking in the terminal.
-- When Claude finishes, a peek shows "Done" and how long it took.
-- If FJBC Notch isn't running, the hooks fail quietly and Claude Code works as normal.
-
-These are Claude Code's built-in HTTP hooks, so no script is needed. The app only accepts requests from this PC and blocks requests from web pages.
 
 ## Differences from the Mac version
 
@@ -101,7 +75,6 @@ FJBC Notch updates itself from this repo's [releases](https://github.com/paramtr
 1. Turn off **Launch at login** in Settings if you turned it on.
 2. Windows Settings → Apps → Installed apps → **FJBC Notch** → Uninstall.
 3. Optionally delete `%APPDATA%\FJBC Notch` (settings and lyrics cache).
-4. Remove the Claude Code hook lines from `%USERPROFILE%\.claude\settings.json`.
 
 ## Build from source
 

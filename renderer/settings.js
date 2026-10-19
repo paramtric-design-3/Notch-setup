@@ -94,20 +94,5 @@ function bindText(id, key, savedId) {
   bindText('#city', 'city', '#citySaved');
   bindText('#msgApps', 'messageApps', '#appsSaved');
   bindText('#cal', 'calendarUrl', '#calSaved');
-  const snip = await api.invoke('claude-snippet');
-  $('#snippet').textContent = snip;
-  $('#copy').onclick = async () => { await api.invoke('copy-text', snip); flash('#copied'); };
-  const ago = t => { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `${s} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
-  const NICE = { PreToolUse: 'a tool step', PermissionRequest: 'a permission request', Stop: 'a finished task', UserPromptSubmit: 'a new prompt', Notification: 'a notification' };
-  const showCC = c => {
-    const el = $('#ccStatus');
-    if (!c) return;
-    if (c.error) { el.innerHTML = `<b style="color:var(--accent)">Not listening:</b> ${c.error.replace(/[<>&]/g, '')}`; return; }
-    if (!c.lastAt) { el.innerHTML = '<b>Not connected yet.</b> <span class="sub">No message from Claude Code so far. Check the lines are in settings.json, then restart Claude Code.</span>'; return; }
-    el.innerHTML = `<b style="color:var(--accent)">Connected.</b> <span class="sub">Last message: ${NICE[c.lastEvent] || c.lastEvent}, ${ago(c.lastAt)}.</span>`;
-  };
-  let CC = await api.invoke('claude-status'); showCC(CC);
-  api.on('claude-status', c => { CC = c; showCC(c); });
-  setInterval(() => showCC(CC), 15000);
   api.on('settings', s => { S = s; render(); });
 })();

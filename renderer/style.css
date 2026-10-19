@@ -4,8 +4,8 @@
   --gap: 8px;
   --tile-h: 112px;
   --pad: 12px;
-  --notch-w: 200px;
-  --notch-h: 32px;
+  --notch-w: 120px;
+  --notch-h: 30px;
   --ear: 10px;
   --spring: cubic-bezier(.32, 1.28, .5, 1);
   --ease: cubic-bezier(.3, .8, .3, 1);
@@ -76,7 +76,7 @@ svg { display: block; width: 100%; height: 100%; }
     border-radius .4s var(--ease), background-color .25s var(--ease), box-shadow .3s var(--ease);
   contain: layout style;
 }
-#island.s-compact { width: calc(var(--notch-w) + 128px); border-radius: 0 0 16px 16px; }
+#island.s-compact { border-radius: 0 0 15px 15px; }
 #island.s-peek, #island.s-open, #island.s-perm { --ib: var(--bg); box-shadow: var(--shadow); }
 #island.s-peek { border-radius: 0 0 22px 22px; }
 #island.s-open, #island.s-perm { border-radius: 0 0 24px 24px; }
@@ -91,7 +91,8 @@ svg { display: block; width: 100%; height: 100%; }
 
 /* the notch band always stays black */
 .band { position: absolute; top: 0; left: 0; right: 0; height: var(--notch-h); }
-.notch {
+.notch { display: none; }   /* no camera: nothing to draw around */
+.notch-unused {
   position: absolute; top: 0; left: 50%; width: var(--notch-w); height: var(--notch-h);
   transform: translateX(-50%); background: #000; border-radius: 0 0 10px 10px;
 }
@@ -102,8 +103,8 @@ svg { display: block; width: 100%; height: 100%; }
   display: flex; align-items: center; color: #ECECEC;
   opacity: 0; transition: opacity .2s var(--ease); pointer-events: none;
 }
-.compact-l { left: 0; justify-content: flex-start; padding-left: 14px; }
-.compact-r { right: 0; justify-content: flex-end; padding-right: 14px; }
+.compact-l { left: 0; justify-content: flex-start; padding-left: 12px; }
+.compact-r { right: 0; justify-content: flex-end; padding-right: 12px; }
 #island.s-compact .compact { opacity: 1; transition-delay: .12s; }
 .compact .mini-art { width: 20px; height: 20px; border-radius: 50%; background: #2a2a2a center/cover no-repeat; }
 .compact .mini-art.spin { animation: spin 8s linear infinite; will-change: transform; backface-visibility: hidden; }
@@ -132,7 +133,9 @@ svg { display: block; width: 100%; height: 100%; }
 #island:not(.s-open) .tile * { animation-play-state: paused !important; }
 
 /* ------------------------------------------------------------ views */
-.body { position: absolute; top: var(--notch-h); left: 0; right: 0; bottom: 0; overflow: hidden; }
+.body { position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; }
+/* the compact parts live in the band; hide it while a panel is open so content starts at the top */
+#island.s-open .band, #island.s-peek .band, #island.s-perm .band { visibility: hidden; }
 .view {
   position: absolute; top: 0; left: 50%; transform: translateX(-50%);
   opacity: 0; visibility: hidden; transition: opacity .18s var(--ease), visibility 0s .18s;
@@ -143,7 +146,7 @@ svg { display: block; width: 100%; height: 100%; }
 
 /* ------------------------------------------------------------ tiles */
 #tiles {
-  padding: 8px var(--pad) var(--pad);
+  padding: var(--pad);
   display: flex; flex-wrap: wrap; gap: var(--gap); justify-content: center;
   width: max-content; max-width: calc(10 * var(--cell) + 9 * var(--gap) + 2 * var(--pad));
 }
@@ -286,10 +289,9 @@ html[data-theme="dark"] .badge { color: #2A1606; }
 .claude.w1 .cbig { width: 28px; height: 28px; color: var(--accent); }
 .claude.w1 .cstate { font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .compact .cdot { margin-right: -2px; }
-.compact .cstep { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 8px; }
+.compact .cstep { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 8px; }
 .compact-l, .compact-r { gap: 8px; }
-.compact-l { width: 180px !important; }
-.compact-r { width: 180px !important; }
+.compact-l, .compact-r { width: 50% !important; }
 
 /* calendar */
 .calendar .label { font-size: 11px; letter-spacing: .6px; text-transform: uppercase; color: var(--accent); font-weight: 600; }
@@ -311,7 +313,7 @@ html[data-theme="dark"] .badge { color: #2A1606; }
 .timer.w1 .tlabel { display: none; }
 
 /* ------------------------------------------------------------ peek */
-#peek { width: 360px; padding: 6px 16px 12px; display: flex; align-items: center; gap: 12px; }
+#peek { width: 360px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
 #peek .picon { width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid; place-items: center; background: var(--btn); color: var(--accent); overflow: hidden; }
 #peek .picon img { width: 28px; height: 28px; }
 #peek .picon svg { width: 19px; height: 19px; }
@@ -322,7 +324,7 @@ html[data-theme="dark"] .badge { color: #2A1606; }
 #peek .psub { font-size: 12.5px; color: var(--text-2); }
 
 /* ------------------------------------------------------------ Claude permission */
-#perm { width: 580px; padding: 10px 16px 16px; }
+#perm { width: 580px; padding: 14px 16px 16px; }
 #perm .phead { display: flex; align-items: center; gap: 10px; }
 #perm .phead .pico { width: 30px; height: 30px; border-radius: 9px; background: var(--btn-on); color: var(--accent); display: grid; place-items: center; flex: none; }
 #perm .phead .pico svg { width: 17px; height: 17px; }

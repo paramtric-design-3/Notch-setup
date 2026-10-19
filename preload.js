@@ -3,10 +3,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const ON = new Set([
   'settings', 'media', 'art', 'lyrics', 'radios', 'volume', 'brightness', 'dark',
-  'weather', 'messages', 'calendar', 'peek', 'claude', 'claude-perm', 'claude-perm-cancel', 'perm-key', 'displays', 'update', 'claude-status', 'claude-sessions', 'claude-app',
+  'weather', 'messages', 'calendar', 'peek', 'displays', 'update', 'claude-app',
 ]);
-const SEND = new Set(['island-size', 'island-open', 'helper', 'perm-answer', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update', 'claude-sessions-request']);
-const INVOKE = new Set(['get-settings', 'set-settings', 'claude-snippet', 'copy-text', 'initial-state', 'get-displays', 'get-update', 'claude-status']);
+const SEND = new Set(['island-size', 'island-open', 'helper', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update', 'claude-app-request']);
+const INVOKE = new Set(['get-settings', 'set-settings', 'copy-text', 'initial-state', 'get-displays', 'get-update']);
 
 contextBridge.exposeInMainWorld('notch', {
   on: (ch, cb) => { if (ON.has(ch)) ipcRenderer.on(ch, (_e, d) => cb(d)); },
