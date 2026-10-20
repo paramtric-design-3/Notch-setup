@@ -108,7 +108,8 @@ class League {
       if (!this.me || Date.now() - this.meAt > 5 * 60 * 1000) await this.loadMe();
       this.loadMeta();
       if (phase === 'GameStart' || phase === 'InProgress' || phase === 'Reconnect') { this.cs = null; await this.loadGame(); }
-      if (phase === 'ChampSelect') await this.loadChampSelect(changed);
+      if (changed || (phase === 'ChampSelect' && !this.modeAt)) await this.loadMode(phase);
+      if (phase === 'ChampSelect' && !this.noHelper) await this.loadChampSelect(changed);
       else if (this.cs) { this.cs = null; this.csChamp = 0; }
       if (!this.history || Date.now() - this.historyAt > 10 * 60 * 1000 || (changed && phase === 'EndOfGame')) await this.loadHistory();
       this.emit();
@@ -117,6 +118,24 @@ class League {
     } finally {
       this.busy = false;
     }
+  }
+
+  // Which game mode is queued. ARAM (Howling Abyss) and Arena have random or very different
+  // picks, so the champ select helper stays out of the way there.
+  async loadMode(phase) {
+    this.modeAt = Date.now();
+    if (phase === 'None') { this.mode = null; this.noHelper = false; return; }
+    try {
+      const g = await this.lcuGet('/lol-gameflow/v1/session');
+      const gd = (g && g.gameData) || {};
+      const q = gd.queue || {};
+      const gm = String(q.gameMode || (g && g.map && g.map.gameMode) || '').toUpperCase();
+      const mapId = q.mapId || (g && g.map && g.map.id) || 0;
+      const arena = gm === 'CHERRY' || q.id === 1700 || q.id === 1710;
+      const aram = !arena && (mapId === 12 || gm === 'ARAM' || q.id === 450 || q.id === 100);
+      this.mode = arena ? 'Arena' : aram ? 'ARAM' : (QUEUES[q.id] || '');
+      this.noHelper = arena || aram;
+    } catch { this.mode = null; this.noHelper = false; }
   }
 
   async loadMe() {
@@ -674,7 +693,7 @@ class League {
 
   emit() {
     const data = {
-      type: 'state', client: !!this.lcu, phase: this.phase,
+      type: 'state', client: !!this.lcu, phase: this.phase, mode: this.mode || '',
       me: this.me && { name: this.me.name, tag: this.me.tag, solo: this.me.solo, flex: this.me.flex },
       cs: this.cs && { ...this.cs, me: this.cs.me && { ...this.cs.me, icon: this.icons.get(this.cs.me.key) || this.cs.me.icon },
         allies: this.cs.allies.map(a => ({ ...a, champ: a.champ && { ...a.champ, icon: this.icons.get(a.champ.key) || null } })),

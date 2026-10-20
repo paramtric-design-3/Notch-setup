@@ -303,6 +303,7 @@ const TILE = {
       ? `<div class="lrow"><span class="lq">${label}</span>${rankPill(r)}<span class="lwr">${wr(r)}</span></div>`
       : `<div class="lrow"><span class="lq">${label}</span><span class="muted">Unranked</span></div>`;
     const phase = { Lobby: 'In lobby', Matchmaking: 'In queue', ReadyCheck: 'Match found', ChampSelect: 'Champ select', GameStart: 'Game starting', InProgress: 'In game', EndOfGame: 'Game over' }[L.phase] || 'League open';
+    const phaseText = L.mode && L.phase !== 'Lobby' && L.phase !== 'None' ? `${phase} · ${L.mode}` : phase;
     t.classList.add('clickable');
     t.title = 'Show your champions and the tier list';
     if (size === 1) {
@@ -310,7 +311,7 @@ const TILE = {
       return t;
     }
     t.innerHTML = `
-      <div class="chead"><span class="cstatus ellipsis">${esc(me.name)}<span class="muted">#${esc(me.tag)}</span></span><span class="cfolder">${phase}</span></div>
+      <div class="chead"><span class="cstatus ellipsis">${esc(me.name)}<span class="muted">#${esc(me.tag)}</span></span><span class="cfolder">${esc(phaseText)}</span></div>
       ${line('Solo', me.solo)}${size > 1 ? line('Flex', me.flex) : ''}`;
     return t;
   },
