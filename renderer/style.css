@@ -584,3 +584,9 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .uload { display: flex; flex-direction: column; gap: 10px; }
 .league .uload .csme { align-items: center; }
 
+/* your champions and the tier list end on the same line */
+.league .lsplit { align-items: stretch; }
+.league .lsplit .lcol, .league .lsplit .ltl { height: 100%; }
+.league .lsplit .cslist { flex: 1; grid-auto-rows: 1fr; }
+.league .lsplit .ltlist { flex: 1; grid-auto-rows: 1fr; align-content: stretch; }
+.league .lsplit .ltrow { height: auto; min-height: 26px; }

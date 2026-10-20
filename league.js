@@ -374,7 +374,14 @@ class League {
   // Lane tier lists (like the ones on OP.GG, u.gg or Mobalytics) and, in champ select, counters,
   // items, skill order and runes for your champion. Free and keyless; see opgg.js.
   async loadMeta() {
-    if (this.metaLoading || Date.now() - this.metaAt < (this.meta ? META_TTL : 10 * 60 * 1000)) return;
+    if (this.metaLoading || Date.now() - this.metaAt < (this.meta ? META_TTL : 10 * 60 * 1000)) {
+      // Tier list read from disk: make sure its pictures load too.
+      if (this.meta && !this.metaIconsAsked && this.champs) {
+        this.metaIconsAsked = true;
+        this.loadIcons(Object.values(this.meta).flatMap(l => l.slice(0, 12)).map(x => (this.champs[x.id] || {}).key).filter(Boolean));
+      } else if (this.meta && !this.champs) this.loadChampions();
+      return;
+    }
     this.metaLoading = true;
     this.metaAt = Date.now();          // also the retry delay when it fails
     try {
@@ -408,7 +415,7 @@ class League {
       this.log(`opgg meta: ${Object.entries(lanes).map(([k, v]) => `${k} ${v.length}`).join(', ')}`);
     } catch (e) { this.log('opgg meta: ' + e.message); }
     finally { this.metaLoading = false; }
-    if (this.meta) this.loadIcons(Object.values(this.meta).flat().map(x => (this.champs[x.id] || {}).key).filter(Boolean));
+    if (this.meta) { this.metaIconsAsked = true; this.loadIcons(Object.values(this.meta).flatMap(l => l.slice(0, 12)).map(x => (this.champs[x.id] || {}).key).filter(Boolean)); }
     this.emit();
   }
 

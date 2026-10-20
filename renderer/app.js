@@ -470,7 +470,7 @@ const chIcon = (c, cls = 'lch') => {
 };
 const imgIcon = (k, title) => LICON[k] ? `<img class="lit" src="${LICON[k]}" alt="" title="${esc(title || '')}">` : `<span class="lit none" title="${esc(title || '')}"></span>`;
 const OPGG_TIER = { 1: ['OP', '#F29A4A'], 2: ['Strong', '#d6a84c'], 3: ['Good', '#6b8ff0'], 4: ['Average', '#8a8a8a'], 5: ['Weak', '#6a6a6a'] };
-const tierPill = t => { const [n, c] = OPGG_TIER[t] || ['–', '#666']; return `<span class="ltier" style="--tier:${c}">${n}</span>`; };
+const tierPill = t => { const [n, c] = OPGG_TIER[t] || OPGG_TIER[t === 0 ? 1 : -1] || ['–', '#666']; return `<span class="ltier" style="--tier:${c}">${n}</span>`; };
 const pct = x => Math.round((x || 0) * 1000) / 10 + '%';
 const LANES = [['top', 'Top'], ['jungle', 'Jungle'], ['mid', 'Mid'], ['adc', 'Bot'], ['support', 'Support']];
 function opggUrl(champ, lane) {
@@ -498,7 +498,7 @@ function tierList(L) {
   return `<div class="ltl">
     <div class="lcolhead"><span class="cstatus">${I.bars}OP.GG tier list</span><span class="muted">Ranked · this patch · click a champion for its build</span></div>
     <div class="ltabs">${LANES.map(([k, n]) => `<button class="ltab ${k === lane ? 'on' : ''}" data-tierlane="${k}">${n}</button>`).join('')}</div>
-    <div class="ltlist" style="grid-template-rows: repeat(${Math.max(1, Math.ceil(list.length / 2))}, auto)">${list.length ? list.map((c, i) => `
+    <div class="ltlist" style="grid-template-rows: repeat(${Math.max(1, Math.ceil(list.length / 2))}, 1fr)">${list.length ? list.map((c, i) => `
       <button class="ltrow" data-url="${esc(opggUrl(c, lane))}" title="${esc(c.name)} build on OP.GG"><span class="ltrank">${c.rank || i + 1}</span>${chIcon(c, 'lch sm')}<span class="ellipsis ltname">${esc(c.name)}</span>${tierPill(c.tier)}<span class="ltnum"><b>${pct(c.winRate)}</b></span><span class="ltnum muted">${pct(c.pickRate)}</span><span class="ltnum muted">${pct(c.banRate)}</span></button>`).join('')
       : `<div class="muted">${L.meta ? 'No tier list for this lane' : 'Loading the tier list from OP.GG…'}</div>`}</div>
     ${list.length ? '<div class="lthead muted"><span>Win · Pick · Ban</span></div>' : ''}
