@@ -374,6 +374,7 @@ tilesView.addEventListener('click', async e => {
     return;
   }
   if (b.dataset.url) { api.send('open-url', b.dataset.url); return; }
+  if (b.dataset.cstab) { D.csTab = b.dataset.cstab; rerenderTile('league'); return; }
   if (b.dataset.tierlane) { D.tierLane = b.dataset.tierlane; rerenderTile('league'); return; }
   if (b.dataset.import !== undefined) {
     b.disabled = true; b.textContent = 'Importing…';
@@ -508,47 +509,105 @@ function statLine(st) {
   return `<b class="${pct >= 55 ? 'hot' : pct < 47 ? 'cold' : ''}">${pct}%</b> · ${st.games} game${st.games === 1 ? '' : 's'} · ${st.kda} KDA`;
 }
 function csTimeLeft(cs) { return Math.max(0, cs.timeLeft - (Date.now() - cs.at)); }
+const ROLE_SHORT = { top: 'TOP', jungle: 'JGL', middle: 'MID', bottom: 'BOT', utility: 'SUP' };
+const pct0 = x => Math.round((x || 0) * 1000) / 10 + '%';
+const games = n => n ? (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : n) + ' games' : '';
+function ulist(items, value, label, cls, empty) {
+  if (!items.length) return `<div class="muted uempty">${empty}</div>`;
+  const max = Math.max(...items.map(value), 0.0001);
+  return items.map(c => `<button class="urow ${c.banned || c.taken ? 'dim' : ''} ${cls(c)}" data-url="${esc(opggUrl(c, c.lane || ''))}" title="${esc(c.name)} on OP.GG">
+    ${chIcon(c)}<span class="umid"><span class="ellipsis">${esc(c.name)}</span><span class="ubar"><i style="width:${Math.max(4, Math.round(100 * value(c) / max))}%"></i></span></span>
+    <span class="uval"><b>${label(c)}</b><span class="muted">${esc(c.sub || games(c.games))}</span></span></button>`).join('');
+}
+function csAutoTab(cs) {
+  if (cs.stage === 'ban') return 'ban';
+  if (cs.stage === 'final' || (cs.me && cs.me.locked)) return 'loadout';
+  return 'pick';
+}
 function leagueChampSelect(cs) {
-  const t = el('div', 'tile league game cs');
+  const t = el('div', 'tile league game cs ugg');
   const me = cs.me;
-  const pos = ROLE[cs.position] || '';
-  const o = cs.opgg && cs.opgg.runes;
-  const r = o || cs.runes;
-  const left = me ? `
-    <div class="csme">
-      ${chIcon(me, 'csbig')}
-      <div class="csinfo">
-        <div class="csname">${esc(me.name)} <span class="muted">${me.locked ? 'locked in' : 'hovering'}</span></div>
-        <div class="csstat">Your games: ${statLine(me.stats)}</div>
-        <div class="csrunes">${r ? `${o ? imgIcon('rune:' + o.keystoneId, o.keystone) : I.trophy}<b>${esc(r.keystone || r.primaryName)}</b>&nbsp;· ${esc(r.primaryName)} + ${esc(r.secondaryName)}${o ? '<span class="muted">&nbsp;(OP.GG)</span>' : ''}` : '<span class="muted">Loading recommended runes…</span>'}</div>
-      </div>
-    </div>
-    ${opggBlock(cs.opgg, me)}
-    ${!me.locked && cs.picks && cs.picks.filter(c => c.id !== me.id).length ? `<div class="orow csalt"><span class="olabel">Or pick</span>${cs.picks.filter(c => c.id !== me.id).slice(0, 4).map(c => `<button class="ocw" data-url="${esc(opggUrl(c, UGG_ROLE[cs.myPos]))}" title="${esc(c.name)}: ${esc(c.why)}">${chIcon(c, 'lch sm')}<span>${esc(c.name)}</span></button>`).join('')}</div>` : ''}
-    <div class="csbtns">
-      <button class="pbtn allow" data-import ${r && r.perkIds && r.perkIds.length >= 6 ? '' : 'disabled'}>Import ${o ? 'OP.GG ' : ''}runes</button>
-      <button class="pbtn" data-url="${esc(opggUrl(me, cs.opgg && cs.opgg.lane))}">OP.GG ↗</button>
-      <button class="pbtn" data-url="${esc(uggUrl(me, cs.position, 'build'))}">u.gg ↗</button>
-    </div>` : `
-    <div class="csnone">
-      <div class="csname">Pick a champion</div>
-      ${cs.picks && cs.picks.length ? '' : `<div class="muted">${cs.ideas.length ? `Your most played${pos ? ' ' + pos : ''} champions` : 'Hover a champion to see runes and your stats'}</div>`}
-      <div class="csideas" ${cs.picks && cs.picks.length ? 'hidden' : ''}>${cs.ideas.map(c => `<button class="csidea" data-url="${esc(uggUrl(c, cs.position))}" title="${esc(c.name)} on u.gg">${chIcon(c)}<span>${esc(c.name)}</span><span class="muted">${c.stats ? Math.round(100 * c.stats.wins / c.stats.games) + '% · ' + c.stats.games + 'g' : ''}</span></button>`).join('')}</div>
-      ${cs.picks && cs.picks.length ? `<div class="muted">Suggested picks for ${esc(ROLE[cs.myPos] || 'you')}${cs.opponent ? ` · vs ${esc(cs.opponent.name)}` : ''}</div>
-      <div class="cspicks">${cs.picks.map(c => `<button class="cspick" data-url="${esc(opggUrl(c, UGG_ROLE[cs.myPos]))}" title="${esc(c.name)} build on OP.GG">${chIcon(c)}<span class="ellipsis">${esc(c.name)}</span>${c.tier ? tierPill(c.tier) : '<span></span>'}<span class="muted ellipsis">${esc(c.why)}</span></button>`).join('')}</div>` : ''}
+  const pos = ROLE[cs.myPos || cs.position] || '';
+  const lane = UGG_ROLE[cs.myPos || cs.position] || '';
+  const auto = csAutoTab(cs);
+  const autoKey = `${cs.stage}:${!!(me && me.locked)}`;
+  if (D.csTabKey !== autoKey) { D.csTabKey = autoKey; D.csTab = auto; }
+  const tab = D.csTab || auto;
+
+  // ---- teams (left)
+  const allyRows = cs.allies.map(a => {
+    const p = a.position || a.guess;
+    return `<div class="uplayer ${a.me ? 'me' : ''} ${a.champ ? '' : 'vacant'}">
+      <span class="urole" title="${esc(ROLE[p] || '')}">${ROLE_SHORT[p] || ''}${!a.position && a.guess && !a.sure ? '?' : ''}</span>
+      ${chIcon(a.champ, 'uch' + (a.locked ? '' : ' hover'))}
+      <span class="uname"><b class="ellipsis">${esc(a.name || (a.me ? 'You' : ROLE[p] || 'Teammate'))}</b><span class="ustat">${(a.spells || []).map(x => imgIcon('spell:' + x, 'Summoner spell')).join('')}${esc(a.status)}${a.champ && !a.locked ? ' · ' + esc(a.champ.name) : ''}</span></span>
+      <span class="uwr">${a.winRate ? `<b>${pct0(a.winRate)}</b><span class="muted">${esc(ROLE[p] || '')} WR</span>` : ''}</span>
     </div>`;
-  const allies = cs.allies.map(a => `<div class="csrow ${a.me ? 'me' : ''} ${a.locked ? '' : 'dim'}">${chIcon(a.champ)}<span class="cspos">${ROLE[a.position] || (a.guess ? ROLE[a.guess] + (a.sure ? '' : '?') : '')}</span><span class="ellipsis">${a.champ ? esc(a.champ.name) : '<span class="muted">Picking…</span>'}</span></div>`).join('');
-  const bad = new Set(((cs.opgg && cs.opgg.counters) || []).map(c => c.id)), good = new Set(((cs.opgg && cs.opgg.goodVs) || []).map(c => c.id));
-  const enemies = cs.enemies.length ? cs.enemies.map(e => `<div class="csrow ${cs.opponent && cs.opponent.id === e.id ? 'opp' : ''}" title="${e.guess ? 'Estimated role: ' + ROLE[e.guess] + (cs.opponent && cs.opponent.id === e.id ? ' (your lane)' : '') : ''}">${chIcon(e)}<span class="cspos">${e.guess ? ROLE[e.guess] + (e.sure ? '' : '?') : ''}</span><span class="ellipsis">${esc(e.name)}</span>${bad.has(e.id) ? '<span class="otag cold">counters you</span>' : good.has(e.id) ? '<span class="otag hot">you counter</span>' : ''}</div>`).join('') : '<div class="muted csempty">No enemy picks yet</div>';
+  }).join('');
+  const byId = new Map(cs.enemies.map(e => [e.id, e]));
+  const enemyRows = (cs.enemyRows || cs.enemies.map((e, i) => ({ champ: e, status: 'Locked in', n: i + 1 }))).map(r => {
+    const e = r.champ && (byId.get(r.champ.id) || r.champ);
+    const isOpp = e && cs.opponent && cs.opponent.id === e.id;
+    return `<div class="uplayer enemy ${e ? '' : 'vacant'} ${isOpp ? 'opp' : ''}">
+      ${chIcon(e, 'uch')}
+      <span class="uname"><b class="ellipsis">${e ? esc(e.name) : 'Enemy ' + r.n}</b><span class="ustat">${e && e.guess ? `<span class="upred">${esc(ROLE[e.guess])}${e.sure ? '' : '?'}</span>${isOpp ? ' your lane' : ' predicted'}` : esc(r.status)}</span></span>
+      <span class="uwr">${e && e.winRate ? `<b>${pct0(e.winRate)}</b><span class="muted">${esc(ROLE[e.guess] || '')} WR</span>` : ''}</span>
+      <span class="ucount">${e && e.counters && e.counters.length ? `<span class="muted">Counters</span><span class="ucicons">${e.counters.map(c => `<span title="${esc(c.name)} wins ${pct0(c.winRate)} vs ${esc(e.name)}">${chIcon(c, 'lch sm')}<i>${Math.round(c.winRate * 100)}%</i></span>`).join('')}</span>` : ''}</span>
+    </div>`;
+  }).join('');
+
+  // ---- panel (right)
+  const o = cs.opgg;
+  let body;
+  if (tab === 'ban') {
+    const counters = (o && o.counters) || [];
+    body = `<div class="ucols">
+      <div class="ucol"><div class="uhead">Most banned ${esc(pos || 'champions')}<span class="muted">Ban rate</span></div>
+        ${ulist((cs.banList || []).map(c => ({ ...c, lane })), c => c.banRate, c => pct0(c.banRate) + ' BR', () => 'ban', 'Loading OP.GG ban rates…')}</div>
+      <div class="ucol">${me && counters.length
+        ? `<div class="uhead">${esc(me.name)} counters<span class="muted">Your win rate</span></div>${ulist(counters.map(c => ({ ...c, lane })), c => 1 - c.winRate, c => pct0(c.winRate) + ' WR', () => 'bad', '')}`
+        : `<div class="uhead">Strongest ${esc(pos || '')} picks<span class="muted">Win rate</span></div>${ulist((cs.laneTop || []).slice(0, 8).map(c => ({ ...c, lane })), c => c.winRate - 0.45, c => pct0(c.winRate) + ' WR', () => '', 'Loading the tier list…')}`}</div>
+    </div>`;
+  } else if (tab === 'pick') {
+    const vs = cs.opponent && cs.enemies.find(e => e.id === cs.opponent.id);
+    const beat = (vs && vs.counters) || [];
+    body = `<div class="ucols">
+      <div class="ucol"><div class="uhead">Suggested for ${esc(pos || 'you')}<span class="muted">Why</span></div>
+        ${(cs.picks || []).length ? cs.picks.map(c => `<button class="urow pick" data-url="${esc(opggUrl(c, lane))}" title="${esc(c.name)} build on OP.GG">${chIcon(c)}<span class="umid"><span class="ellipsis">${esc(c.name)}</span><span class="muted ellipsis usub">${esc(c.why)}</span></span><span class="uval">${c.tier ? tierPill(c.tier) : ''}</span></button>`).join('') : '<div class="muted uempty">Suggestions appear once OP.GG\'s tier list has loaded</div>'}</div>
+      <div class="ucol">${beat.length
+        ? `<div class="uhead">Beats ${esc(vs.name)}<span class="muted">Their win rate</span></div>${ulist(beat.map(c => ({ ...c, lane, sub: '' })), c => c.winRate, c => pct0(c.winRate) + ' WR', () => 'good', '')}`
+        : `<div class="uhead">Strongest ${esc(pos || '')} picks<span class="muted">Win rate</span></div>${ulist((cs.laneTop || []).slice(0, 8).map(c => ({ ...c, lane })), c => c.winRate - 0.45, c => pct0(c.winRate) + ' WR', () => 'good', 'Loading the tier list…')}`}</div>
+    </div>`;
+  } else {
+    const r = (o && o.runes) || cs.runes;
+    body = me ? `<div class="uload">
+      <div class="csme">
+        ${chIcon(me, 'csbig')}
+        <div class="csinfo">
+          <div class="csname">${esc(me.name)} <span class="muted">${me.locked ? 'locked in' : 'hovering'}</span></div>
+          <div class="csstat">Your games: ${statLine(me.stats)}</div>
+          <div class="csrunes">${r ? `${o && o.runes ? imgIcon('rune:' + o.runes.keystoneId, r.keystone) : I.trophy}<b>${esc(r.keystone || r.primaryName)}</b>&nbsp;· ${esc(r.primaryName)} + ${esc(r.secondaryName)}${o && o.runes ? '<span class="muted">&nbsp;(OP.GG)</span>' : ''}` : '<span class="muted">Loading recommended runes…</span>'}</div>
+        </div>
+      </div>
+      <div class="csbtns">
+          <button class="pbtn allow" data-import ${r && r.perkIds && r.perkIds.length >= 6 ? '' : 'disabled'}>Import ${o && o.runes ? 'OP.GG ' : ''}runes</button>
+          <button class="pbtn" data-url="${esc(opggUrl(me, o && o.lane))}">OP.GG ↗</button>
+          <button class="pbtn" data-url="${esc(uggUrl(me, cs.position, 'build'))}">u.gg ↗</button>
+      </div>
+      ${opggBlock(o, me)}
+    </div>` : '<div class="muted uempty">Hover a champion to see its build, skills and runes</div>';
+  }
   const bs = cs.banSides || { mine: [], theirs: [] };
   const banRow = (list, cls) => `<span class="cbans ${cls}">${list.map(b => b ? `<span class="cban" title="Banned: ${esc(b.name)}">${chIcon(b, 'lch')}</span>` : '<span class="cban none">✕</span>').join('')}</span>`;
   t.innerHTML = `
     <div class="lhead csbar"><span class="cstatus">${I.trophy}Champ select${pos ? ' · ' + pos : ''}</span>
       <span class="csbanbar">${banRow(bs.mine, 'blue')}<span class="cstimer" data-cstimer>${fmtTime(csTimeLeft(cs))}</span>${banRow(bs.theirs, 'red')}</span><span></span></div>
-    <div class="csgrid">
-      <div class="csleft">${left}</div>
-      <div class="csteam blue"><div class="clabel">Your team</div>${allies}</div>
-      <div class="csteam red"><div class="clabel">Enemy team</div>${enemies}</div>
+    <div class="ugrid">
+      <div class="uteams"><div class="uteam blue">${allyRows}</div><div class="uteam red">${enemyRows}</div></div>
+      <div class="upanel">
+        <div class="utabs">${[['ban', 'Ban'], ['pick', 'Pick'], ['loadout', 'Loadout']].map(([k, n]) => `<button class="utab ${tab === k ? 'on' : ''}" data-cstab="${k}">${n}</button>`).join('')}</div>
+        <div class="ubody">${body}</div>
+      </div>
     </div>`;
   return t;
 }

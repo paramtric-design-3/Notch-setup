@@ -75,7 +75,7 @@ class League {
     this.meta = null; this.metaAt = 0;
     try {
       const m = JSON.parse(fs.readFileSync(path.join(cacheDir, 'opgg-meta.json'), 'utf8'));
-      if (m && m.lanes && m.roles && Date.now() - m.at < META_TTL) { this.meta = m.lanes; this.roleRates = m.roles; this.metaAt = m.at; }
+      if (m && m.v === 2 && m.lanes && m.roles && Date.now() - m.at < META_TTL) { this.meta = m.lanes; this.roleRates = m.roles; this.metaAt = m.at; }
     } catch { /* first run */ }
   }
 
@@ -206,12 +206,22 @@ class League {
     try { s = await this.lcuGet('/lol-champ-select/v1/session'); } catch { s = null; }
     if (!s || !Array.isArray(s.myTeam)) return;
     const meCell = s.localPlayerCellId;
+    const timer = s.timer || {};
     const actions = (s.actions || []).flat();
     const lockedCells = new Set(actions.filter(a => a.type === 'pick' && a.completed).map(a => a.actorCellId));
+    const inProgress = new Set(actions.filter(a => a.isInProgress && !a.completed).map(a => a.actorCellId));
+    const status = (cell, locked) => locked ? 'Locked in' : inProgress.has(cell) ? (actions.find(a => a.isInProgress && a.actorCellId === cell).type === 'ban' ? 'Banning' : 'Picking') : 'Waiting';
     const allies = s.myTeam.map(p => {
       const id = p.championId || p.championPickIntent || 0;
-      return { me: p.cellId === meCell, position: p.assignedPosition || '', champ: this.champ(id), locked: !!p.championId && lockedCells.has(p.cellId) };
+      const locked = !!p.championId && lockedCells.has(p.cellId);
+      return {
+        me: p.cellId === meCell, position: p.assignedPosition || '', champ: this.champ(id), locked,
+        name: p.gameName || p.summonerName || '', status: status(p.cellId, locked), spells: [p.spell1Id, p.spell2Id].filter(x => x > 0),
+      };
     });
+    const enemyRows = (s.theirTeam || []).map((p, i) => ({ champ: p.championId ? this.champ(p.championId) : null, status: p.championId ? (lockedCells.has(p.cellId) ? 'Locked in' : 'Hovering') : status(p.cellId, false), n: i + 1 }));
+    const cur = actions.find(a => a.isInProgress && !a.completed);
+    const stage = cur ? cur.type : (timer.phase === 'FINALIZATION' ? 'final' : (timer.phase === 'PLANNING' ? 'ban' : 'pick'));
     const mine = allies.find(a => a.me) || {};
     const enemies = (s.theirTeam || []).map(p => this.champ(p.championId)).filter(Boolean);
     const bans = s.bans || {};
@@ -226,7 +236,6 @@ class League {
       return Array.from({ length: 5 }, (_, i) => ids[i] || 0);
     };
     const banSides = { mine: side(true), theirs: side(false) };
-    const timer = s.timer || {};
     const myChamp = mine.champ ? mine.champ.id : 0;
     if (myChamp !== this.csChamp) {
       this.csChamp = myChamp;
@@ -243,21 +252,47 @@ class League {
     const myPos = mine.position || mine.guess || '';
     const opponent = myPos ? enemies.find(e => e.guess === myPos) || null : null;
     if (opponent) this.loadOpponent(opponent.id, myPos);
+    for (const e of enemies) if (e.guess) this.queueAnalysis(e.id, e.guess);
+    for (const a of allies) {
+      const pos = a.position || a.guess;
+      a.winRate = a.champ && pos ? this.laneWinRate(a.champ.id, pos) : 0;
+    }
+    for (const e of enemies) e.winRate = e.guess ? this.laneWinRate(e.id, e.guess) : 0;
     this.cs = {
       position: mine.position || '', timeLeft: Math.max(0, Math.round(timer.adjustedTimeLeftInPhase || 0)), timerPhase: timer.phase || '',
       at: Date.now(), me: mine.champ ? { ...mine.champ, locked: mine.locked, stats: this.statsFor(mine.champ.id) } : null,
       allies, enemies, bans: [...new Set([...banList, ...actionBans])].map(id => this.champ(id)),
       runes: this.csRunes, ideas: this.topChamps(mine.position || '', 4),
       opgg: this.opggView(this.csOpgg), meta: mine.position ? this.metaFor(mine.position, 5) : [],
-      myPos, opponent: opponent && { ...opponent }, picks: [], banSides,
+      myPos, opponent: opponent && { ...opponent }, picks: [], banSides, stage, enemyRows,
     };
     this.csUnavailable = new Set([...this.cs.bans.filter(Boolean).map(b => b.id), ...enemies.map(e => e.id), ...allies.filter(a => a.champ && !a.me).map(a => a.champ.id)]);
     this.refreshPicks();
-    this.loadIcons([...allies.map(a => a.champ && a.champ.key), ...enemies.map(e => e.key), ...this.cs.bans.map(b => b && b.key), ...this.cs.ideas.map(i => i.key), ...this.cs.meta.map(m => m.key), ...this.cs.picks.map(m => m.key)].filter(Boolean));
+    this.loadIcons([...allies.map(a => a.champ && a.champ.key), ...enemies.map(e => e.key), ...this.cs.bans.map(b => b && b.key), ...this.cs.ideas.map(i => i.key), ...this.cs.meta.map(m => m.key), ...this.cs.picks.map(m => m.key), ...(this.cs.banList || []).map(m => m.key), ...(this.cs.laneTop || []).map(m => m.key), ...allies.flatMap(a => (a.spells || []).map(x => 'spell:' + x))].filter(Boolean));
+  }
+  laneWinRate(id, position) {
+    const m = ((this.meta && this.meta[POS[position]]) || []).find(x => x.id === id);
+    return m ? m.winRate : 0;
+  }
+  // Champions that beat an enemy pick (OP.GG), loaded one at a time in the background.
+  queueAnalysis(id, position) {
+    const key = `${id}:${POS[position]}`;
+    this.aQueued = this.aQueued || new Set();
+    if (this.aQueued.has(key)) return;
+    this.aQueued.add(key);
+    this.aChain = (this.aChain || Promise.resolve()).then(() => this.loadAnalysis(id, position, true)).then(() => { if (this.cs) this.emit(); }).catch(() => {});
+  }
+  countersOf(id, position) {
+    const a = this.analysis.get(`${id}:${POS[position]}`);
+    return ((a && a.data && a.data.counters) || []).slice(0, 3).map(c => ({ ...this.champ(c.id), ...(this.champs && this.champs[c.id] ? {} : { name: c.name }), winRate: 1 - c.winRate }));
   }
   refreshPicks() {
     if (!this.cs) return;
     this.cs.picks = this.suggestPicks(this.cs.myPos, this.cs.opponent, this.csUnavailable || new Set());
+    const lane = POS[this.cs.myPos];
+    const list = (this.meta && this.meta[lane]) || [];
+    this.cs.banList = list.slice().sort((a, b) => b.banRate - a.banRate).slice(0, 10).map(m => ({ ...this.champ(m.id), banRate: m.banRate, winRate: m.winRate, games: m.play, banned: (this.csUnavailable || new Set()).has(m.id) }));
+    this.cs.laneTop = list.slice(0, 10).map(m => ({ ...this.champ(m.id), winRate: m.winRate, tier: m.tier, games: m.play, taken: (this.csUnavailable || new Set()).has(m.id) }));
   }
 
   // Riot's own recommended rune pages, from the client.
@@ -344,13 +379,13 @@ class League {
         lanes[lane] = list.filter(x => x && !x.is_rip).map(x => ({
           id: this.champIdOf(x.champion !== undefined ? x.champion : (x.champion_id || x.champion_name)),
           tier: +x.tier || 0, rank: +x.rank || 0, winRate: +x.win_rate || 0, pickRate: +x.pick_rate || 0, banRate: +x.ban_rate || 0,
-          prev: +x.rank_prev || 0,
-        })).filter(x => x.id).sort((a, b) => (a.rank || 999) - (b.rank || 999) || a.tier - b.tier || b.winRate - a.winRate).slice(0, 12);
+          prev: +x.rank_prev || 0, play: +x.play || 0,
+        })).filter(x => x.id).sort((a, b) => (a.rank || 999) - (b.rank || 999) || a.tier - b.tier || b.winRate - a.winRate).slice(0, 80);
       }
       if (!Object.keys(lanes).length) throw new Error('no lanes in answer');
       this.meta = lanes;
       this.roleRates = roles;
-      try { fs.writeFileSync(path.join(this.cacheDir, 'opgg-meta.json'), JSON.stringify({ at: this.metaAt, lanes, roles })); } catch { /* ignore */ }
+      try { fs.writeFileSync(path.join(this.cacheDir, 'opgg-meta.json'), JSON.stringify({ v: 2, at: this.metaAt, lanes, roles })); } catch { /* ignore */ }
       this.log(`opgg meta: ${Object.entries(lanes).map(([k, v]) => `${k} ${v.length}`).join(', ')}`);
     } catch (e) { this.log('opgg meta: ' + e.message); }
     finally { this.metaLoading = false; }
@@ -647,7 +682,8 @@ class League {
         bans: this.cs.bans.filter(Boolean).map(b => ({ ...b, icon: this.icons.get(b.key) || null })),
         banSides: this.cs.banSides && Object.fromEntries(Object.entries(this.cs.banSides).map(([k, ids]) => [k, ids.map(id => { const c = id ? this.champ(id) : null; return c && { ...c, icon: this.icons.get(c.key) || null }; })])),
         ideas: this.cs.ideas.map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
-        picks: (this.cs.picks || []).map(i => ({ ...i, icon: this.icons.get(i.key) || null })) },
+        picks: (this.cs.picks || []).map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
+        enemies: this.cs.enemies.map(e => ({ ...e, icon: this.icons.get(e.key) || null, counters: e.guess ? this.countersOf(e.id, e.guess) : [] })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
       game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players },
       meta: this.meta ? Object.fromEntries(Object.keys(this.meta).map(l => [l, this.metaFor(l, 10).map(({ icon, ...c }) => c)])) : null,
