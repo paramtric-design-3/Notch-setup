@@ -1,6 +1,6 @@
 {
   "name": "fjbc-notch",
-  "version": "1.29.3",
+  "version": "1.30.0",
   "description": "A Dynamic Island for Windows",
   "main": "main.js",
   "scripts": {

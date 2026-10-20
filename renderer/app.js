@@ -497,8 +497,8 @@ function tierList(L) {
   const lane = D.tierLane || L.mainLane || 'jungle';
   const list = (L.meta && L.meta[lane]) || [];
   return `<div class="ltl">
-    <div class="lcolhead"><span class="cstatus">${I.bars}OP.GG tier list</span><span class="muted">Ranked · this patch · click a champion for its build</span></div>
-    <div class="ltabs">${LANES.map(([k, n]) => `<button class="ltab ${k === lane ? 'on' : ''}" data-tierlane="${k}">${n}</button>`).join('')}</div>
+    <div class="lcolhead"><span class="cstatus">${I.podium}OP.GG tier list</span><span class="muted">Ranked · this patch · click a champion for its build</span></div>
+    <div class="ltabs">${LANES.map(([k, n]) => `<button class="ltab ${k === lane ? 'on' : ''}" data-tierlane="${k}">${roleIcon(k)}${n}</button>`).join('')}</div>
     <div class="ltlist" style="grid-template-rows: repeat(${Math.max(1, Math.ceil(list.length / 2))}, 1fr)">${list.length ? list.map((c, i) => `
       <button class="ltrow" data-url="${esc(opggUrl(c, lane))}" title="${esc(c.name)} build on OP.GG"><span class="ltrank">${c.rank || i + 1}</span>${chIcon(c, 'lch sm')}<span class="ellipsis ltname">${esc(c.name)}</span>${tierPill(c.tier)}<span class="ltnum"><b>${pct(c.winRate)}</b></span><span class="ltnum muted">${pct(c.pickRate)}</span><span class="ltnum muted">${pct(c.banRate)}</span></button>`).join('')
       : `<div class="muted">${L.meta ? 'No tier list for this lane' : 'Loading the tier list from OP.GG…'}</div>`}</div>
@@ -512,6 +512,8 @@ function statLine(st) {
 }
 function csTimeLeft(cs) { return Math.max(0, cs.timeLeft - (Date.now() - cs.at)); }
 const ROLE_SHORT = { top: 'TOP', jungle: 'JGL', middle: 'MID', bottom: 'BOT', utility: 'SUP' };
+const ROLE_ICON = { top: 'roleTop', jungle: 'roleJungle', middle: 'roleMid', bottom: 'roleBot', utility: 'roleSupport', mid: 'roleMid', adc: 'roleBot', support: 'roleSupport' };
+const roleIcon = p => (ROLE_ICON[p] && I[ROLE_ICON[p]]) || '';
 const pct0 = x => Math.round((x || 0) * 1000) / 10 + '%';
 const games = n => n ? (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : n) + ' games' : '';
 function ulist(items, value, label, cls, empty) {
@@ -540,7 +542,7 @@ function leagueChampSelect(cs) {
   const allyRows = cs.allies.map(a => {
     const p = a.position || a.guess;
     return `<div class="uplayer ${a.me ? 'me' : ''} ${a.champ ? '' : 'vacant'}">
-      <span class="urole" title="${esc(ROLE[p] || '')}">${ROLE_SHORT[p] || ''}${!a.position && a.guess && !a.sure ? '?' : ''}</span>
+      <span class="urole" title="${esc(ROLE[p] || '')}${!a.position && a.guess ? ' (estimated)' : ''}">${roleIcon(p)}${!a.position && a.guess && !a.sure ? '<i>?</i>' : ''}</span>
       ${chIcon(a.champ, 'uch' + (a.locked ? '' : ' hover'))}
       <span class="uname"><b class="ellipsis">${esc(a.name || (a.me ? 'You' : ROLE[p] || 'Teammate'))}</b><span class="ustat">${(a.spells || []).map(x => imgIcon('spell:' + x, 'Summoner spell')).join('')}${esc(a.status)}${a.champ && !a.locked ? ' · ' + esc(a.champ.name) : ''}</span></span>
       <span class="uwr">${a.winRate ? `<b>${pct0(a.winRate)}</b><span class="muted">${esc(ROLE[p] || '')} WR</span>` : ''}</span>
@@ -552,7 +554,7 @@ function leagueChampSelect(cs) {
     const isOpp = e && cs.opponent && cs.opponent.id === e.id;
     return `<div class="uplayer enemy ${e ? '' : 'vacant'} ${isOpp ? 'opp' : ''}">
       ${chIcon(e, 'uch')}
-      <span class="uname"><b class="ellipsis">${e ? esc(e.name) : 'Enemy ' + r.n}</b><span class="ustat">${e && e.guess ? `<span class="upred">${esc(ROLE[e.guess])}${e.sure ? '' : '?'}</span>${isOpp ? ' your lane' : ' predicted'}` : esc(r.status)}</span></span>
+      <span class="uname"><b class="ellipsis">${e ? esc(e.name) : 'Enemy ' + r.n}</b><span class="ustat">${e && e.guess ? `<span class="upred">${roleIcon(e.guess)}${esc(ROLE[e.guess])}${e.sure ? '' : '?'}</span>${isOpp ? ' your lane' : ' predicted'}` : esc(r.status)}</span></span>
       <span class="uwr">${e && e.winRate ? `<b>${pct0(e.winRate)}</b><span class="muted">${esc(ROLE[e.guess] || '')} WR</span>` : ''}</span>
       <span class="ucount">${e && e.counters && e.counters.length ? `<span class="muted">Counters</span><span class="ucicons">${e.counters.map(c => `<span title="${esc(c.name)} wins ${pct0(c.winRate)} vs ${esc(e.name)}">${chIcon(c, 'lch sm')}<i>${Math.round(c.winRate * 100)}%</i></span>`).join('')}</span>` : ''}</span>
     </div>`;
@@ -619,7 +621,7 @@ function leagueChampions(L) {
   t.innerHTML = `
     <div class="lsplit">
       <div class="lcol">
-      <div class="lcolhead"><span class="cstatus">${I.trophy}Your champions</span><span class="muted">Last 50 games · click an empty spot to close</span></div>
+      <div class="lcolhead"><span class="cstatus">${I.swords}Your champions</span><span class="muted">Last 50 games · click an empty spot to close</span></div>
       <div class="cslist">${list.length ? list.map(c => `
         <button class="cschamp" data-url="${esc(opggUrl(c, ''))}">${chIcon(c, 'csbig sm')}<span class="csname">${esc(c.name)}</span><span class="csstat">${statLine(c.stats)}</span></button>`).join('') : '<div class="muted">Play a few games and your champions show up here.</div>'}</div>
       </div>

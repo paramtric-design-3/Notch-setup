@@ -595,3 +595,13 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .ltl .ltrow { padding-left: 0; grid-template-columns: 18px 20px minmax(0, 1fr) auto 40px; }
 .league .ltl .ltrank { text-align: left; }
 .league .lcolhead .cstatus svg { margin-left: -1px; }
+/* role icons */
+.league .urole { display: inline-flex; align-items: center; justify-content: center; position: relative; color: var(--text-2); }
+.league .urole svg { width: 18px; height: 18px; }
+.league .uplayer.me .urole { color: var(--accent); }
+.league .urole i { position: absolute; right: 0; top: -2px; font-style: normal; font-size: 9px; font-weight: 700; color: var(--text-2); }
+.league .upred { display: inline-flex; align-items: center; gap: 3px; }
+.league .upred svg { width: 12px; height: 12px; }
+.league .ltab { display: inline-flex; align-items: center; gap: 5px; }
+.league .ltab svg { width: 14px; height: 14px; opacity: .8; }
+.league .ltab.on svg { opacity: 1; }
