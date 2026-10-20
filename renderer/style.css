@@ -590,3 +590,8 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .lsplit .cslist { flex: 1; grid-auto-rows: 1fr; }
 .league .lsplit .ltlist { flex: 1; grid-auto-rows: 1fr; align-content: stretch; }
 .league .lsplit .ltrow { height: auto; min-height: 26px; }
+/* tier list: header, tabs and rows share one left edge */
+.league .ltl .ltabs { margin-left: -10px; }
+.league .ltl .ltrow { padding-left: 0; grid-template-columns: 18px 20px minmax(0, 1fr) auto 40px; }
+.league .ltl .ltrank { text-align: left; }
+.league .lcolhead .cstatus svg { margin-left: -1px; }
