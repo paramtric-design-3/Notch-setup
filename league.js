@@ -8,8 +8,10 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { Opgg, POS, nameCandidates } = require('./opgg');
 
 const LIVE_PORT = 2999;
+const META_TTL = 6 * 3600 * 1000;      // OP.GG tier lists and builds change once a patch, roughly
 // Both servers use self-signed certificates and only listen on 127.0.0.1.
 const agent = new https.Agent({ rejectUnauthorized: false, keepAlive: true, maxSockets: 4 });
 
@@ -65,6 +67,15 @@ class League {
     this.timer = null;
     this.busy = false;
     this.lastSent = '';
+    this.opgg = new Opgg({ fetchImpl: this.fetch, log: this.log });
+    this.analysis = new Map();      // `${champId}:${position}` -> { at, data }
+    this.opggNames = new Map();     // champId -> the name OP.GG knows it by
+    this.sentIcons = new Set();
+    this.meta = null; this.metaAt = 0;
+    try {
+      const m = JSON.parse(fs.readFileSync(path.join(cacheDir, 'opgg-meta.json'), 'utf8'));
+      if (m && m.lanes && Date.now() - m.at < META_TTL) { this.meta = m.lanes; this.metaAt = m.at; }
+    } catch { /* first run */ }
   }
 
   start() { if (!this.timer) this.timer = setInterval(() => this.tick(), 1500); }
@@ -94,7 +105,7 @@ class League {
       this.phase = phase;
       if (changed && (phase === 'EndOfGame' || phase === 'Lobby' || phase === 'None')) { this.endGame(); this.meAt = 0; }
       if (!this.me || Date.now() - this.meAt > 5 * 60 * 1000) await this.loadMe();
-      this.opggProbe();
+      this.loadMeta();
       if (phase === 'GameStart' || phase === 'InProgress' || phase === 'Reconnect') { this.cs = null; await this.loadGame(); }
       if (phase === 'ChampSelect') await this.loadChampSelect(changed);
       else if (this.cs) { this.cs = null; this.csChamp = 0; }
@@ -180,6 +191,13 @@ class League {
     return [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([id]) => ({ ...this.champ(id), stats: this.statsFor(id) }));
   }
 
+  mainLane() {
+    const n = {};
+    for (const g of this.history || []) if (g.lane && (g.queue === 420 || g.queue === 440 || g.queue === 400)) n[g.lane] = (n[g.lane] || 0) + 1;
+    const best = Object.entries(n).sort((a, b) => b[1] - a[1])[0];
+    return best ? POS[best[0]] : 'jungle';
+  }
+
   // ---------------------------------------------------------------- champ select
   async loadChampSelect(entered) {
     await this.loadChampions();
@@ -203,7 +221,8 @@ class League {
     if (myChamp !== this.csChamp) {
       this.csChamp = myChamp;
       this.csRunes = null;
-      if (myChamp) this.loadRecommendedRunes(myChamp, mine.position);
+      this.csOpgg = null;
+      if (myChamp) { this.loadRecommendedRunes(myChamp, mine.position); this.loadAnalysis(myChamp, mine.position); }
     }
     if (entered) this.send({ type: 'cs-start', position: mine.position });
     this.cs = {
@@ -211,8 +230,9 @@ class League {
       at: Date.now(), me: mine.champ ? { ...mine.champ, locked: mine.locked, stats: this.statsFor(mine.champ.id) } : null,
       allies, enemies, bans: [...new Set([...banList, ...actionBans])].map(id => this.champ(id)),
       runes: this.csRunes, ideas: this.topChamps(mine.position || '', 4),
+      opgg: this.opggView(this.csOpgg), meta: mine.position ? this.metaFor(mine.position, 5) : [],
     };
-    this.loadIcons([...allies.map(a => a.champ && a.champ.key), ...enemies.map(e => e.key), ...this.cs.bans.map(b => b && b.key), ...this.cs.ideas.map(i => i.key)].filter(Boolean));
+    this.loadIcons([...allies.map(a => a.champ && a.champ.key), ...enemies.map(e => e.key), ...this.cs.bans.map(b => b && b.key), ...this.cs.ideas.map(i => i.key), ...this.cs.meta.map(m => m.key)].filter(Boolean));
   }
 
   // Riot's own recommended rune pages, from the client.
@@ -238,8 +258,10 @@ class League {
   }
 
   // Create (or update) a rune page named "Notch: <champion>" and make it current.
+  // OP.GG's most played page (all 9 choices) is used when it's there, else Riot's recommendation.
   async importRunes() {
-    const r = this.csRunes;
+    const o = this.csOpgg && this.csOpgg.runes;
+    const r = o && o.perkIds.length === 9 ? o : this.csRunes;
     const me = this.cs && this.cs.me;
     if (!r || !me || r.perkIds.length < 6) return { ok: false, error: 'No recommended runes yet' };
     const body = { name: `Notch: ${me.name}`, primaryStyleId: r.primary, subStyleId: r.secondary, selectedPerkIds: r.perkIds, current: true };
@@ -248,7 +270,7 @@ class League {
       const ours = pages.find(p => /^Notch:/.test(p.name || '') && p.isEditable);
       if (ours) await this.lcuSend('DELETE', `/lol-perks/v1/pages/${ours.id}`);
       await this.lcuSend('POST', '/lol-perks/v1/pages', body);
-      return { ok: true };
+      return { ok: true, source: r === o ? 'OP.GG' : 'Riot' };
     } catch (e) {
       this.log('league import runes: ' + e.message);
       return { ok: false, error: /400|limit|max/i.test(e.message) ? 'All rune pages are in use: delete one in the client first' : 'Could not create the rune page' };
@@ -269,55 +291,120 @@ class League {
     });
   }
 
-  // ---------------------------------------------------------------- OP.GG open data (one-time format check)
-  // OP.GG publishes its champion data (counters, builds, runes) at https://mcp-api.op.gg/mcp.
-  // Ask once which tools and parameters it has and save one sample answer, so the next
-  // version can use it. Written to opgg-sample.json in the app's settings folder.
-  async opggProbe() {
-    if (this.opggDone) return;
-    this.opggDone = true;
-    const file = path.join(this.cacheDir, 'opgg-sample.json');
-    try { if (Date.now() - fs.statSync(file).mtimeMs < 24 * 3600 * 1000) return; } catch { /* not yet */ }
-    const url = 'https://mcp-api.op.gg/mcp';
-    let session = null, id = 0;
-    const call = async (method, params, notify = false) => {
-      const res = await this.fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...(session ? { 'Mcp-Session-Id': session } : {}) },
-        body: JSON.stringify(notify ? { jsonrpc: '2.0', method, params } : { jsonrpc: '2.0', id: ++id, method, params }),
-      });
-      session = res.headers.get('mcp-session-id') || session;
-      const text = await res.text();
-      if (notify) return null;
-      const json = text.trim().startsWith('{') ? text : (text.split('\n').filter(l => l.startsWith('data:')).map(l => l.slice(5).trim()).pop() || 'null');
-      return JSON.parse(json);
-    };
-    const out = { at: new Date().toISOString() };
+  // ---------------------------------------------------------------- OP.GG open data
+  // Lane tier lists (like the ones on OP.GG, u.gg or Mobalytics) and, in champ select, counters,
+  // items, skill order and runes for your champion. Free and keyless; see opgg.js.
+  async loadMeta() {
+    if (this.metaLoading || Date.now() - this.metaAt < (this.meta ? META_TTL : 10 * 60 * 1000)) return;
+    this.metaLoading = true;
+    this.metaAt = Date.now();          // also the retry delay when it fails
     try {
-      out.init = await call('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'fjbc-notch', version: '1' } });
-      await call('notifications/initialized', {}, true);
-      const tools = await call('tools/list', {});
-      out.tools = ((tools && tools.result && tools.result.tools) || []).filter(t => /^lol/.test(t.name));
-      const t = out.tools.find(x => /champion_analysis|champion-analysis/.test(x.name));
-      if (t) {
-        const props = (t.inputSchema && t.inputSchema.properties) || {};
-        const pick = (k, want) => {
-          const en = props[k] && (props[k].enum || (props[k].items && props[k].items.enum));
-          if (!en) return want[0];
-          return en.find(v => want.some(w => String(v).toLowerCase() === w.toLowerCase())) || en[0];
-        };
-        const args = {};
-        if (props.champion) args.champion = pick('champion', ['AHRI', 'Ahri', 'ahri']);
-        if (props.position) args.position = pick('position', ['mid', 'middle', 'MID']);
-        if (props.game_mode) args.game_mode = pick('game_mode', ['ranked', 'RANKED']);
-        if (props.lang) args.lang = pick('lang', ['en_US', 'en']);
-        if (props.desired_output_fields) args.desired_output_fields = ['data'];
-        out.args = args;
-        out.sample = await call('tools/call', { name: t.name, arguments: args });
+      await this.loadChampions();
+      let out;
+      try { out = await this.opgg.call('lol_list_lane_meta_champions', { position: 'all', lang: 'en_US', desired_output_fields: ['data'] }); } catch (e) {
+        const f = '{ban_rate,champion,is_rip,kda,pick_rate,play,rank,role_rate,tier,win_rate}';
+        out = await this.opgg.call('lol_list_lane_meta_champions', { position: 'all', lang: 'en_US', desired_output_fields: ['top', 'jungle', 'mid', 'adc', 'support'].map(p => `data.positions.${p}[].${f}`) });
       }
-    } catch (e) { out.error = String(e && e.message || e); }
-    try { fs.writeFileSync(file, JSON.stringify(out, null, 1)); } catch { /* ignore */ }
-    this.log('opgg probe: ' + (out.error || `${(out.tools || []).length} tools, sample ${out.sample ? 'saved' : 'missing'}`));
+      const positions = (out && out.data && out.data.positions) || (out && out.positions) || {};
+      const lanes = {};
+      for (const [lane, list] of Object.entries(positions)) {
+        if (!Array.isArray(list)) continue;
+        lanes[lane] = list.filter(x => x && !x.is_rip).map(x => ({
+          id: this.champIdOf(x.champion !== undefined ? x.champion : (x.champion_id || x.champion_name)),
+          tier: +x.tier || 0, rank: +x.rank || 0, winRate: +x.win_rate || 0, pickRate: +x.pick_rate || 0, banRate: +x.ban_rate || 0,
+          prev: +x.rank_prev || 0,
+        })).filter(x => x.id).sort((a, b) => (a.rank || 999) - (b.rank || 999) || a.tier - b.tier || b.winRate - a.winRate).slice(0, 12);
+      }
+      if (!Object.keys(lanes).length) throw new Error('no lanes in answer');
+      this.meta = lanes;
+      try { fs.writeFileSync(path.join(this.cacheDir, 'opgg-meta.json'), JSON.stringify({ at: this.metaAt, lanes })); } catch { /* ignore */ }
+      this.log(`opgg meta: ${Object.entries(lanes).map(([k, v]) => `${k} ${v.length}`).join(', ')}`);
+    } catch (e) { this.log('opgg meta: ' + e.message); }
+    finally { this.metaLoading = false; }
+    if (this.meta) this.loadIcons(Object.values(this.meta).flat().map(x => (this.champs[x.id] || {}).key).filter(Boolean));
+    this.emit();
+  }
+
+  // OP.GG may name a champion by id, by name or by an object; find our id.
+  champIdOf(v) {
+    if (v && typeof v === 'object') return this.champIdOf(v.id || v.champion_id || v.key || v.name);
+    if (typeof v === 'number' || /^\d+$/.test(String(v))) return +v;
+    const norm = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+    const want = norm(v);
+    if (!want || !this.champs) return 0;
+    for (const [id, c] of Object.entries(this.champs)) if (norm(c.name) === want || norm(c.key) === want) return +id;
+    const alias = { monkeyking: 'wukong', nunu: 'nunuwillump', renata: 'renataglasc' }[want];
+    if (alias) for (const [id, c] of Object.entries(this.champs)) if (norm(c.name) === alias) return +id;
+    return 0;
+  }
+
+  metaFor(position, n) {
+    const lane = POS[position] || position;
+    return ((this.meta && this.meta[lane]) || []).slice(0, n).map(x => ({ ...this.champ(x.id), tier: x.tier, rank: x.rank, prev: x.prev, winRate: x.winRate, pickRate: x.pickRate, banRate: x.banRate }));
+  }
+
+  // Counters, build, skills and runes for one champion in one lane.
+  async loadAnalysis(champId, position) {
+    const lane = POS[position] || 'all';
+    const id = `${champId}:${lane}`;
+    const hit = this.analysis.get(id);
+    if (hit && Date.now() - hit.at < META_TTL) { this.useAnalysis(champId, hit.data); return; }
+    const c = this.champs && this.champs[champId];
+    if (!c) return;
+    const names = this.opggNames.has(champId) ? [this.opggNames.get(champId)] : nameCandidates(c.name, c.key);
+    let data = null, lastErr = null;
+    for (const name of names) {
+      try {
+        const out = await this.opgg.call('lol_get_champion_analysis', { champion: name, position: lane, game_mode: 'ranked', lang: 'en_US', desired_output_fields: ['data'] });
+        const d = out && (out.data || out);
+        if (d && (d.summary || d.core_items || d.runes)) { data = d; this.opggNames.set(champId, name); break; }
+      } catch (e) { lastErr = e; }
+    }
+    if (!data) { this.log(`opgg ${c.name}/${lane}: ${lastErr ? lastErr.message : 'no data'}`); this.analysis.set(id, { at: Date.now() - META_TTL + 2 * 60 * 1000, data: null }); return; }
+    const avg = (data.summary && data.summary.average_stats) || {};
+    const lanePos = ((data.summary && data.summary.positions) || []).find(p => String(p.name || '').toLowerCase() === lane) || null;
+    const ls = (lanePos && lanePos.stats) || {};
+    const ids = x => ((x && x.ids) || []).filter(v => typeof v === 'number');
+    const counter = x => ({ id: x.champion_id, name: x.champion_name || '', winRate: +x.my_win_rate || (x.win_rate ? 1 - x.win_rate : 0), games: x.play || 0 });
+    const r = data.runes || {};
+    const a = {
+      lane,
+      tier: avg.tier || (ls.tier_data && ls.tier_data.tier) || 0,
+      rank: avg.rank || (ls.tier_data && ls.tier_data.rank) || 0,
+      winRate: ls.win_rate || avg.win_rate || 0, pickRate: ls.pick_rate || avg.pick_rate || 0, banRate: ls.ban_rate || avg.ban_rate || 0,
+      games: ls.play || avg.play || 0,
+      counters: (data.weak_counters || []).filter(x => x && x.champion_id).map(counter).slice(0, 4),
+      goodVs: (data.strong_counters || []).filter(x => x && x.champion_id).map(counter).slice(0, 4),
+      starter: ids(data.starter_items), boots: ids(data.boots), core: ids(data.core_items),
+      spells: ids(data.summoner_spells),
+      skills: ((data.skills && data.skills.order) || []).slice(0, 15),
+      maxOrder: ((data.skill_masteries && data.skill_masteries.ids) || []).filter(x => typeof x === 'string'),
+      runes: r.primary_page_id ? {
+        primary: r.primary_page_id, secondary: r.secondary_page_id, primaryName: r.primary_page_name || '', secondaryName: r.secondary_page_name || '',
+        keystone: (r.primary_rune_names || [])[0] || '', keystoneId: (r.primary_rune_ids || [])[0] || 0,
+        perkIds: [...(r.primary_rune_ids || []), ...(r.secondary_rune_ids || []), ...(r.stat_mod_ids || [])].filter(x => typeof x === 'number'),
+        names: [...(r.primary_rune_names || []), ...(r.secondary_rune_names || [])].filter(x => typeof x === 'string'),
+        winRate: r.play ? r.win / r.play : 0,
+      } : null,
+    };
+    this.analysis.set(id, { at: Date.now(), data: a });
+    this.useAnalysis(champId, a);
+  }
+
+  useAnalysis(champId, a) {
+    if (!a || this.csChamp !== champId) return;
+    this.csOpgg = a;
+    const keys = [...a.counters, ...a.goodVs].map(x => (this.champs[x.id] || {}).key).filter(Boolean);
+    const r = a.runes;
+    this.loadIcons([...keys, ...[...a.starter, ...a.boots, ...a.core].map(i => 'item:' + i), ...a.spells.map(i => 'spell:' + i),
+      ...(r ? ['rune:' + r.keystoneId, 'rune:' + r.secondary] : [])]);
+    if (this.cs) { this.cs.opgg = this.opggView(a); this.emit(); }
+  }
+
+  opggView(a) {
+    if (!a) return null;
+    const ch = x => ({ ...this.champ(x.id), ...(this.champs && this.champs[x.id] ? {} : { name: x.name || `#${x.id}` }), winRate: x.winRate, games: x.games });
+    return { ...a, counters: a.counters.map(ch), goodVs: a.goodVs.map(ch) };
   }
 
   endGame() { this.game = null; this.gameKey = ''; this.players.clear(); }
@@ -399,7 +486,34 @@ class League {
     this.game.players = this.game.players.map(p => ({ ...p, icon: this.icons.get(p.champKey) || p.icon, ...(this.players.get(`${p.name}#${p.tag}`) || {}) }));
   }
 
-  // Champion pictures from Riot's Data Dragon, cached on disk.
+  // Pictures from Riot's Data Dragon, cached on disk: champions by key ("Ahri"), and
+  // "item:3118", "spell:4" and "rune:8112" for builds.
+  async ddJson(file) {
+    this.dd = this.dd || {};
+    if (!this.dd[file]) this.dd[file] = this.fetch(`https://ddragon.leagueoflegends.com/cdn/${this.ddVersion}/data/en_US/${file}`).then(r => r.json()).catch(e => { this.dd[file] = null; throw e; });
+    return this.dd[file];
+  }
+  async iconUrl(k) {
+    const v = this.ddVersion;
+    const [kind, id] = k.includes(':') ? k.split(':') : ['champion', k];
+    if (kind === 'champion') return [`https://ddragon.leagueoflegends.com/cdn/${v}/img/champion/${encodeURIComponent(id)}.png`, 'champions', id];
+    if (kind === 'item') return [`https://ddragon.leagueoflegends.com/cdn/${v}/img/item/${+id}.png`, 'items', id];
+    if (kind === 'spell') {
+      const d = await this.ddJson('summoner.json');
+      const s = Object.values((d && d.data) || {}).find(x => String(x.key) === String(id));
+      return s ? [`https://ddragon.leagueoflegends.com/cdn/${v}/img/spell/${s.image.full}`, 'spells', id] : null;
+    }
+    if (kind === 'rune') {
+      const d = await this.ddJson('runesReforged.json');
+      let icon = null;
+      for (const st of d || []) {
+        if (String(st.id) === id) icon = st.icon;
+        for (const sl of st.slots || []) for (const r of sl.runes || []) if (String(r.id) === id) icon = r.icon;
+      }
+      return icon ? [`https://ddragon.leagueoflegends.com/cdn/img/${icon}`, 'runes', id] : null;
+    }
+    return null;
+  }
   async loadIcons(keys) {
     if (Date.now() < (this.iconRetryAt || 0)) return;
     try {
@@ -408,17 +522,24 @@ class League {
         this.ddVersion = Array.isArray(v) && v[0];
       }
       if (!this.ddVersion) return;
-      const dir = path.join(this.cacheDir, 'champions');
-      fs.mkdirSync(dir, { recursive: true });
       let any = false;
-      for (const k of [...new Set(keys)].filter(k => k && !this.icons.has(k))) {
-        const file = path.join(dir, `${k}.png`);
-        let buf = null;
-        try { buf = fs.readFileSync(file); } catch {
-          const res = await this.fetch(`https://ddragon.leagueoflegends.com/cdn/${this.ddVersion}/img/champion/${encodeURIComponent(k)}.png`);
-          if (res.ok) { buf = Buffer.from(await res.arrayBuffer()); fs.writeFileSync(file, buf); }
-        }
-        if (buf) { this.icons.set(k, 'data:image/png;base64,' + buf.toString('base64')); any = true; }
+      this.iconBusy = this.iconBusy || new Set();
+      for (const k of [...new Set(keys)].filter(k => k && !/:0$/.test(k) && !this.icons.has(k) && !this.iconBusy.has(k))) {
+        this.iconBusy.add(k);
+        try {
+          const [, folder, name] = k.includes(':') ? [null, { item: 'items', spell: 'spells', rune: 'runes' }[k.split(':')[0]], k.split(':')[1]] : [null, 'champions', k];
+          if (!folder) continue;
+          const dir = path.join(this.cacheDir, folder);
+          const file = path.join(dir, `${name}.png`);
+          let buf = null;
+          try { buf = fs.readFileSync(file); } catch {
+            const u = await this.iconUrl(k);
+            if (!u) { this.icons.set(k, null); continue; }
+            const res = await this.fetch(u[0]);
+            if (res.ok) { buf = Buffer.from(await res.arrayBuffer()); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(file, buf); }
+          }
+          if (buf) { this.icons.set(k, 'data:image/png;base64,' + buf.toString('base64')); any = true; }
+        } finally { this.iconBusy.delete(k); }
       }
       if (any) { this.refreshRoster(); this.emit(); }
     } catch (e) { this.iconRetryAt = Date.now() + 60 * 1000; this.log('league icons: ' + e.message); }
@@ -435,10 +556,17 @@ class League {
         ideas: this.cs.ideas.map(i => ({ ...i, icon: this.icons.get(i.key) || null })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
       game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players },
+      meta: this.meta ? Object.fromEntries(Object.keys(this.meta).map(l => [l, this.metaFor(l, 10).map(({ icon, ...c }) => c)])) : null,
+      mainLane: this.mainLane(),
     };
+    // Pictures go once; the island keeps them (meta and builds refer to them by key).
+    const fresh = {};
+    for (const [k, v] of this.icons) if (v && !this.sentIcons.has(k)) fresh[k] = v;
+    if (Object.keys(fresh).length) data.icons = fresh;
     const sig = JSON.stringify({ ...data, game: data.game && { ...data.game, time: 0 }, cs: data.cs && { ...data.cs, at: 0, timeLeft: Math.round(data.cs.timeLeft / 5000) } });
     if (sig === this.lastSent) return;
     this.lastSent = sig;
+    for (const k of Object.keys(data.icons || {})) this.sentIcons.add(k);
     this.send(data);
   }
 }

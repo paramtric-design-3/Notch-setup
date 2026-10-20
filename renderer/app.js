@@ -347,7 +347,7 @@ function layoutWidth(shown) {
 function renderTiles() {
   if (!D.settings) return;
   let shown = D.settings.tiles.filter(x => x.show && (x.id !== 'league' || (D.league && D.league.client)));
-  if (leagueWide()) shown = [...shown.filter(x => x.id === 'league'), ...shown.filter(x => x.id !== 'league')];
+  if (leagueWide()) shown = shown.filter(x => x.id === 'league');   // the League panel takes the whole notch
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
@@ -374,10 +374,11 @@ tilesView.addEventListener('click', async e => {
     return;
   }
   if (b.dataset.url) { api.send('open-url', b.dataset.url); return; }
+  if (b.dataset.tierlane) { D.tierLane = b.dataset.tierlane; rerenderTile('league'); return; }
   if (b.dataset.import !== undefined) {
     b.disabled = true; b.textContent = 'Importing…';
     const res = await api.invoke('league-import-runes').catch(() => ({ ok: false, error: 'Could not reach League' }));
-    b.textContent = res.ok ? 'Runes imported ✓' : 'Import runes';
+    b.textContent = res.ok ? `${res.source || ''} runes imported ✓` : 'Import runes';
     b.disabled = !!res.ok;
     if (!res.ok) peek({ icon: I.trophy, title: 'Runes not imported', sub: res.error || '', ms: 4000 });
     return;
@@ -460,7 +461,46 @@ function uggUrl(champ, position, page = 'build') {
   const role = UGG_ROLE[position];
   return `https://u.gg/lol/champions/${slug}/${page}${role ? `?role=${role}` : ''}`;
 }
-const chIcon = (c, cls = 'lch') => `<span class="${cls}">${c && c.icon ? `<img src="${c.icon}" alt="">` : esc(((c && c.name) || '?').slice(0, 2))}</span>`;
+const LICON = {};   // pictures by key: champion key, "item:3118", "spell:4", "rune:8112"
+const chIcon = (c, cls = 'lch') => {
+  const src = c && (c.icon || LICON[c.key]);
+  return `<span class="${cls}">${src ? `<img src="${src}" alt="">` : esc(((c && c.name) || '?').slice(0, 2))}</span>`;
+};
+const imgIcon = (k, title) => LICON[k] ? `<img class="lit" src="${LICON[k]}" alt="" title="${esc(title || '')}">` : `<span class="lit none" title="${esc(title || '')}"></span>`;
+const OPGG_TIER = { 1: ['OP', '#F29A4A'], 2: ['Strong', '#d6a84c'], 3: ['Good', '#6b8ff0'], 4: ['Average', '#8a8a8a'], 5: ['Weak', '#6a6a6a'] };
+const tierPill = t => { const [n, c] = OPGG_TIER[t] || ['–', '#666']; return `<span class="ltier" style="--tier:${c}">${n}</span>`; };
+const pct = x => Math.round((x || 0) * 1000) / 10 + '%';
+const LANES = [['top', 'Top'], ['jungle', 'Jungle'], ['mid', 'Mid'], ['adc', 'Bot'], ['support', 'Support']];
+function opggUrl(champ, lane) {
+  const slug = String((champ && champ.name) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const s2 = { nunuwillump: 'nunu', renataglasc: 'renata', wukong: 'monkeyking' }[slug] || slug;
+  return `https://op.gg/lol/champions/${s2}/build${lane && lane !== 'all' ? '/' + lane : ''}`;
+}
+// OP.GG's build for the champion you hover or lock: counters, items, skills.
+function opggBlock(o, me) {
+  if (!o) return `<div class="opgg muted">Loading OP.GG counters and build…</div>`;
+  const cw = (list, cls) => list.map(c => `<button class="ocw" data-url="${esc(opggUrl(c, o.lane))}" title="${esc(c.name)}: you win ${pct(c.winRate)} of ${c.games} games">${chIcon(c, 'lch sm')}<span class="${cls}">${Math.round(c.winRate * 100)}%</span></button>`).join('');
+  const items = (ids, label) => ids.length ? `<span class="obuild">${ids.map(i => imgIcon('item:' + i, label)).join('')}</span>` : '';
+  const r = o.runes;
+  return `<div class="opgg">
+    <div class="orow">${tierPill(o.tier)}<span><b>${pct(o.winRate)}</b> win · ${pct(o.pickRate)} pick · ${pct(o.banRate)} ban</span><span class="muted osrc">OP.GG · ranked</span></div>
+    <div class="orow"><span class="olabel">Build</span>${o.spells.map(i => imgIcon('spell:' + i, 'Summoner spell')).join('')}<span class="osep"></span>${items(o.starter, 'Start')}<span class="oarrow">›</span>${items(o.boots, 'Boots')}<span class="oarrow">›</span>${items(o.core, 'Core')}</div>
+    ${o.maxOrder.length || o.skills.length ? `<div class="orow"><span class="olabel">Skills</span><span class="omax">${o.maxOrder.map(k => `<i>${esc(k)}</i>`).join('<span class="oarrow">›</span>')}</span><span class="oskills">${o.skills.map(k => `<i class="${k === 'R' ? 'r' : ''}">${esc(k)}</i>`).join('')}</span></div>` : ''}
+    <div class="orow"><span class="olabel">Counters</span>${cw(o.counters, 'cold') || '<span class="muted">–</span>'}</div>
+    <div class="orow"><span class="olabel">Good vs</span>${cw(o.goodVs, 'hot') || '<span class="muted">–</span>'}</div>
+  </div>`;
+}
+function tierList(L) {
+  const lane = D.tierLane || L.mainLane || 'jungle';
+  const list = (L.meta && L.meta[lane]) || [];
+  return `<div class="ltl">
+    <div class="ltabs">${LANES.map(([k, n]) => `<button class="ltab ${k === lane ? 'on' : ''}" data-tierlane="${k}">${n}</button>`).join('')}<span class="muted osrc">OP.GG tier list</span></div>
+    <div class="ltlist">${list.length ? list.map((c, i) => `
+      <button class="ltrow" data-url="${esc(opggUrl(c, lane))}" title="${esc(c.name)} build on OP.GG"><span class="ltrank">${c.rank || i + 1}</span>${chIcon(c, 'lch sm')}<span class="ellipsis ltname">${esc(c.name)}</span>${tierPill(c.tier)}<span class="ltnum"><b>${pct(c.winRate)}</b></span><span class="ltnum muted">${pct(c.pickRate)}</span><span class="ltnum muted">${pct(c.banRate)}</span></button>`).join('')
+      : `<div class="muted">${L.meta ? 'No tier list for this lane' : 'Loading the tier list from OP.GG…'}</div>`}</div>
+    ${list.length ? '<div class="lthead muted"><span>Win · Pick · Ban</span></div>' : ''}
+  </div>`;
+}
 function statLine(st) {
   if (!st) return '<span class="muted">No recent games on this champion</span>';
   const pct = Math.round(100 * st.wins / st.games);
@@ -471,28 +511,33 @@ function leagueChampSelect(cs) {
   const t = el('div', 'tile league game cs');
   const me = cs.me;
   const pos = ROLE[cs.position] || '';
-  const r = cs.runes;
+  const o = cs.opgg && cs.opgg.runes;
+  const r = o || cs.runes;
   const left = me ? `
     <div class="csme">
       ${chIcon(me, 'csbig')}
       <div class="csinfo">
         <div class="csname">${esc(me.name)} <span class="muted">${me.locked ? 'locked in' : 'hovering'}</span></div>
         <div class="csstat">Your games: ${statLine(me.stats)}</div>
-        <div class="csrunes">${r ? `${I.trophy}<b>${esc(r.keystone || r.primaryName)}</b>&nbsp;· ${esc(r.primaryName)} + ${esc(r.secondaryName)}` : '<span class="muted">Loading Riot\'s recommended runes…</span>'}</div>
+        <div class="csrunes">${r ? `${o ? imgIcon('rune:' + o.keystoneId, o.keystone) : I.trophy}<b>${esc(r.keystone || r.primaryName)}</b>&nbsp;· ${esc(r.primaryName)} + ${esc(r.secondaryName)}${o ? '<span class="muted">&nbsp;(OP.GG)</span>' : ''}` : '<span class="muted">Loading recommended runes…</span>'}</div>
       </div>
     </div>
+    ${opggBlock(cs.opgg, me)}
     <div class="csbtns">
-      <button class="pbtn allow" data-import ${r && r.perkIds && r.perkIds.length >= 6 ? '' : 'disabled'}>Import runes</button>
-      <button class="pbtn" data-url="${esc(uggUrl(me, cs.position, 'build'))}">Build on u.gg ↗</button>
-      <button class="pbtn" data-url="${esc(uggUrl(me, cs.position, 'counter'))}">Counters ↗</button>
+      <button class="pbtn allow" data-import ${r && r.perkIds && r.perkIds.length >= 6 ? '' : 'disabled'}>Import ${o ? 'OP.GG ' : ''}runes</button>
+      <button class="pbtn" data-url="${esc(opggUrl(me, cs.opgg && cs.opgg.lane))}">OP.GG ↗</button>
+      <button class="pbtn" data-url="${esc(uggUrl(me, cs.position, 'build'))}">u.gg ↗</button>
     </div>` : `
     <div class="csnone">
       <div class="csname">Pick a champion</div>
       <div class="muted">${cs.ideas.length ? `Your most played${pos ? ' ' + pos : ''} champions` : 'Hover a champion to see runes and your stats'}</div>
       <div class="csideas">${cs.ideas.map(c => `<button class="csidea" data-url="${esc(uggUrl(c, cs.position))}" title="${esc(c.name)} on u.gg">${chIcon(c)}<span>${esc(c.name)}</span><span class="muted">${c.stats ? Math.round(100 * c.stats.wins / c.stats.games) + '% · ' + c.stats.games + 'g' : ''}</span></button>`).join('')}</div>
+      ${cs.meta && cs.meta.length ? `<div class="muted" style="margin-top:8px">Strongest${pos ? ' ' + pos : ''} picks this patch (OP.GG)</div>
+      <div class="csideas">${cs.meta.map(c => `<button class="csidea" data-url="${esc(opggUrl(c, ''))}" title="${esc(c.name)} on OP.GG">${chIcon(c)}<span>${esc(c.name)}</span><span class="muted">${tierPill(c.tier)} ${pct(c.winRate)}</span></button>`).join('')}</div>` : ''}
     </div>`;
   const allies = cs.allies.map(a => `<div class="csrow ${a.me ? 'me' : ''} ${a.locked ? '' : 'dim'}">${chIcon(a.champ)}<span class="cspos">${ROLE[a.position] || ''}</span><span class="ellipsis">${a.champ ? esc(a.champ.name) : '<span class="muted">Picking…</span>'}</span></div>`).join('');
-  const enemies = cs.enemies.length ? cs.enemies.map(e => `<div class="csrow">${chIcon(e)}<span class="ellipsis">${esc(e.name)}</span></div>`).join('') : '<div class="muted csempty">No enemy picks yet</div>';
+  const bad = new Set(((cs.opgg && cs.opgg.counters) || []).map(c => c.id)), good = new Set(((cs.opgg && cs.opgg.goodVs) || []).map(c => c.id));
+  const enemies = cs.enemies.length ? cs.enemies.map(e => `<div class="csrow">${chIcon(e)}<span class="ellipsis">${esc(e.name)}</span>${bad.has(e.id) ? '<span class="otag cold">counters you</span>' : good.has(e.id) ? '<span class="otag hot">you counter</span>' : ''}</div>`).join('') : '<div class="muted csempty">No enemy picks yet</div>';
   const bans = cs.bans.length ? `<div class="csbans">${cs.bans.map(b => `<span class="csban" title="${esc(b.name)}">${chIcon(b, 'lch sm')}</span>`).join('')}</div>` : '';
   t.innerHTML = `
     <div class="lhead"><span class="cstatus">${I.trophy}Champ select${pos ? ' · ' + pos : ''}</span><span class="cstimer" data-cstimer>${fmtTime(csTimeLeft(cs))}</span></div>
@@ -507,9 +552,12 @@ function leagueChampions(L) {
   const t = el('div', 'tile league game champs clickable');
   const list = L.top || [];
   t.innerHTML = `
-    <div class="lhead"><span class="cstatus">${I.trophy}Your champions</span><span class="muted">Last 50 games · click a champion for its u.gg build · click here to close</span></div>
-    <div class="cslist">${list.length ? list.map(c => `
-      <button class="cschamp" data-url="${esc(uggUrl(c, ''))}">${chIcon(c, 'csbig sm')}<span class="csname">${esc(c.name)}</span><span class="csstat">${statLine(c.stats)}</span></button>`).join('') : '<div class="muted">Play a few games and your champions show up here.</div>'}</div>`;
+    <div class="lhead"><span class="cstatus">${I.trophy}Your champions</span><span class="muted">Last 50 games · click a champion for its build · click here to close</span></div>
+    <div class="lsplit">
+      <div class="cslist">${list.length ? list.map(c => `
+        <button class="cschamp" data-url="${esc(opggUrl(c, ''))}">${chIcon(c, 'csbig sm')}<span class="csname">${esc(c.name)}</span><span class="csstat">${statLine(c.stats)}</span></button>`).join('') : '<div class="muted">Play a few games and your champions show up here.</div>'}</div>
+      ${tierList(L)}
+    </div>`;
   return t;
 }
 
@@ -685,6 +733,7 @@ api.on('league', L => {
   const wideBefore = leagueWide();
   const clientBefore = !!(D.league && D.league.client);
   if (L && L.cs && !(D.league && D.league.cs)) D.leagueOpen = false;
+  if (L && L.icons) Object.assign(LICON, L.icons);
   D.league = L;
   const layoutChanged = clientBefore !== !!(L && L.client) || wideBefore !== leagueWide();
   // Champ select opens the notch by itself so the helper is right there.
@@ -699,7 +748,7 @@ api.on('league', L => {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.league = s.league || null; D.outputs = s.outputs || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();

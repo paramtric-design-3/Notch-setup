@@ -39,7 +39,6 @@ const DEFAULT_SETTINGS = {
     { id: 'weather', show: true, size: 2 },
     { id: 'messages', show: true, size: 3 },
     { id: 'controls', show: true, size: 2 },
-    { id: 'calendar', show: false, size: 2 },
     { id: 'timer', show: false, size: 2 },
     { id: 'league', show: true, size: 3 },
   ],
@@ -818,7 +817,7 @@ app.whenReady().then(() => {
     send: d => {
       if (d.type === 'game-start') toIsland('peek', { kind: 'league', title: 'Game loading', sub: d.queue ? `${d.queue} · ranks in the notch` : 'Ranks in the notch', ms: 4000 });
       else if (d.type === 'cs-start') toIsland('peek', { kind: 'league', title: 'Champ select', sub: 'Runes, your stats and the draft are in the notch', ms: 4000 });
-      else { state.league = d; toIsland('league', d); }
+      else { state.league = { ...d, icons: { ...((state.league && state.league.icons) || {}), ...(d.icons || {}) } }; toIsland('league', d); }
     },
     log: helperLog,
     cacheDir: app.getPath('userData'),

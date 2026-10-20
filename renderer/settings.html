@@ -11,39 +11,39 @@
     body { margin:0; background:var(--bg); color:var(--text); font:13.5px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
     main { padding: 22px 22px 28px; max-width: 640px; margin: 0 auto; }
     h1 { font: 600 20px "Segoe UI Variable Display","Segoe UI",system-ui; margin: 0 0 2px; letter-spacing: -.2px; }
-    .lead { color: var(--text-2); margin: 0 0 18px; font-size: 13px; }
+   .lead { color: var(--text-2); margin: 0 0 18px; font-size: 13px; }
     section { background: var(--tile); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
-    h2 { font-size: 12px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--text-2); margin: 0 0 10px; }
-    .row { display: flex; align-items: center; gap: 10px; min-height: 36px; }
-    .row + .row { border-top: 1px solid var(--line); }
-    .row label.grow, .grow { flex: 1; min-width: 0; }
-    .sub { color: var(--text-2); font-size: 12px; }
+    h2 { font-size: 12px; font-weight: 600; letter-spacing:.6px; text-transform: uppercase; color: var(--text-2); margin: 0 0 10px; }
+   .row { display: flex; align-items: center; gap: 10px; min-height: 36px; }
+   .row +.row { border-top: 1px solid var(--line); }
+   .row label.grow,.grow { flex: 1; min-width: 0; }
+   .sub { color: var(--text-2); font-size: 12px; }
     input[type=text] { width: 100%; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 11px; font: inherit; outline: none; }
     input[type=text]:focus { border-color: var(--accent); }
-    .seg { display: inline-flex; background: var(--btn); border-radius: 10px; padding: 3px; gap: 2px; }
-    .seg button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
-    .seg button.on { background: var(--tile); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-    html[data-theme="dark"] .seg button.on { background: #2A2A2A; }
-    .switch { position: relative; width: 38px; height: 22px; flex: none; }
-    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .switch span { position: absolute; inset: 0; border-radius: 11px; background: var(--btn-h); transition: background .15s; cursor: pointer; }
-    .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .18s cubic-bezier(.3,1.3,.5,1); }
-    .switch input:checked + span { background: var(--accent); }
-    .switch input:checked + span::after { transform: translateX(16px); }
-    .arrow { border: 0; background: var(--btn); color: var(--text-2); width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 13px; }
-    .arrow:hover { background: var(--btn-h); color: var(--text); }
-    .arrow:disabled { opacity: .3; cursor: default; }
-    .btn { border: 0; background: var(--btn); color: var(--text); font: inherit; font-weight: 600; font-size: 12.5px; height: 32px; padding: 0 14px; border-radius: 10px; cursor: pointer; }
-    .btn:hover { background: var(--btn-h); }
-    .btn.primary { background: var(--accent); color: #fff; }
-    .btn:disabled { opacity: .45; cursor: default; }
-    html[data-theme="dark"] .btn.primary { color: #2A1606; }
+   .seg { display: inline-flex; background: var(--btn); border-radius: 10px; padding: 3px; gap: 2px; }
+   .seg button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
+   .seg button.on { background: var(--tile); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+    html[data-theme="dark"].seg button.on { background: #2A2A2A; }
+   .switch { position: relative; width: 38px; height: 22px; flex: none; }
+   .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+   .switch span { position: absolute; inset: 0; border-radius: 11px; background: var(--btn-h); transition: background.15s; cursor: pointer; }
+   .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform.18s cubic-bezier(.3,1.3,.5,1); }
+   .switch input:checked + span { background: var(--accent); }
+   .switch input:checked + span::after { transform: translateX(16px); }
+   .arrow { border: 0; background: var(--btn); color: var(--text-2); width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+   .arrow:hover { background: var(--btn-h); color: var(--text); }
+   .arrow:disabled { opacity:.3; cursor: default; }
+   .btn { border: 0; background: var(--btn); color: var(--text); font: inherit; font-weight: 600; font-size: 12.5px; height: 32px; padding: 0 14px; border-radius: 10px; cursor: pointer; }
+   .btn:hover { background: var(--btn-h); }
+   .btn.primary { background: var(--accent); color: #fff; }
+   .btn:disabled { opacity:.45; cursor: default; }
+    html[data-theme="dark"].btn.primary { color: #2A1606; }
     pre { background: var(--mono); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: 11.5px/1.5 "Cascadia Mono", Consolas, monospace; overflow: auto; max-height: 220px; margin: 8px 0; user-select: text; }
     p { margin: 6px 0; }
-    .note { color: var(--text-2); font-size: 12px; }
+   .note { color: var(--text-2); font-size: 12px; }
     code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; background: var(--btn); padding: 1px 5px; border-radius: 5px; }
-    .saved { color: var(--accent); font-size: 12px; opacity: 0; transition: opacity .2s; }
-    .saved.show { opacity: 1; }
+   .saved { color: var(--accent); font-size: 12px; opacity: 0; transition: opacity.2s; }
+   .saved.show { opacity: 1; }
     select { height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 10px; font: inherit; outline: none; min-width: 0; flex: 1; }
     select:focus { border-color: var(--accent); }
   </style>
@@ -87,19 +87,6 @@
   </section>
 
   <section>
-    <h2>Next event</h2>
-    <div class="row"><input type="text" id="cal" placeholder="Calendar link ending in .ics"><span class="saved" id="calSaved">Saved</span></div>
-    <p class="note">In Outlook.com: Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link. Turn the tile on above.</p>
-  </section>
-
-  <section>
-    <h2>Peeks</h2>
-    <div class="row"><span class="grow">Apps opening and closing</span><label class="switch"><input type="checkbox" id="peekApps"><span></span></label></div>
-    <div class="row"><span class="grow">Charger and battery</span><label class="switch"><input type="checkbox" id="peekPower"><span></span></label></div>
-    <p class="note">Do Not Disturb has no public Windows API, so there is no peek for it.</p>
-  </section>
-
-  <section>
     <h2>Updates</h2>
     <div class="row"><span class="grow" id="upText">Version …</span><button class="btn" id="upBtn">Check now</button></div>
     <p class="note">FJBC Notch checks for a new version every 5 minutes and whenever your PC wakes up. It downloads updates in the background and installs them by itself straight away while the notch is closed (it restarts in a few seconds).</p>
@@ -107,7 +94,7 @@
 
   <section>
     <h2>Privacy</h2>
-    <p class="note">Nothing leaves this PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), album covers when the player doesn't provide one (iTunes Search), League champion pictures (Riot Data Dragon), a one-time check of OP.GG's open champion data, update checks (GitHub) and your calendar link if you add one. No accounts, no analytics.</p>
+    <p class="note">Nothing leaves this PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), album covers when the player doesn't provide one (iTunes Search), League champion pictures (Riot Data Dragon), OP.GG's open champion data (tier lists, counters and builds) and update checks (GitHub). No accounts, no analytics.</p>
   </section>
 </main>
 <script src="settings.js"></script>

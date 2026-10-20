@@ -29,17 +29,16 @@ Tray icon → **Screen**, or Settings → **Screen**:
 | Tile | Where the data comes from |
 |---|---|
 | Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key). If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
-| League of Legends | Appears while the League client is open. Outside a game: your Solo and Flex rank, LP and win rate. When a game loads: both teams with each player's champion, rank, season win rate and their last 10 games, like Porofessor's loading screen. Uses only the League client on this PC (no Riot account key) plus champion pictures from Riot's Data Dragon. Ranks are looked up once the game is loading, not in champ select, because Riot doesn't allow revealing the hidden names there. **Champ select helper:** opens by itself in champ select with your role and the timer, your stats on the champion you hover or lock, Riot's recommended runes with one-click Import runes (a page named "Notch: <champion>"), both teams' picks and the bans, and buttons for the u.gg build and counters. Outside champ select, click the tile to see your most played champions. |
+| League of Legends | Appears while the League client is open. Outside a game: your Solo and Flex rank, LP and win rate. When a game loads: both teams with each player's champion, rank, season win rate and their last 10 games, like Porofessor's loading screen. Uses only the League client on this PC (no Riot account key) plus champion pictures from Riot's Data Dragon. Ranks are looked up once the game is loading, not in champ select, because Riot doesn't allow revealing the hidden names there. **Champ select helper:** opens by itself in champ select with your role and the timer, your stats on the champion you hover or lock, Riot's recommended runes with one-click Import runes (a page named "Notch: <champion>"), both teams' picks and the bans. From OP.GG's open data (free, no key): the champion's tier and win/pick/ban rate, summoner spells, starting items, boots and core items, skill order, the champions that counter you and the ones you beat (enemy picks are tagged), and OP.GG's most played rune page, which Import runes then uses. Before you hover a champion it suggests your most played picks and the strongest picks for your role this patch. Outside champ select, click the tile for your most played champions and a tier list per lane (Top, Jungle, Mid, Bot, Support). While the League panel is open it's the only tile in the notch. |
 | Sound output | The speaker button on the music tile (top right) lists your playback devices; click one to make it the default. Also in the tray menu under **Sound output**. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
 | Messages | The notifications Windows is still holding (WhatsApp, Telegram, Teams…). Read-only and local. |
 | Quick controls | Wi-Fi, Bluetooth, dark mode, volume (click mutes, scroll changes), brightness (laptop screens only; click cycles, scroll changes), Start menu. |
-| Next event | Optional. An ICS calendar link (Outlook.com: Settings → Calendar → Shared calendars → Publish). |
 | Focus timer | Optional. 25 minutes, with start, pause and reset. |
 
 Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in Settings.
 
-**Peeks** are small bubbles that appear for a few seconds: the charger connected or disconnected, and battery at 20% and 10%. Bubbles for apps opening and closing are off by default (Settings → Peeks).
+**Peeks** are small bubbles that appear for a few seconds, for example when champ select starts or a game loads.
 
 **Compact state**: while music plays or the focus timer counts down, the pill widens a little to show it.
 
@@ -55,7 +54,7 @@ Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in S
 
 ## Privacy
 
-Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), cover lookups (iTunes Search) when a player shares no cover, champion pictures (Riot Data Dragon), update checks (GitHub) and your calendar link if you add one. There are no accounts and no analytics. Settings, the lyrics and cover caches, and a small troubleshooting log (`helper.log`) live in `%APPDATA%\FJBC Notch`.
+Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), cover lookups (iTunes Search) when a player shares no cover, champion, item and rune pictures (Riot Data Dragon), OP.GG's open champion data and update checks (GitHub). There are no accounts and no analytics. Settings, the lyrics and cover caches, and a small troubleshooting log (`helper.log`) live in `%APPDATA%\FJBC Notch`.
 
 ## Updates
 

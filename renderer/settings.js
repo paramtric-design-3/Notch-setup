@@ -38,11 +38,8 @@ function render() {
   $('#login').checked = !!S.launchAtLogin;
   renderDisplays();
   $('#msgAll').checked = !!S.messageAllApps;
-  $('#peekApps').checked = !!S.peeks.apps;
-  $('#peekPower').checked = !!S.peeks.power;
   if (document.activeElement !== $('#city')) $('#city').value = S.city || '';
   if (document.activeElement !== $('#msgApps')) $('#msgApps').value = S.messageApps || '';
-  if (document.activeElement !== $('#cal')) $('#cal').value = S.calendarUrl || '';
 
   const box = $('#tiles');
   box.innerHTML = '';
@@ -87,10 +84,7 @@ function bindText(id, key, savedId) {
   document.querySelectorAll('#theme button').forEach(b => b.onclick = () => save({ theme: b.dataset.v }));
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
-  $('#peekApps').onchange = e => save({ peeks: { ...S.peeks, apps: e.target.checked } });
-  $('#peekPower').onchange = e => save({ peeks: { ...S.peeks, power: e.target.checked } });
   bindText('#city', 'city', '#citySaved');
   bindText('#msgApps', 'messageApps', '#appsSaved');
-  bindText('#cal', 'calendarUrl', '#calSaved');
   api.on('settings', s => { S = s; render(); });
 })();
