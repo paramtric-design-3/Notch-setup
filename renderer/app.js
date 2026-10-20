@@ -22,7 +22,8 @@ const D = {
   radios: {}, volume: null, brightness: null, dark: null,
   weather: null, messages: null, calendar: null,
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
-  league: null,           // League client state: { client, phase, me, game }
+  league: null,           // League client state: { client, phase, me, game, cs, top }
+  leagueOpen: false,      // the League tile was clicked open
   outputs: [], outPicker: false,   // sound output devices and whether the picker is open
 };
 
@@ -41,6 +42,7 @@ function wantCompact() {
 }
 
 let lastOpenSent = null;
+let csShownOnce = false;
 function setState(next) {
   state = next;
   island.className = 's-' + next;
@@ -117,6 +119,7 @@ api.on('pointer', p => {
 
 island.addEventListener('click', e => {
   if (e.target.closest('button, pre, a')) return;
+  if (state === 'open' && e.target.closest('.tile.league.clickable')) return;   // handled by the tile
   if (state === 'open') { pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
   else { pinned = true; setState('open'); }
 });
@@ -290,7 +293,9 @@ const TILE = {
   league(size) {
     const L = D.league;
     const g = L && L.game;
+    if (L && L.cs) return leagueChampSelect(L.cs);
     if (g && g.players && g.players.length) return leagueGame(g);
+    if (D.leagueOpen && L && L.me) return leagueChampions(L);
     const t = el('div', `tile league w${size}`);
     const me = L && L.me;
     if (!me) { t.innerHTML = `<div class="empty"><div class="ico">${I.trophy}</div>League client is starting…</div>`; return t; }
@@ -302,6 +307,8 @@ const TILE = {
       t.innerHTML = `<div class="lbig">${I.trophy}</div>${me.solo ? rankPill(me.solo) : '<span class="muted">Unranked</span>'}`;
       return t;
     }
+    t.classList.add('clickable');
+    t.title = 'Show your champions';
     t.innerHTML = `
       <div class="chead"><span class="cstatus ellipsis">${esc(me.name)}<span class="muted">#${esc(me.tag)}</span></span><span class="cfolder">${phase}</span></div>
       ${line('Solo', me.solo)}${size > 1 ? line('Flex', me.flex) : ''}`;
@@ -323,12 +330,13 @@ const TILE = {
 };
 
 const CELL = 84, GAP = 8, PAD = 12, MAX_CELLS = 10;
+const leagueWide = () => !!(D.league && (D.league.cs || D.league.game || (D.leagueOpen && D.league.me)));
 function layoutWidth(shown) {
   // Rows of at most 10 cells.
   const rows = []; let cur = 0;
   for (const x of shown) {
     const size = Math.max(1, Math.min(3, x.size || 2));
-    if (x.id === 'league' && D.league && D.league.game) { if (cur) rows.push(cur); rows.push(MAX_CELLS); cur = 0; continue; }
+    if (x.id === 'league' && leagueWide()) { if (cur) rows.push(cur); rows.push(MAX_CELLS); cur = 0; continue; }
     if (cur && cur + size > MAX_CELLS) { rows.push(cur); cur = 0; }
     cur += size;
   }
@@ -339,7 +347,7 @@ function layoutWidth(shown) {
 function renderTiles() {
   if (!D.settings) return;
   let shown = D.settings.tiles.filter(x => x.show && (x.id !== 'league' || (D.league && D.league.client)));
-  if (D.league && D.league.game) shown = [...shown.filter(x => x.id === 'league'), ...shown.filter(x => x.id !== 'league')];
+  if (leagueWide()) shown = [...shown.filter(x => x.id === 'league'), ...shown.filter(x => x.id !== 'league')];
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
@@ -358,9 +366,22 @@ function rerenderTile(id) {
 }
 
 // tile actions
-tilesView.addEventListener('click', e => {
+tilesView.addEventListener('click', async e => {
   const b = e.target.closest('button');
-  if (!b) return;
+  if (!b) {
+    const lt = e.target.closest('.tile.league.clickable');
+    if (lt) { D.leagueOpen = !D.leagueOpen; renderTiles(); sizeIsland(); }
+    return;
+  }
+  if (b.dataset.url) { api.send('open-url', b.dataset.url); return; }
+  if (b.dataset.import !== undefined) {
+    b.disabled = true; b.textContent = 'Importing…';
+    const res = await api.invoke('league-import-runes').catch(() => ({ ok: false, error: 'Could not reach League' }));
+    b.textContent = res.ok ? 'Runes imported ✓' : 'Import runes';
+    b.disabled = !!res.ok;
+    if (!res.ok) peek({ icon: I.trophy, title: 'Runes not imported', sub: res.error || '', ms: 4000 });
+    return;
+  }
   if (b.dataset.out !== undefined) { D.outPicker = true; api.send('helper', { c: 'outputs' }); rerenderTile('music'); return; }
   if (b.dataset.outclose !== undefined) { D.outPicker = false; rerenderTile('music'); return; }
   if (b.dataset.outid) {
@@ -430,6 +451,68 @@ function leagueGame(g) {
   return t;
 }
 
+// champ select helper and your champions
+const ROLE = { top: 'Top', jungle: 'Jungle', middle: 'Mid', bottom: 'Bot', utility: 'Support' };
+const UGG_ROLE = { top: 'top', jungle: 'jungle', middle: 'mid', bottom: 'adc', utility: 'support' };
+function uggUrl(champ, position, page = 'build') {
+  let slug = String((champ && champ.name) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  slug = { nunuwillump: 'nunu', renataglasc: 'renata' }[slug] || slug;
+  const role = UGG_ROLE[position];
+  return `https://u.gg/lol/champions/${slug}/${page}${role ? `?role=${role}` : ''}`;
+}
+const chIcon = (c, cls = 'lch') => `<span class="${cls}">${c && c.icon ? `<img src="${c.icon}" alt="">` : esc(((c && c.name) || '?').slice(0, 2))}</span>`;
+function statLine(st) {
+  if (!st) return '<span class="muted">No recent games on this champion</span>';
+  const pct = Math.round(100 * st.wins / st.games);
+  return `<b class="${pct >= 55 ? 'hot' : pct < 47 ? 'cold' : ''}">${pct}%</b> · ${st.games} game${st.games === 1 ? '' : 's'} · ${st.kda} KDA`;
+}
+function csTimeLeft(cs) { return Math.max(0, cs.timeLeft - (Date.now() - cs.at)); }
+function leagueChampSelect(cs) {
+  const t = el('div', 'tile league game cs');
+  const me = cs.me;
+  const pos = ROLE[cs.position] || '';
+  const r = cs.runes;
+  const left = me ? `
+    <div class="csme">
+      ${chIcon(me, 'csbig')}
+      <div class="csinfo">
+        <div class="csname">${esc(me.name)} <span class="muted">${me.locked ? 'locked in' : 'hovering'}</span></div>
+        <div class="csstat">Your games: ${statLine(me.stats)}</div>
+        <div class="csrunes">${r ? `${I.trophy}<b>${esc(r.keystone || r.primaryName)}</b>&nbsp;· ${esc(r.primaryName)} + ${esc(r.secondaryName)}` : '<span class="muted">Loading Riot\'s recommended runes…</span>'}</div>
+      </div>
+    </div>
+    <div class="csbtns">
+      <button class="pbtn allow" data-import ${r && r.perkIds && r.perkIds.length >= 6 ? '' : 'disabled'}>Import runes</button>
+      <button class="pbtn" data-url="${esc(uggUrl(me, cs.position, 'build'))}">Build on u.gg ↗</button>
+      <button class="pbtn" data-url="${esc(uggUrl(me, cs.position, 'counter'))}">Counters ↗</button>
+    </div>` : `
+    <div class="csnone">
+      <div class="csname">Pick a champion</div>
+      <div class="muted">${cs.ideas.length ? `Your most played${pos ? ' ' + pos : ''} champions` : 'Hover a champion to see runes and your stats'}</div>
+      <div class="csideas">${cs.ideas.map(c => `<button class="csidea" data-url="${esc(uggUrl(c, cs.position))}" title="${esc(c.name)} on u.gg">${chIcon(c)}<span>${esc(c.name)}</span><span class="muted">${c.stats ? Math.round(100 * c.stats.wins / c.stats.games) + '% · ' + c.stats.games + 'g' : ''}</span></button>`).join('')}</div>
+    </div>`;
+  const allies = cs.allies.map(a => `<div class="csrow ${a.me ? 'me' : ''} ${a.locked ? '' : 'dim'}">${chIcon(a.champ)}<span class="cspos">${ROLE[a.position] || ''}</span><span class="ellipsis">${a.champ ? esc(a.champ.name) : '<span class="muted">Picking…</span>'}</span></div>`).join('');
+  const enemies = cs.enemies.length ? cs.enemies.map(e => `<div class="csrow">${chIcon(e)}<span class="ellipsis">${esc(e.name)}</span></div>`).join('') : '<div class="muted csempty">No enemy picks yet</div>';
+  const bans = cs.bans.length ? `<div class="csbans">${cs.bans.map(b => `<span class="csban" title="${esc(b.name)}">${chIcon(b, 'lch sm')}</span>`).join('')}</div>` : '';
+  t.innerHTML = `
+    <div class="lhead"><span class="cstatus">${I.trophy}Champ select${pos ? ' · ' + pos : ''}</span><span class="cstimer" data-cstimer>${fmtTime(csTimeLeft(cs))}</span></div>
+    <div class="csgrid">
+      <div class="csleft">${left}</div>
+      <div class="csteam blue"><div class="clabel">Your team</div>${allies}</div>
+      <div class="csteam red"><div class="clabel">Enemy team</div>${enemies}${bans ? '<div class="clabel" style="margin-top:6px">Bans</div>' + bans : ''}</div>
+    </div>`;
+  return t;
+}
+function leagueChampions(L) {
+  const t = el('div', 'tile league game champs clickable');
+  const list = L.top || [];
+  t.innerHTML = `
+    <div class="lhead"><span class="cstatus">${I.trophy}Your champions</span><span class="muted">Last 50 games · click a champion for its u.gg build · click here to close</span></div>
+    <div class="cslist">${list.length ? list.map(c => `
+      <button class="cschamp" data-url="${esc(uggUrl(c, ''))}">${chIcon(c, 'csbig sm')}<span class="csname">${esc(c.name)}</span><span class="csstat">${statLine(c.stats)}</span></button>`).join('') : '<div class="muted">Play a few games and your champions show up here.</div>'}</div>`;
+  return t;
+}
+
 // ------------------------------------------------------------------ sound output picker
 function outputIcon(o) {
   const n = String((o && o.name) || '').toLowerCase();
@@ -492,12 +575,14 @@ function renderCompact() {
 // ------------------------------------------------------------------ ticker (only while something on screen moves)
 let ticker = null;
 function startTicker() {
-  const need = (state === 'open' && (D.media || D.timer.running)) || D.timer.running;
+  const need = (state === 'open' && (D.media || D.timer.running || (D.league && D.league.cs))) || D.timer.running;
   if (need && !ticker) ticker = setInterval(tick, 500);
   if (!need && ticker) { clearInterval(ticker); ticker = null; }
 }
 
 function tick() {
+  const cst = document.querySelector('[data-cstimer]');
+  if (cst && D.league && D.league.cs) cst.textContent = fmtTime(csTimeLeft(D.league.cs));
   for (const el of document.querySelectorAll('[data-since]')) el.textContent = fmtTime(Date.now() - +el.dataset.since);
   if (D.timer.running && timerLeft() <= 0) {
     D.timer.running = false; D.timer.left = 0;
@@ -597,8 +682,15 @@ api.on('peek', p => {
 
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
 api.on('league', L => {
-  const layoutChanged = !!(D.league && D.league.client) !== !!(L && L.client) || !!(D.league && D.league.game) !== !!(L && L.game);
+  const wideBefore = leagueWide();
+  const clientBefore = !!(D.league && D.league.client);
+  if (L && L.cs && !(D.league && D.league.cs)) D.leagueOpen = false;
   D.league = L;
+  const layoutChanged = clientBefore !== !!(L && L.client) || wideBefore !== leagueWide();
+  // Champ select opens the notch by itself so the helper is right there.
+  if (L && L.cs && state !== 'open' && !csShownOnce) { csShownOnce = true; pinned = true; setState('open'); }
+  if (!(L && L.cs)) csShownOnce = false;
+  startTicker();
   if (state === 'open') { if (layoutChanged) renderTiles(); else rerenderTile('league'); }
 });
 // ------------------------------------------------------------------ boot

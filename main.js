@@ -796,6 +796,7 @@ ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSetting
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state }));
 ipcMain.handle('get-displays', () => listDisplays());
+ipcMain.handle('league-import-runes', () => league ? league.importRunes() : { ok: false, error: 'League is not open' });
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));
 ipcMain.on('install-update', () => installUpdate());
@@ -816,6 +817,7 @@ app.whenReady().then(() => {
   league = new League({
     send: d => {
       if (d.type === 'game-start') toIsland('peek', { kind: 'league', title: 'Game loading', sub: d.queue ? `${d.queue} · ranks in the notch` : 'Ranks in the notch', ms: 4000 });
+      else if (d.type === 'cs-start') toIsland('peek', { kind: 'league', title: 'Champ select', sub: 'Runes, your stats and the draft are in the notch', ms: 4000 });
       else { state.league = d; toIsland('league', d); }
     },
     log: helperLog,
