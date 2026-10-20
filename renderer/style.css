@@ -510,3 +510,8 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .cspick:hover { background: var(--btn-hover); }
 .league .cspick .muted { font-size: 11px; text-align: right; }
 .league .csalt .ocw span { font-size: 11px; color: var(--text); }
+.league .lcol { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.league .lcolhead { display: flex; flex-direction: column; gap: 1px; margin-bottom: 2px; }
+.league .lcolhead .cstatus { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; }
+.league .lcolhead .cstatus svg { width: 15px; height: 15px; color: var(--accent); }
+.league .lcolhead .muted { font-size: 10.5px; }

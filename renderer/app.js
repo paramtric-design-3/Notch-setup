@@ -494,7 +494,8 @@ function tierList(L) {
   const lane = D.tierLane || L.mainLane || 'jungle';
   const list = (L.meta && L.meta[lane]) || [];
   return `<div class="ltl">
-    <div class="ltabs">${LANES.map(([k, n]) => `<button class="ltab ${k === lane ? 'on' : ''}" data-tierlane="${k}">${n}</button>`).join('')}<span class="muted osrc">OP.GG tier list</span></div>
+    <div class="lcolhead"><span class="cstatus">${I.bars}OP.GG tier list</span><span class="muted">Ranked · this patch · click a champion for its build</span></div>
+    <div class="ltabs">${LANES.map(([k, n]) => `<button class="ltab ${k === lane ? 'on' : ''}" data-tierlane="${k}">${n}</button>`).join('')}</div>
     <div class="ltlist" style="grid-template-rows: repeat(${Math.max(1, Math.ceil(list.length / 2))}, auto)">${list.length ? list.map((c, i) => `
       <button class="ltrow" data-url="${esc(opggUrl(c, lane))}" title="${esc(c.name)} build on OP.GG"><span class="ltrank">${c.rank || i + 1}</span>${chIcon(c, 'lch sm')}<span class="ellipsis ltname">${esc(c.name)}</span>${tierPill(c.tier)}<span class="ltnum"><b>${pct(c.winRate)}</b></span><span class="ltnum muted">${pct(c.pickRate)}</span><span class="ltnum muted">${pct(c.banRate)}</span></button>`).join('')
       : `<div class="muted">${L.meta ? 'No tier list for this lane' : 'Loading the tier list from OP.GG…'}</div>`}</div>
@@ -553,10 +554,12 @@ function leagueChampions(L) {
   const t = el('div', 'tile league game champs clickable');
   const list = L.top || [];
   t.innerHTML = `
-    <div class="lhead"><span class="cstatus">${I.trophy}Your champions</span><span class="muted">Last 50 games · click a champion for its build · click here to close</span></div>
     <div class="lsplit">
+      <div class="lcol">
+      <div class="lcolhead"><span class="cstatus">${I.trophy}Your champions</span><span class="muted">Last 50 games · click an empty spot to close</span></div>
       <div class="cslist">${list.length ? list.map(c => `
         <button class="cschamp" data-url="${esc(opggUrl(c, ''))}">${chIcon(c, 'csbig sm')}<span class="csname">${esc(c.name)}</span><span class="csstat">${statLine(c.stats)}</span></button>`).join('') : '<div class="muted">Play a few games and your champions show up here.</div>'}</div>
+      </div>
       ${tierList(L)}
     </div>`;
   return t;
