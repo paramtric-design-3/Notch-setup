@@ -451,7 +451,7 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .csteam { display: flex; flex-direction: column; gap: 3px; padding-left: 10px; border-left: 2px solid #4a7bd0; min-width: 0; }
 .league .csteam.red { border-left-color: #d0584a; }
 .league .csteam .clabel { font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--text-2); font-weight: 600; margin-bottom: 2px; }
-.league .csrow { display: grid; grid-template-columns: 24px auto minmax(0, 1fr); gap: 8px; align-items: center; height: 26px; font-size: 12.5px; padding: 0 6px 0 2px; border-radius: 7px; }
+.league .csrow { display: grid; grid-template-columns: 24px auto minmax(0, 1fr) auto; gap: 8px; align-items: center; height: 26px; font-size: 12.5px; padding: 0 6px 0 2px; border-radius: 7px; }
 .league .csrow.me { background: var(--btn-on); }
 .league .csrow.me .ellipsis { color: var(--accent); font-weight: 600; }
 .league .csrow.dim { opacity: .55; }
@@ -503,3 +503,10 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .ltrank { font-size: 10.5px; color: var(--text-2); text-align: right; font-variant-numeric: tabular-nums; }
 .league .ltnum { text-align: right; font-variant-numeric: tabular-nums; font-size: 11.5px; }
 .league .lthead { display: none; }
+.league .csrow.opp { background: rgba(208, 88, 74, .14); }
+.league .csrow.opp .ellipsis { font-weight: 600; }
+.league .cspicks { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.league .cspick { display: grid; grid-template-columns: 24px minmax(0, 110px) auto minmax(0, 1fr); gap: 8px; align-items: center; padding: 3px 8px 3px 3px; border-radius: 8px; text-align: left; font-size: 12px; }
+.league .cspick:hover { background: var(--btn-hover); }
+.league .cspick .muted { font-size: 11px; text-align: right; }
+.league .csalt .ocw span { font-size: 11px; color: var(--text); }

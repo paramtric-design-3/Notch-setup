@@ -11,6 +11,7 @@ const path = require('path');
 const { Opgg, POS, nameCandidates } = require('./opgg');
 
 const LIVE_PORT = 2999;
+const OUR_POS = { top: 'top', jungle: 'jungle', mid: 'middle', adc: 'bottom', support: 'utility' };
 const META_TTL = 6 * 3600 * 1000;      // OP.GG tier lists and builds change once a patch, roughly
 // Both servers use self-signed certificates and only listen on 127.0.0.1.
 const agent = new https.Agent({ rejectUnauthorized: false, keepAlive: true, maxSockets: 4 });
@@ -74,7 +75,7 @@ class League {
     this.meta = null; this.metaAt = 0;
     try {
       const m = JSON.parse(fs.readFileSync(path.join(cacheDir, 'opgg-meta.json'), 'utf8'));
-      if (m && m.lanes && Date.now() - m.at < META_TTL) { this.meta = m.lanes; this.metaAt = m.at; }
+      if (m && m.lanes && m.roles && Date.now() - m.at < META_TTL) { this.meta = m.lanes; this.roleRates = m.roles; this.metaAt = m.at; }
     } catch { /* first run */ }
   }
 
@@ -225,14 +226,29 @@ class League {
       if (myChamp) { this.loadRecommendedRunes(myChamp, mine.position); this.loadAnalysis(myChamp, mine.position); }
     }
     if (entered) this.send({ type: 'cs-start', position: mine.position });
+    // Estimated roles: allies without an assigned role (blind pick) and the whole enemy team.
+    const allyGuess = this.estimateRoles(allies.filter(a => !a.position && a.champ).map(a => a.champ.id), allies.map(a => POS[a.position]).filter(Boolean));
+    for (const a of allies) if (!a.position && a.champ && allyGuess[a.champ.id]) { a.guess = allyGuess[a.champ.id].position; a.sure = allyGuess[a.champ.id].sure; }
+    const enemyGuess = this.estimateRoles(enemies.map(e => e.id));
+    for (const e of enemies) if (enemyGuess[e.id]) { e.guess = enemyGuess[e.id].position; e.sure = enemyGuess[e.id].sure; }
+    const myPos = mine.position || mine.guess || '';
+    const opponent = myPos ? enemies.find(e => e.guess === myPos) || null : null;
+    if (opponent) this.loadOpponent(opponent.id, myPos);
     this.cs = {
       position: mine.position || '', timeLeft: Math.max(0, Math.round(timer.adjustedTimeLeftInPhase || 0)), timerPhase: timer.phase || '',
       at: Date.now(), me: mine.champ ? { ...mine.champ, locked: mine.locked, stats: this.statsFor(mine.champ.id) } : null,
       allies, enemies, bans: [...new Set([...banList, ...actionBans])].map(id => this.champ(id)),
       runes: this.csRunes, ideas: this.topChamps(mine.position || '', 4),
       opgg: this.opggView(this.csOpgg), meta: mine.position ? this.metaFor(mine.position, 5) : [],
+      myPos, opponent: opponent && { ...opponent }, picks: [],
     };
-    this.loadIcons([...allies.map(a => a.champ && a.champ.key), ...enemies.map(e => e.key), ...this.cs.bans.map(b => b && b.key), ...this.cs.ideas.map(i => i.key), ...this.cs.meta.map(m => m.key)].filter(Boolean));
+    this.csUnavailable = new Set([...this.cs.bans.filter(Boolean).map(b => b.id), ...enemies.map(e => e.id), ...allies.filter(a => a.champ && !a.me).map(a => a.champ.id)]);
+    this.refreshPicks();
+    this.loadIcons([...allies.map(a => a.champ && a.champ.key), ...enemies.map(e => e.key), ...this.cs.bans.map(b => b && b.key), ...this.cs.ideas.map(i => i.key), ...this.cs.meta.map(m => m.key), ...this.cs.picks.map(m => m.key)].filter(Boolean));
+  }
+  refreshPicks() {
+    if (!this.cs) return;
+    this.cs.picks = this.suggestPicks(this.cs.myPos, this.cs.opponent, this.csUnavailable || new Set());
   }
 
   // Riot's own recommended rune pages, from the client.
@@ -306,9 +322,16 @@ class League {
         out = await this.opgg.call('lol_list_lane_meta_champions', { position: 'all', lang: 'en_US', desired_output_fields: ['top', 'jungle', 'mid', 'adc', 'support'].map(p => `data.positions.${p}[].${f}`) });
       }
       const positions = (out && out.data && out.data.positions) || (out && out.positions) || {};
-      const lanes = {};
+      const lanes = {}, roles = {};
       for (const [lane, list] of Object.entries(positions)) {
         if (!Array.isArray(list)) continue;
+        // How often each champion is played in this lane, for guessing roles in champ select.
+        for (const x of list) {
+          const cid = x && this.champIdOf(x.champion !== undefined ? x.champion : (x.champion_id || x.champion_name));
+          if (!cid) continue;
+          const rate = x.role_rate != null ? +x.role_rate : (+x.pick_rate || 0.01);
+          (roles[cid] = roles[cid] || {})[lane] = x.is_rip ? rate * 0.3 : rate;
+        }
         lanes[lane] = list.filter(x => x && !x.is_rip).map(x => ({
           id: this.champIdOf(x.champion !== undefined ? x.champion : (x.champion_id || x.champion_name)),
           tier: +x.tier || 0, rank: +x.rank || 0, winRate: +x.win_rate || 0, pickRate: +x.pick_rate || 0, banRate: +x.ban_rate || 0,
@@ -317,7 +340,8 @@ class League {
       }
       if (!Object.keys(lanes).length) throw new Error('no lanes in answer');
       this.meta = lanes;
-      try { fs.writeFileSync(path.join(this.cacheDir, 'opgg-meta.json'), JSON.stringify({ at: this.metaAt, lanes })); } catch { /* ignore */ }
+      this.roleRates = roles;
+      try { fs.writeFileSync(path.join(this.cacheDir, 'opgg-meta.json'), JSON.stringify({ at: this.metaAt, lanes, roles })); } catch { /* ignore */ }
       this.log(`opgg meta: ${Object.entries(lanes).map(([k, v]) => `${k} ${v.length}`).join(', ')}`);
     } catch (e) { this.log('opgg meta: ' + e.message); }
     finally { this.metaLoading = false; }
@@ -338,17 +362,75 @@ class League {
     return 0;
   }
 
+  // Guess which lane each champion plays: try every way to spread them over the free lanes
+  // and keep the one where the champions are most often played in those lanes (OP.GG play rates).
+  estimateRoles(ids, taken = []) {
+    const lanes = ['top', 'jungle', 'mid', 'adc', 'support'].filter(l => !taken.includes(l));
+    const list = ids.filter(Boolean).slice(0, lanes.length);
+    if (!list.length || !this.roleRates) return {};
+    const rate = (id, l) => Math.max(0.005, ((this.roleRates[id] || {})[l]) || 0);
+    let best = null, bestScore = -Infinity;
+    const walk = (i, used, pick, score) => {
+      if (i === list.length) { if (score > bestScore) { bestScore = score; best = pick.slice(); } return; }
+      for (const l of lanes) if (!used.has(l)) { used.add(l); pick.push(l); walk(i + 1, used, pick, score + Math.log(rate(list[i], l))); pick.pop(); used.delete(l); }
+    };
+    walk(0, new Set(), [], 0);
+    const out = {};
+    list.forEach((id, i) => {
+      const l = best[i], r = rate(id, l);
+      const total = Object.values(this.roleRates[id] || {}).reduce((a, b) => a + b, 0) || r;
+      out[id] = { lane: l, position: OUR_POS[l], sure: r / total >= 0.7 };
+    });
+    return out;
+  }
+
+  // Pick suggestions for your lane: champions that beat your likely lane opponent, then your own
+  // good champions in this role, then the strongest picks of the patch.
+  suggestPicks(position, opponent, unavailable) {
+    const lane = POS[position];
+    if (!lane) return [];
+    const out = new Map();
+    const names = {};
+    const add = (id, why, score, name) => {
+      if (!id || unavailable.has(id)) return;
+      if (name) names[id] = name;
+      const cur = out.get(id);
+      if (cur) { cur.why.push(why); cur.score += score; } else out.set(id, { id, why: [why], score });
+    };
+    const mine = new Map(this.topChamps(position, 8).filter(c => c.stats).map(c => [c.id, c.stats]));
+    const vs = opponent && this.analysis.get(`${opponent.id}:${lane}`);
+    for (const c of (vs && vs.data && vs.data.counters) || []) add(c.id, `beats ${opponent.name} ${Math.round(100 * (1 - c.winRate))}%`, 3 + (1 - c.winRate - 0.5) * 20, c.name);
+    for (const [id, st] of mine) {
+      const w = st.wins / st.games;
+      if (st.games >= 2 && w >= 0.45) add(id, `you ${Math.round(100 * w)}% · ${st.games}g`, 1.5 + w + Math.min(st.games, 10) / 10);
+    }
+    for (const m of ((this.meta && this.meta[lane]) || []).slice(0, 8)) add(m.id, `${['', 'OP', 'Strong', 'Good', 'Average', 'Weak'][m.tier] || 'Meta'} tier`, (6 - (m.tier || 5)) * 0.6);
+    return [...out.values()].sort((a, b) => b.score - a.score).slice(0, 5).map(x => {
+      const meta = ((this.meta && this.meta[lane]) || []).find(m => m.id === x.id);
+      return { ...this.champ(x.id), ...(this.champs && this.champs[x.id] ? {} : { name: names[x.id] || `#${x.id}` }), why: x.why.slice(0, 2).join(' · '), tier: meta ? meta.tier : 0, mine: mine.has(x.id) };
+    });
+  }
+
+  // Counters and builds for the enemy who is probably in your lane (for counter-pick ideas).
+  async loadOpponent(champId, position) {
+    const key = `${champId}:${POS[position]}`;
+    if (this.oppKey === key) return;
+    this.oppKey = key;
+    await this.loadAnalysis(champId, position, true);
+    if (this.cs) { this.refreshPicks(); this.emit(); }
+  }
+
   metaFor(position, n) {
     const lane = POS[position] || position;
     return ((this.meta && this.meta[lane]) || []).slice(0, n).map(x => ({ ...this.champ(x.id), tier: x.tier, rank: x.rank, prev: x.prev, winRate: x.winRate, pickRate: x.pickRate, banRate: x.banRate }));
   }
 
   // Counters, build, skills and runes for one champion in one lane.
-  async loadAnalysis(champId, position) {
+  async loadAnalysis(champId, position, cacheOnly = false) {
     const lane = POS[position] || 'all';
     const id = `${champId}:${lane}`;
     const hit = this.analysis.get(id);
-    if (hit && Date.now() - hit.at < META_TTL) { this.useAnalysis(champId, hit.data); return; }
+    if (hit && Date.now() - hit.at < META_TTL) { if (!cacheOnly) this.useAnalysis(champId, hit.data); return; }
     const c = this.champs && this.champs[champId];
     if (!c) return;
     const names = this.opggNames.has(champId) ? [this.opggNames.get(champId)] : nameCandidates(c.name, c.key);
@@ -388,7 +470,8 @@ class League {
       } : null,
     };
     this.analysis.set(id, { at: Date.now(), data: a });
-    this.useAnalysis(champId, a);
+    if (!cacheOnly) this.useAnalysis(champId, a);
+    else this.loadIcons(a.counters.map(x => (this.champs[x.id] || {}).key).filter(Boolean));
   }
 
   useAnalysis(champId, a) {
@@ -553,7 +636,8 @@ class League {
         allies: this.cs.allies.map(a => ({ ...a, champ: a.champ && { ...a.champ, icon: this.icons.get(a.champ.key) || null } })),
         enemies: this.cs.enemies.map(e => ({ ...e, icon: this.icons.get(e.key) || null })),
         bans: this.cs.bans.filter(Boolean).map(b => ({ ...b, icon: this.icons.get(b.key) || null })),
-        ideas: this.cs.ideas.map(i => ({ ...i, icon: this.icons.get(i.key) || null })) },
+        ideas: this.cs.ideas.map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
+        picks: (this.cs.picks || []).map(i => ({ ...i, icon: this.icons.get(i.key) || null })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
       game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players },
       meta: this.meta ? Object.fromEntries(Object.keys(this.meta).map(l => [l, this.metaFor(l, 10).map(({ icon, ...c }) => c)])) : null,

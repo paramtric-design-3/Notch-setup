@@ -523,6 +523,7 @@ function leagueChampSelect(cs) {
       </div>
     </div>
     ${opggBlock(cs.opgg, me)}
+    ${!me.locked && cs.picks && cs.picks.filter(c => c.id !== me.id).length ? `<div class="orow csalt"><span class="olabel">Or pick</span>${cs.picks.filter(c => c.id !== me.id).slice(0, 4).map(c => `<button class="ocw" data-url="${esc(opggUrl(c, UGG_ROLE[cs.myPos]))}" title="${esc(c.name)}: ${esc(c.why)}">${chIcon(c, 'lch sm')}<span>${esc(c.name)}</span></button>`).join('')}</div>` : ''}
     <div class="csbtns">
       <button class="pbtn allow" data-import ${r && r.perkIds && r.perkIds.length >= 6 ? '' : 'disabled'}>Import ${o ? 'OP.GG ' : ''}runes</button>
       <button class="pbtn" data-url="${esc(opggUrl(me, cs.opgg && cs.opgg.lane))}">OP.GG ↗</button>
@@ -530,14 +531,14 @@ function leagueChampSelect(cs) {
     </div>` : `
     <div class="csnone">
       <div class="csname">Pick a champion</div>
-      <div class="muted">${cs.ideas.length ? `Your most played${pos ? ' ' + pos : ''} champions` : 'Hover a champion to see runes and your stats'}</div>
-      <div class="csideas">${cs.ideas.map(c => `<button class="csidea" data-url="${esc(uggUrl(c, cs.position))}" title="${esc(c.name)} on u.gg">${chIcon(c)}<span>${esc(c.name)}</span><span class="muted">${c.stats ? Math.round(100 * c.stats.wins / c.stats.games) + '% · ' + c.stats.games + 'g' : ''}</span></button>`).join('')}</div>
-      ${cs.meta && cs.meta.length ? `<div class="muted" style="margin-top:8px">Strongest${pos ? ' ' + pos : ''} picks this patch (OP.GG)</div>
-      <div class="csideas">${cs.meta.map(c => `<button class="csidea" data-url="${esc(opggUrl(c, ''))}" title="${esc(c.name)} on OP.GG">${chIcon(c)}<span>${esc(c.name)}</span><span class="muted">${tierPill(c.tier)} ${pct(c.winRate)}</span></button>`).join('')}</div>` : ''}
+      ${cs.picks && cs.picks.length ? '' : `<div class="muted">${cs.ideas.length ? `Your most played${pos ? ' ' + pos : ''} champions` : 'Hover a champion to see runes and your stats'}</div>`}
+      <div class="csideas" ${cs.picks && cs.picks.length ? 'hidden' : ''}>${cs.ideas.map(c => `<button class="csidea" data-url="${esc(uggUrl(c, cs.position))}" title="${esc(c.name)} on u.gg">${chIcon(c)}<span>${esc(c.name)}</span><span class="muted">${c.stats ? Math.round(100 * c.stats.wins / c.stats.games) + '% · ' + c.stats.games + 'g' : ''}</span></button>`).join('')}</div>
+      ${cs.picks && cs.picks.length ? `<div class="muted">Suggested picks for ${esc(ROLE[cs.myPos] || 'you')}${cs.opponent ? ` · vs ${esc(cs.opponent.name)}` : ''}</div>
+      <div class="cspicks">${cs.picks.map(c => `<button class="cspick" data-url="${esc(opggUrl(c, UGG_ROLE[cs.myPos]))}" title="${esc(c.name)} build on OP.GG">${chIcon(c)}<span class="ellipsis">${esc(c.name)}</span>${c.tier ? tierPill(c.tier) : '<span></span>'}<span class="muted ellipsis">${esc(c.why)}</span></button>`).join('')}</div>` : ''}
     </div>`;
-  const allies = cs.allies.map(a => `<div class="csrow ${a.me ? 'me' : ''} ${a.locked ? '' : 'dim'}">${chIcon(a.champ)}<span class="cspos">${ROLE[a.position] || ''}</span><span class="ellipsis">${a.champ ? esc(a.champ.name) : '<span class="muted">Picking…</span>'}</span></div>`).join('');
+  const allies = cs.allies.map(a => `<div class="csrow ${a.me ? 'me' : ''} ${a.locked ? '' : 'dim'}">${chIcon(a.champ)}<span class="cspos">${ROLE[a.position] || (a.guess ? ROLE[a.guess] + (a.sure ? '' : '?') : '')}</span><span class="ellipsis">${a.champ ? esc(a.champ.name) : '<span class="muted">Picking…</span>'}</span></div>`).join('');
   const bad = new Set(((cs.opgg && cs.opgg.counters) || []).map(c => c.id)), good = new Set(((cs.opgg && cs.opgg.goodVs) || []).map(c => c.id));
-  const enemies = cs.enemies.length ? cs.enemies.map(e => `<div class="csrow">${chIcon(e)}<span class="ellipsis">${esc(e.name)}</span>${bad.has(e.id) ? '<span class="otag cold">counters you</span>' : good.has(e.id) ? '<span class="otag hot">you counter</span>' : ''}</div>`).join('') : '<div class="muted csempty">No enemy picks yet</div>';
+  const enemies = cs.enemies.length ? cs.enemies.map(e => `<div class="csrow ${cs.opponent && cs.opponent.id === e.id ? 'opp' : ''}" title="${e.guess ? 'Estimated role: ' + ROLE[e.guess] + (cs.opponent && cs.opponent.id === e.id ? ' (your lane)' : '') : ''}">${chIcon(e)}<span class="cspos">${e.guess ? ROLE[e.guess] + (e.sure ? '' : '?') : ''}</span><span class="ellipsis">${esc(e.name)}</span>${bad.has(e.id) ? '<span class="otag cold">counters you</span>' : good.has(e.id) ? '<span class="otag hot">you counter</span>' : ''}</div>`).join('') : '<div class="muted csempty">No enemy picks yet</div>';
   const bans = cs.bans.length ? `<div class="csbans">${cs.bans.map(b => `<span class="csban" title="${esc(b.name)}">${chIcon(b, 'lch sm')}</span>`).join('')}</div>` : '';
   t.innerHTML = `
     <div class="lhead"><span class="cstatus">${I.trophy}Champ select${pos ? ' · ' + pos : ''}</span><span class="cstimer" data-cstimer>${fmtTime(csTimeLeft(cs))}</span></div>
