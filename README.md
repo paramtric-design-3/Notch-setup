@@ -29,6 +29,7 @@ Tray icon → **Screen**, or Settings → **Screen**:
 | Tile | Where the data comes from |
 |---|---|
 | Music | Windows media controls, so it works with Spotify, browsers and most players. Synced lyrics from LRCLIB (free, no key). If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
+| League of Legends | Appears while the League client is open. Outside a game: your Solo and Flex rank, LP and win rate. When a game loads: both teams with each player's champion, rank, season win rate and their last 10 games, like Porofessor's loading screen. Uses only the League client on this PC (no Riot account key) plus champion pictures from Riot's Data Dragon. Ranks are looked up once the game is loading, not in champ select, because Riot doesn't allow revealing the hidden names there. |
 | Sound output | The speaker button on the music tile (top right) lists your playback devices; click one to make it the default. Also in the tray menu under **Sound output**. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
 | Messages | The notifications Windows is still holding (WhatsApp, Telegram, Teams…). Read-only and local. |
@@ -54,7 +55,7 @@ Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in S
 
 ## Privacy
 
-Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), cover lookups (iTunes Search) when a player shares no cover, update checks (GitHub) and your calendar link if you add one. There are no accounts and no analytics. Settings, the lyrics and cover caches, and a small troubleshooting log (`helper.log`) live in `%APPDATA%\FJBC Notch`.
+Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), cover lookups (iTunes Search) when a player shares no cover, champion pictures (Riot Data Dragon), update checks (GitHub) and your calendar link if you add one. There are no accounts and no analytics. Settings, the lyrics and cover caches, and a small troubleshooting log (`helper.log`) live in `%APPDATA%\FJBC Notch`.
 
 ## Updates
 

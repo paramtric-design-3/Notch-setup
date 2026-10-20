@@ -22,6 +22,7 @@ const D = {
   radios: {}, volume: null, brightness: null, dark: null,
   weather: null, messages: null, calendar: null,
   timer: { total: 25 * 60 * 1000, left: 25 * 60 * 1000, running: false, endsAt: 0 },
+  league: null,           // League client state: { client, phase, me, game }
   outputs: [], outPicker: false,   // sound output devices and whether the picker is open
 };
 
@@ -286,6 +287,27 @@ const TILE = {
     return t;
   },
 
+  league(size) {
+    const L = D.league;
+    const g = L && L.game;
+    if (g && g.players && g.players.length) return leagueGame(g);
+    const t = el('div', `tile league w${size}`);
+    const me = L && L.me;
+    if (!me) { t.innerHTML = `<div class="empty"><div class="ico">${I.trophy}</div>League client is starting…</div>`; return t; }
+    const line = (label, r) => r
+      ? `<div class="lrow"><span class="lq">${label}</span>${rankPill(r)}<span class="lwr">${wr(r)}</span></div>`
+      : `<div class="lrow"><span class="lq">${label}</span><span class="muted">Unranked</span></div>`;
+    const phase = { Lobby: 'In lobby', Matchmaking: 'In queue', ReadyCheck: 'Match found', ChampSelect: 'Champ select', GameStart: 'Game starting', InProgress: 'In game', EndOfGame: 'Game over' }[L.phase] || 'League open';
+    if (size === 1) {
+      t.innerHTML = `<div class="lbig">${I.trophy}</div>${me.solo ? rankPill(me.solo) : '<span class="muted">Unranked</span>'}`;
+      return t;
+    }
+    t.innerHTML = `
+      <div class="chead"><span class="cstatus ellipsis">${esc(me.name)}<span class="muted">#${esc(me.tag)}</span></span><span class="cfolder">${phase}</span></div>
+      ${line('Solo', me.solo)}${size > 1 ? line('Flex', me.flex) : ''}`;
+    return t;
+  },
+
   timer(size) {
     const t = el('div', `tile timer w${size}`);
     const T = D.timer;
@@ -306,6 +328,7 @@ function layoutWidth(shown) {
   const rows = []; let cur = 0;
   for (const x of shown) {
     const size = Math.max(1, Math.min(3, x.size || 2));
+    if (x.id === 'league' && D.league && D.league.game) { if (cur) rows.push(cur); rows.push(MAX_CELLS); cur = 0; continue; }
     if (cur && cur + size > MAX_CELLS) { rows.push(cur); cur = 0; }
     cur += size;
   }
@@ -315,7 +338,8 @@ function layoutWidth(shown) {
 }
 function renderTiles() {
   if (!D.settings) return;
-  const shown = D.settings.tiles.filter(x => x.show);
+  let shown = D.settings.tiles.filter(x => x.show && (x.id !== 'league' || (D.league && D.league.client)));
+  if (D.league && D.league.game) shown = [...shown.filter(x => x.id === 'league'), ...shown.filter(x => x.id !== 'league')];
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
@@ -367,6 +391,44 @@ tilesView.addEventListener('wheel', e => {
   const delta = e.deltaY < 0 ? 4 : -4;
   api.send('helper', b.dataset.q === 'vol' ? { c: 'vol', delta } : { c: 'bright', delta: delta * 2 });
 }, { passive: false });
+
+// ------------------------------------------------------------------ League of Legends
+const TIER = {
+  IRON: ['I', '#7a6f6a'], BRONZE: ['B', '#a5735a'], SILVER: ['S', '#9aa6b2'], GOLD: ['G', '#d6a84c'],
+  PLATINUM: ['P', '#4fb3a9'], EMERALD: ['E', '#2fb36f'], DIAMOND: ['D', '#6b8ff0'], MASTER: ['M', '#a66be0'],
+  GRANDMASTER: ['GM', '#e05a5a'], CHALLENGER: ['C', '#f0c96a'],
+};
+const DIV = { I: 1, II: 2, III: 3, IV: 4 };
+function rankPill(r) {
+  if (!r) return '<span class="lpill none">Unranked</span>';
+  const [ab, color] = TIER[r.tier] || [r.tier.slice(0, 1), '#888'];
+  const div = DIV[r.division] ? DIV[r.division] : '';
+  return `<span class="lpill" style="--tier:${color}">${ab}${div}<span class="llp">${r.lp} LP</span></span>`;
+}
+function wr(r) {
+  const games = (r.wins || 0) + (r.losses || 0);
+  if (!games) return '';
+  const pct = Math.round(100 * r.wins / games);
+  return `<b class="${pct >= 55 ? 'hot' : pct < 47 ? 'cold' : ''}">${pct}%</b> ${games}g`;
+}
+function leagueGame(g) {
+  const t = el('div', 'tile league game');
+  const side = team => g.players.filter(p => p.team === team).map(p => {
+    const form = (p.recent || []).slice(0, 10).map(w => `<i class="${w ? 'w' : 'l'}"></i>`).join('');
+    const r = p.rank;
+    return `<div class="lp ${p.me ? 'me' : ''}">
+      <span class="lch">${p.icon ? `<img src="${p.icon}" alt="">` : esc((p.champ || '?').slice(0, 2))}</span>
+      <span class="lname ellipsis" title="${esc(p.name)}#${esc(p.tag)} · ${esc(p.champ)}">${esc(p.name)}</span>
+      ${p.bot ? '<span class="lpill none">Bot</span>' : p.loading ? '<span class="lpill none">…</span>' : rankPill(r)}
+      <span class="lwr">${r ? wr(r) : ''}</span>
+      <span class="lform">${form}</span>
+    </div>`;
+  }).join('');
+  t.innerHTML = `
+    <div class="lhead"><span class="cstatus">${I.trophy}${esc(g.queue || 'In game')}</span><span class="muted">Win rate and form: this season · last 10 games</span></div>
+    <div class="lteams"><div class="lteam blue">${side('blue')}</div><div class="lteam red">${side('red')}</div></div>`;
+  return t;
+}
 
 // ------------------------------------------------------------------ sound output picker
 function outputIcon(o) {
@@ -528,18 +590,24 @@ api.on('messages', m => { D.messages = m; rerenderTile('messages'); });
 api.on('calendar', c => { D.calendar = c; rerenderTile('calendar'); });
 api.on('peek', p => {
   if (p.kind === 'app') peek({ img: p.icon, icon: I.grid, title: p.title, sub: p.sub });
+  else if (p.kind === 'league') peek({ icon: I.trophy, title: p.title, sub: p.sub, ms: p.ms || 4000 });
   else if (p.kind === 'update') peek({ icon: I.download, title: p.title, sub: p.sub, ms: p.ms || 3500 });
   else peek(p);
 });
 
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
+api.on('league', L => {
+  const layoutChanged = !!(D.league && D.league.client) !== !!(L && L.client) || !!(D.league && D.league.game) !== !!(L && L.game);
+  D.league = L;
+  if (state === 'open') { if (layoutChanged) renderTiles(); else rerenderTile('league'); }
+});
 // ------------------------------------------------------------------ boot
 (async () => {
   try {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.outputs = s.outputs || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.league = s.league || null; D.outputs = s.outputs || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();

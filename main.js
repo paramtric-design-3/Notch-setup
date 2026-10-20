@@ -12,6 +12,7 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
+const { League } = require('./league');
 
 // The window is sized to the island itself (the renderer reports its size), so it
 // catches clicks normally and never covers the apps around it.
@@ -40,6 +41,7 @@ const DEFAULT_SETTINGS = {
     { id: 'controls', show: true, size: 2 },
     { id: 'calendar', show: false, size: 2 },
     { id: 'timer', show: false, size: 2 },
+    { id: 'league', show: true, size: 3 },
   ],
 };
 
@@ -259,7 +261,7 @@ function trayImage() {
 }
 
 const TILE_NAMES = {
-  music: 'Music', weather: 'Weather', messages: 'Messages',
+  league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages',
   controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer',
 };
 
@@ -320,7 +322,8 @@ function createTray() {
 let helper = null;
 let helperBuf = '';
 let helperRestarts = 0;
-const state = { media: null, radios: {}, volume: null, brightness: null, dark: null, outputs: [] };
+let league = null;
+const state = { league: null, media: null, radios: {}, volume: null, brightness: null, dark: null, outputs: [] };
 
 function helperPath() {
   // Not inside asar (packaged with asar disabled), so PowerShell can read it.
@@ -395,6 +398,7 @@ async function onHelperMessage(m) {
       for (const a of (m.data.closed || []).slice(0, 2)) peekApp(a, 'closed');
       break;
     }
+    case 'lcu': league && league.setClient(m.data && m.data.port ? { port: m.data.port, token: m.data.token } : null); break;
     case 'log': helperLog(m.data); break;
   }
 }
@@ -808,6 +812,17 @@ app.whenReady().then(() => {
   createTray();
   startHelper();
   setupUpdater();
+  // League of Legends: the helper reports the client; tests can pass NOTCH_LCU=port:token.
+  league = new League({
+    send: d => {
+      if (d.type === 'game-start') toIsland('peek', { kind: 'league', title: 'Game loading', sub: d.queue ? `${d.queue} · ranks in the notch` : 'Ranks in the notch', ms: 4000 });
+      else { state.league = d; toIsland('league', d); }
+    },
+    log: helperLog,
+    cacheDir: app.getPath('userData'),
+  });
+  league.start();
+  if (process.env.NOTCH_LCU) { const [port, token] = process.env.NOTCH_LCU.split(':'); league.setClient({ port: +port, token }); }
   island.webContents.once('did-finish-load', () => {
     toIsland('settings', settings);
     refreshWeather(true);

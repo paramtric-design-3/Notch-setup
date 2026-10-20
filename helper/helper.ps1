@@ -369,6 +369,23 @@ function Poll-Outputs {
     if ($sig -ne $script:lastOutputs) { $script:lastOutputs = $sig; Emit 'outputs' ([ordered]@{ devices = $devs }) }
 }
 
+# ------------------------------------------------------------------ League of Legends client (its local API port and key)
+$script:lastLcu = $null
+function Poll-League {
+    $info = $null
+    $p = Get-CimInstance -ClassName Win32_Process -Filter "Name='LeagueClientUx.exe'" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($p -and $p.CommandLine) {
+        $port = [regex]::Match($p.CommandLine, '--app-port=(\d+)').Groups[1].Value
+        $token = [regex]::Match($p.CommandLine, '--remoting-auth-token=([\w-]+)').Groups[1].Value
+        if ($port -and $token) { $info = "$port|$token" }
+    }
+    if ($info -ne $script:lastLcu) {
+        $script:lastLcu = $info
+        if ($info) { $f = $info -split '\|'; Emit 'lcu' ([ordered]@{ port = [int]$f[0]; token = $f[1] }) }
+        else { Emit 'lcu' $null }
+    }
+}
+
 # ------------------------------------------------------------------ apps opening and closing
 $script:apps = @{}
 $script:ignore = @('ApplicationFrameHost', 'TextInputHost', 'explorer', 'SearchHost', 'StartMenuExperienceHost',
@@ -460,6 +477,7 @@ while (-not [NotchPump]::Closed) {
         Every 'dark' 5000 { Poll-Dark }
         Every 'apps' 2000 { Poll-Apps }
         Every 'outputs' 5000 { Poll-Outputs }
+        Every 'league' 5000 { Poll-League }
     } else {
         Every 'media' 1500 { Poll-Media }
         Every 'volume' 5000 { Poll-Volume }
@@ -467,6 +485,7 @@ while (-not [NotchPump]::Closed) {
         Every 'dark' 20000 { Poll-Dark }
         Every 'apps' 2500 { Poll-Apps }
         Every 'outputs' 30000 { Poll-Outputs }
+        Every 'league' 8000 { Poll-League }
     }
     Start-Sleep -Milliseconds 200
 }

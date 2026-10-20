@@ -386,3 +386,39 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .picker .pitem.on { color: var(--accent); background: var(--btn-on); }
 .picker .pico, .picker .pcheck { width: 15px; height: 15px; flex: none; }
 .picker .pname { flex: 1; min-width: 0; }
+
+/* League of Legends */
+.tile.league { gap: 6px; padding-top: 11px; }
+.league .lrow { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.league .lq { width: 34px; color: var(--text-2); font-size: 11.5px; }
+.lpill { display: inline-flex; align-items: baseline; gap: 5px; font-weight: 700; font-size: 12.5px; color: var(--tier, var(--text)); white-space: nowrap; flex: none; }
+.lpill .llp { font-weight: 500; font-size: 11px; color: var(--text-2); }
+.lpill.none { color: var(--text-2); font-weight: 500; font-size: 11.5px; }
+.lwr { font-size: 11.5px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lwr b { color: var(--text); font-weight: 600; }
+.lwr b.hot { color: var(--accent); }
+.lwr b.cold { color: #8f97a3; }
+.league .lbig { width: 26px; height: 26px; color: var(--accent); margin: 4px auto; }
+.tile.league.w1 { align-items: center; justify-content: center; }
+.tile.league.game { flex: 1 1 100%; width: auto; height: auto; padding: 10px 12px 12px; gap: 8px; }
+.league .lhead { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+.league .lhead .cstatus { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+.league .lhead .cstatus svg { width: 15px; height: 15px; color: var(--accent); }
+.league .lhead .muted { font-size: 10.5px; }
+.league .lteams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.league .lteam { display: flex; flex-direction: column; gap: 3px; padding-left: 8px; border-left: 2px solid #4a7bd0; }
+.league .lteam.red { border-left-color: #d0584a; }
+.league .lp { display: grid; grid-template-columns: 24px minmax(0, 1fr) 84px 72px 54px; align-items: center; gap: 8px; height: 26px; padding: 0 6px 0 2px; border-radius: 7px; }
+.league .lp.me { background: var(--btn-on); }
+.league .lp.me .lname { color: var(--accent); font-weight: 600; }
+.league .lch { width: 24px; height: 24px; border-radius: 6px; overflow: hidden; background: var(--btn); display: grid; place-items: center; font-size: 10px; color: var(--text-2); }
+.league .lch img { width: 100%; height: 100%; display: block; }
+.league .lname { font-size: 12.5px; min-width: 0; }
+.league .lform { display: flex; gap: 2px; justify-content: flex-end; }
+.league .lform i { width: 4px; height: 12px; border-radius: 2px; background: var(--track); }
+.league .lform i.w { background: var(--accent); }
+.league .lform i.l { background: #6b7280; opacity: .55; }
+.tile.league:not(.game) .chead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.tile.league:not(.game) .chead .cstatus { font-size: 14px; font-weight: 600; min-width: 0; }
+.tile.league:not(.game) .chead .cstatus .muted { font-weight: 400; margin-left: 1px; }
+.tile.league:not(.game) .chead .cfolder { font-size: 11.5px; color: var(--accent); flex: none; }
