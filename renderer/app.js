@@ -495,7 +495,7 @@ function tierList(L) {
   const list = (L.meta && L.meta[lane]) || [];
   return `<div class="ltl">
     <div class="ltabs">${LANES.map(([k, n]) => `<button class="ltab ${k === lane ? 'on' : ''}" data-tierlane="${k}">${n}</button>`).join('')}<span class="muted osrc">OP.GG tier list</span></div>
-    <div class="ltlist">${list.length ? list.map((c, i) => `
+    <div class="ltlist" style="grid-template-rows: repeat(${Math.max(1, Math.ceil(list.length / 2))}, auto)">${list.length ? list.map((c, i) => `
       <button class="ltrow" data-url="${esc(opggUrl(c, lane))}" title="${esc(c.name)} build on OP.GG"><span class="ltrank">${c.rank || i + 1}</span>${chIcon(c, 'lch sm')}<span class="ellipsis ltname">${esc(c.name)}</span>${tierPill(c.tier)}<span class="ltnum"><b>${pct(c.winRate)}</b></span><span class="ltnum muted">${pct(c.pickRate)}</span><span class="ltnum muted">${pct(c.banRate)}</span></button>`).join('')
       : `<div class="muted">${L.meta ? 'No tier list for this lane' : 'Loading the tier list from OP.GG…'}</div>`}</div>
     ${list.length ? '<div class="lthead muted"><span>Win · Pick · Ban</span></div>' : ''}
