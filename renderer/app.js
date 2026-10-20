@@ -540,13 +540,15 @@ function leagueChampSelect(cs) {
   const allies = cs.allies.map(a => `<div class="csrow ${a.me ? 'me' : ''} ${a.locked ? '' : 'dim'}">${chIcon(a.champ)}<span class="cspos">${ROLE[a.position] || (a.guess ? ROLE[a.guess] + (a.sure ? '' : '?') : '')}</span><span class="ellipsis">${a.champ ? esc(a.champ.name) : '<span class="muted">Picking…</span>'}</span></div>`).join('');
   const bad = new Set(((cs.opgg && cs.opgg.counters) || []).map(c => c.id)), good = new Set(((cs.opgg && cs.opgg.goodVs) || []).map(c => c.id));
   const enemies = cs.enemies.length ? cs.enemies.map(e => `<div class="csrow ${cs.opponent && cs.opponent.id === e.id ? 'opp' : ''}" title="${e.guess ? 'Estimated role: ' + ROLE[e.guess] + (cs.opponent && cs.opponent.id === e.id ? ' (your lane)' : '') : ''}">${chIcon(e)}<span class="cspos">${e.guess ? ROLE[e.guess] + (e.sure ? '' : '?') : ''}</span><span class="ellipsis">${esc(e.name)}</span>${bad.has(e.id) ? '<span class="otag cold">counters you</span>' : good.has(e.id) ? '<span class="otag hot">you counter</span>' : ''}</div>`).join('') : '<div class="muted csempty">No enemy picks yet</div>';
-  const bans = cs.bans.length ? `<div class="csbans">${cs.bans.map(b => `<span class="csban" title="${esc(b.name)}">${chIcon(b, 'lch sm')}</span>`).join('')}</div>` : '';
+  const bs = cs.banSides || { mine: [], theirs: [] };
+  const banRow = (list, cls) => `<span class="cbans ${cls}">${list.map(b => b ? `<span class="cban" title="Banned: ${esc(b.name)}">${chIcon(b, 'lch')}</span>` : '<span class="cban none">✕</span>').join('')}</span>`;
   t.innerHTML = `
-    <div class="lhead"><span class="cstatus">${I.trophy}Champ select${pos ? ' · ' + pos : ''}</span><span class="cstimer" data-cstimer>${fmtTime(csTimeLeft(cs))}</span></div>
+    <div class="lhead csbar"><span class="cstatus">${I.trophy}Champ select${pos ? ' · ' + pos : ''}</span>
+      <span class="csbanbar">${banRow(bs.mine, 'blue')}<span class="cstimer" data-cstimer>${fmtTime(csTimeLeft(cs))}</span>${banRow(bs.theirs, 'red')}</span><span></span></div>
     <div class="csgrid">
       <div class="csleft">${left}</div>
       <div class="csteam blue"><div class="clabel">Your team</div>${allies}</div>
-      <div class="csteam red"><div class="clabel">Enemy team</div>${enemies}${bans ? '<div class="clabel" style="margin-top:6px">Bans</div>' + bans : ''}</div>
+      <div class="csteam red"><div class="clabel">Enemy team</div>${enemies}</div>
     </div>`;
   return t;
 }

@@ -217,6 +217,15 @@ class League {
     const bans = s.bans || {};
     const banList = [...(bans.myTeamBans || []), ...(bans.theirTeamBans || [])].filter(x => x > 0);
     const actionBans = actions.filter(a => a.type === 'ban' && a.completed && a.championId > 0).map(a => a.championId);
+    // Bans per team, 5 slots each (null = not banned yet or skipped), like u.gg's bar.
+    const myCells = new Set(s.myTeam.map(p => p.cellId));
+    const side = mine => {
+      const fromActions = actions.filter(a => a.type === 'ban' && myCells.has(a.actorCellId) === mine).map(a => (a.completed && a.championId > 0 ? a.championId : 0));
+      const fromBans = (mine ? bans.myTeamBans : bans.theirTeamBans) || [];
+      const ids = fromBans.length ? fromBans.map(x => (x > 0 ? x : 0)) : fromActions;
+      return Array.from({ length: 5 }, (_, i) => ids[i] || 0);
+    };
+    const banSides = { mine: side(true), theirs: side(false) };
     const timer = s.timer || {};
     const myChamp = mine.champ ? mine.champ.id : 0;
     if (myChamp !== this.csChamp) {
@@ -240,7 +249,7 @@ class League {
       allies, enemies, bans: [...new Set([...banList, ...actionBans])].map(id => this.champ(id)),
       runes: this.csRunes, ideas: this.topChamps(mine.position || '', 4),
       opgg: this.opggView(this.csOpgg), meta: mine.position ? this.metaFor(mine.position, 5) : [],
-      myPos, opponent: opponent && { ...opponent }, picks: [],
+      myPos, opponent: opponent && { ...opponent }, picks: [], banSides,
     };
     this.csUnavailable = new Set([...this.cs.bans.filter(Boolean).map(b => b.id), ...enemies.map(e => e.id), ...allies.filter(a => a.champ && !a.me).map(a => a.champ.id)]);
     this.refreshPicks();
@@ -636,6 +645,7 @@ class League {
         allies: this.cs.allies.map(a => ({ ...a, champ: a.champ && { ...a.champ, icon: this.icons.get(a.champ.key) || null } })),
         enemies: this.cs.enemies.map(e => ({ ...e, icon: this.icons.get(e.key) || null })),
         bans: this.cs.bans.filter(Boolean).map(b => ({ ...b, icon: this.icons.get(b.key) || null })),
+        banSides: this.cs.banSides && Object.fromEntries(Object.entries(this.cs.banSides).map(([k, ids]) => [k, ids.map(id => { const c = id ? this.champ(id) : null; return c && { ...c, icon: this.icons.get(c.key) || null }; })])),
         ideas: this.cs.ideas.map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
         picks: (this.cs.picks || []).map(i => ({ ...i, icon: this.icons.get(i.key) || null })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
