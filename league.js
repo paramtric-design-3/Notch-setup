@@ -255,20 +255,24 @@ class League {
       return Array.from({ length: 5 }, (_, i) => ids[i] || 0);
     };
     const banSides = { mine: side(true), theirs: side(false) };
-    const myChamp = mine.champ ? mine.champ.id : 0;
-    if (myChamp !== this.csChamp) {
-      this.csChamp = myChamp;
-      this.csRunes = null;
-      this.csOpgg = null;
-      if (myChamp) { this.loadRecommendedRunes(myChamp, mine.position); this.loadAnalysis(myChamp, mine.position); }
-    }
     if (entered) this.send({ type: 'cs-start', position: mine.position });
     // Estimated roles: allies without an assigned role (blind pick) and the whole enemy team.
     const allyGuess = this.estimateRoles(allies.filter(a => !a.position && a.champ).map(a => a.champ.id), allies.map(a => POS[a.position]).filter(Boolean));
     for (const a of allies) if (!a.position && a.champ && allyGuess[a.champ.id]) { a.guess = allyGuess[a.champ.id].position; a.sure = allyGuess[a.champ.id].sure; }
     const enemyGuess = this.estimateRoles(enemies.map(e => e.id));
     for (const e of enemies) if (enemyGuess[e.id]) { e.guess = enemyGuess[e.id].position; e.sure = enemyGuess[e.id].sure; }
-    const myPos = mine.position || mine.guess || '';
+    // No assigned role (blind pick, normals): use your champion's estimated role, or its main lane.
+    let myPos = mine.position || mine.guess || '';
+    if (!myPos && mine.champ) myPos = this.mainLaneOf(mine.champ.id);
+    const myChamp = mine.champ ? mine.champ.id : 0;
+    if (myChamp !== this.csChamp || myPos !== this.csPos) {
+      if (myChamp !== this.csChamp) this.csRunes = null;
+      this.csChamp = myChamp;
+      this.csPos = myPos;
+      this.csOpgg = null;
+      this.csOpggFailed = false;
+      if (myChamp) { if (!this.csRunes) this.loadRecommendedRunes(myChamp, myPos); this.loadAnalysis(myChamp, myPos); }
+    }
     const opponent = myPos ? enemies.find(e => e.guess === myPos) || null : null;
     if (opponent) this.loadOpponent(opponent.id, myPos);
     for (const e of enemies) if (e.guess) this.queueAnalysis(e.id, e.guess);
@@ -283,11 +287,16 @@ class League {
       allies, enemies, bans: [...new Set([...banList, ...actionBans])].map(id => this.champ(id)),
       runes: this.csRunes, ideas: this.topChamps(mine.position || '', 4),
       opgg: this.opggView(this.csOpgg), meta: mine.position ? this.metaFor(mine.position, 5) : [],
-      myPos, opponent: opponent && { ...opponent }, picks: [], banSides, stage, enemyRows,
+      myPos, opponent: opponent && { ...opponent }, picks: [], banSides, stage, enemyRows, opggFailed: !!this.csOpggFailed,
     };
     this.csUnavailable = new Set([...this.cs.bans.filter(Boolean).map(b => b.id), ...enemies.map(e => e.id), ...allies.filter(a => a.champ && !a.me).map(a => a.champ.id)]);
     this.refreshPicks();
     this.loadIcons([...allies.map(a => a.champ && a.champ.key), ...enemies.map(e => e.key), ...this.cs.bans.map(b => b && b.key), ...this.cs.ideas.map(i => i.key), ...this.cs.meta.map(m => m.key), ...this.cs.picks.map(m => m.key), ...(this.cs.banList || []).map(m => m.key), ...(this.cs.laneTop || []).map(m => m.key), ...allies.flatMap(a => (a.spells || []).map(x => 'spell:' + x))].filter(Boolean));
+  }
+  mainLaneOf(id) {
+    const r = (this.roleRates && this.roleRates[id]) || {};
+    const best = Object.entries(r).sort((a, b) => b[1] - a[1])[0];
+    return best ? OUR_POS[best[0]] : '';
   }
   laneWinRate(id, position) {
     const m = ((this.meta && this.meta[POS[position]]) || []).find(x => x.id === id);
@@ -348,7 +357,15 @@ class League {
       const pages = (await this.lcuGet('/lol-perks/v1/pages')) || [];
       const ours = pages.find(p => /^Notch:/.test(p.name || '') && p.isEditable);
       if (ours) await this.lcuSend('DELETE', `/lol-perks/v1/pages/${ours.id}`);
-      await this.lcuSend('POST', '/lol-perks/v1/pages', body);
+      try { await this.lcuSend('POST', '/lol-perks/v1/pages', body); } catch (e) {
+        if (!/max pages|400/i.test(e.message)) throw e;
+        // Every rune page is in use: replace the page that's selected now (as u.gg and Porofessor do).
+        const cur = (pages.find(p => p.current && p.isEditable)) || pages.find(p => p.isEditable);
+        if (!cur) throw e;
+        await this.lcuSend('DELETE', `/lol-perks/v1/pages/${cur.id}`);
+        await this.lcuSend('POST', '/lol-perks/v1/pages', body);
+        return { ok: true, source: r === o ? 'OP.GG' : 'Riot', replaced: cur.name || '' };
+      }
       return { ok: true, source: r === o ? 'OP.GG' : 'Riot' };
     } catch (e) {
       this.log('league import runes: ' + e.message);
@@ -497,7 +514,7 @@ class League {
 
   // Counters, build, skills and runes for one champion in one lane.
   async loadAnalysis(champId, position, cacheOnly = false) {
-    const lane = POS[position] || 'all';
+    const lane = POS[position] || 'none';
     const id = `${champId}:${lane}`;
     const hit = this.analysis.get(id);
     if (hit && Date.now() - hit.at < META_TTL) { if (!cacheOnly) this.useAnalysis(champId, hit.data); return; }
@@ -512,7 +529,11 @@ class League {
         if (d && (d.summary || d.core_items || d.runes)) { data = d; this.opggNames.set(champId, name); break; }
       } catch (e) { lastErr = e; }
     }
-    if (!data) { this.log(`opgg ${c.name}/${lane}: ${lastErr ? lastErr.message : 'no data'}`); this.analysis.set(id, { at: Date.now() - META_TTL + 2 * 60 * 1000, data: null }); return; }
+    if (!data) {
+      this.log(`opgg ${c.name}/${lane}: ${lastErr ? lastErr.message : 'no data'}`);
+      if (!cacheOnly && this.csChamp === champId) { this.csOpggFailed = true; if (this.cs) { this.cs.opggFailed = true; this.emit(); } }       this.analysis.set(id, { at: Date.now() - META_TTL + 2 * 60 * 1000, data: null });
+      return;
+    }
     const avg = (data.summary && data.summary.average_stats) || {};
     const lanePos = ((data.summary && data.summary.positions) || []).find(p => String(p.name || '').toLowerCase() === lane) || null;
     const ls = (lanePos && lanePos.stats) || {};

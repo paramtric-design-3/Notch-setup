@@ -383,6 +383,7 @@ tilesView.addEventListener('click', async e => {
     b.textContent = res.ok ? `${res.source || ''} runes imported ✓` : 'Import runes';
     b.disabled = !!res.ok;
     if (!res.ok) peek({ icon: I.trophy, title: 'Runes not imported', sub: res.error || '', ms: 4000 });
+    else if (res.replaced) peek({ icon: I.trophy, title: 'Runes imported', sub: `All pages were in use, so "${res.replaced}" was replaced`, ms: 5000 });
     return;
   }
   if (b.dataset.out !== undefined) { D.outPicker = true; api.send('helper', { c: 'outputs' }); rerenderTile('music'); return; }
@@ -480,7 +481,7 @@ function opggUrl(champ, lane) {
 }
 // OP.GG's build for the champion you hover or lock: counters, items, skills.
 function opggBlock(o, me) {
-  if (!o) return `<div class="opgg muted">Loading OP.GG counters and build…</div>`;
+  if (!o) return `<div class="opgg muted">${D.league && D.league.cs && D.league.cs.opggFailed ? 'OP.GG has no build for this champion in this role' : 'Loading OP.GG counters and build…'}</div>`;
   const cw = (list, cls) => list.map(c => `<button class="ocw" data-url="${esc(opggUrl(c, o.lane))}" title="${esc(c.name)}: you win ${pct(c.winRate)} of ${c.games} games">${chIcon(c, 'lch sm')}<span class="${cls}">${Math.round(c.winRate * 100)}%</span></button>`).join('');
   const items = (ids, label) => ids.length ? `<span class="obuild">${ids.map(i => imgIcon('item:' + i, label)).join('')}</span>` : '';
   const r = o.runes;
