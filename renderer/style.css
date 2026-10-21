@@ -605,3 +605,21 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .ltab { display: inline-flex; align-items: center; gap: 5px; }
 .league .ltab svg { width: 14px; height: 14px; opacity: .8; }
 .league .ltab.on svg { opacity: 1; }
+/* team rows: fixed columns so win rates, counters and spells line up */
+.league .uteam.blue .uplayer { grid-template-columns: 22px 34px minmax(0, 1fr) 58px 88px; gap: 8px; padding: 0 10px 0 8px; }
+.league .uteam.red .uplayer { grid-template-columns: 34px minmax(0, 1fr) 58px 88px; gap: 8px; padding: 0 10px 0 38px; }
+.league .uwr { justify-self: end; text-align: right; }
+.league .ucount, .league .uspells { justify-self: end; }
+.league .uspells { display: flex; gap: 3px; }
+.league .uspells .lit { width: 20px; height: 20px; border-radius: 5px; }
+.league .ucicons .lch.sm { width: 22px; height: 22px; border-radius: 6px; }
+.league .ucicons { gap: 4px; }
+.league .ucount { align-items: flex-end; }
+.league .urole svg { width: 17px; height: 17px; }
+.league .ustat { line-height: 14px; }
+.league .ustat b { font-weight: 600; color: var(--text); }
+.league .ustat.hovering { color: var(--text-2); }
+.league .upred { gap: 4px; }
+.league .upred svg { width: 13px; height: 13px; flex: none; display: block; }
+.league .uch.hover { box-shadow: none !important; outline: 1.5px dashed rgba(255,255,255,.45); outline-offset: 1px; }
+.league .uch.hover img { opacity: .7; }

@@ -543,9 +543,10 @@ function leagueChampSelect(cs) {
     const p = a.position || a.guess;
     return `<div class="uplayer ${a.me ? 'me' : ''} ${a.champ ? '' : 'vacant'}">
       <span class="urole" title="${esc(ROLE[p] || '')}${!a.position && a.guess ? ' (estimated)' : ''}">${roleIcon(p)}${!a.position && a.guess && !a.sure ? '<i>?</i>' : ''}</span>
-      ${chIcon(a.champ, 'uch' + (a.locked ? '' : ' hover'))}
-      <span class="uname"><b class="ellipsis">${esc(a.name || (a.me ? 'You' : ROLE[p] || 'Teammate'))}</b><span class="ustat">${(a.spells || []).map(x => imgIcon('spell:' + x, 'Summoner spell')).join('')}${esc(a.status)}${a.champ && !a.locked ? ' · ' + esc(a.champ.name) : ''}</span></span>
+      ${chIcon(a.champ, 'uch' + (a.champ && !a.locked ? ' hover' : ''))}
+      <span class="uname"><b class="ellipsis">${esc(a.name || (a.me ? 'You' : ROLE[p] || 'Teammate'))}</b><span class="ustat ${a.champ && !a.locked ? 'hovering' : ''}">${a.locked ? 'Locked in' : a.champ ? `Hovering <b>${esc(a.champ.name)}</b>${a.status === 'Picking' ? ' · picking now' : ''}` : esc(a.status)}</span></span>
       <span class="uwr">${a.winRate ? `<b>${pct0(a.winRate)}</b><span class="muted">${esc(ROLE[p] || '')} WR</span>` : ''}</span>
+      <span class="uspells">${(a.spells || []).map(x => imgIcon('spell:' + x, 'Summoner spell')).join('')}</span>
     </div>`;
   }).join('');
   const byId = new Map(cs.enemies.map(e => [e.id, e]));
