@@ -643,3 +643,28 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .gskills .oskills i.nxt { background: var(--accent); color: #2A1606; }
 .league .grunes { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; }
 .league .grunes .lit { width: 18px; height: 18px; border-radius: 50%; background: none; }
+/* full rune page */
+.league .rpage { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--btn); }
+.league .rhead { display: flex; align-items: baseline; gap: 8px; }
+.league .rhead .olabel { width: auto; }
+.league .rhead .muted { font-size: 10.5px; }
+.league .rtrees { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.league .rtree { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.league .rstyle { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 2px; }
+.league .rstyle .lit { width: 18px; height: 18px; background: none; }
+.league .rpk { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text); min-width: 0; }
+.league .rpk .lit { width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.3); }
+.league .rpk.key .lit { width: 30px; height: 30px; }
+.league .rpk.key { font-weight: 600; }
+.league .rshards { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.league .rshard { font-size: 10.5px; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.25); color: var(--text-2); }
+/* compact rune page: keystone on top, the 3 other primary runes side by side */
+.league .rpage { gap: 6px; padding: 7px 10px; }
+.league .rtree { gap: 3px; }
+.league .rstyle { margin-bottom: 0; }
+.league .rpk { font-size: 11.5px; gap: 6px; }
+.league .rpk .lit { width: 20px; height: 20px; }
+.league .rpk.key .lit { width: 26px; height: 26px; }
+.league .rminor { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.league .rminor .rpk { flex-direction: column; gap: 2px; text-align: center; font-size: 10px; color: var(--text-2); }
+.league .rminor .rpk .ellipsis { max-width: 100%; }

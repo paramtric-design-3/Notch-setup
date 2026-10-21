@@ -677,7 +677,7 @@ class League {
     const keys = [...a.counters, ...a.goodVs].map(x => (this.champs[x.id] || {}).key).filter(Boolean);
     const r = a.runes;
     this.loadIcons([...keys, ...[...a.starter, ...a.boots, ...a.core].map(i => 'item:' + i), ...a.spells.map(i => 'spell:' + i),
-      ...(r ? ['rune:' + r.keystoneId, 'rune:' + r.secondary] : [])]);
+      ...(r ? ['rune:' + r.primary, 'rune:' + r.secondary, ...r.perkIds.slice(0, 6).map(x => 'rune:' + x)] : [])]);
     if (this.cs) { this.cs.opgg = this.opggView(a); this.emit(); }
   }
 
