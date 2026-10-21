@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS = {
   messageApps: 'WhatsApp, Telegram, Signal, Teams, Discord, Messenger, Slack, Instagram, Phone Link, YourPhone, Mail, Outlook',
   messageAllApps: false,
   peeks: { apps: false, power: true },
+  overlay: { show: true, place: 'minimap' },   // in-game item overlay: 'minimap' | 'top' | 'left'
   schema: 2,
   tiles: [
     { id: 'music', show: true, size: 3 },
@@ -51,7 +52,7 @@ function loadSettings() {
   settingsPath = path.join(app.getPath('userData'), 'settings.json');
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) } };
+    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) } };
     // keep any tile added in a newer version
     const ids = new Set(settings.tiles.map(t => t.id));
     for (const t of DEFAULT_SETTINGS.tiles) if (!ids.has(t.id)) settings.tiles.push({ ...t });
@@ -90,6 +91,7 @@ function applySettings(next, { fromSettingsWindow = false } = {}) {
   if (settings.calendarUrl !== prevCal) refreshCalendar(true);
   refreshMessages();
   buildTrayMenu();
+  updateOverlay();
   if (!fromSettingsWindow && settingsWin) settingsWin.webContents.send('settings', settings);
 }
 
@@ -252,6 +254,54 @@ function broadcast(channel, data) {
 }
 function toIsland(channel, data) {
   if (island && !island.isDestroyed()) island.webContents.send(channel, data);
+}
+
+// ---------------------------------------------------------------- in-game item overlay
+// A small see-through window over the game (borderless or windowed mode) with the next item to
+// buy and the rest of your build. Clicks go through it.
+let overlay = null;
+let overlayData = null;
+const OVERLAY_W = 300, OVERLAY_H = 150;
+function overlayBounds() {
+  const d = screen.getPrimaryDisplay();
+  const b = d.bounds, s = b.height / 1080;
+  const place = (settings.overlay && settings.overlay.place) || 'minimap';
+  if (place === 'top') return { x: b.x + b.width - OVERLAY_W - 16, y: b.y + Math.round(90 * s), width: OVERLAY_W, height: OVERLAY_H };
+  if (place === 'left') return { x: b.x + 16, y: b.y + Math.round(b.height * 0.42), width: OVERLAY_W, height: OVERLAY_H };
+  // just above the minimap (bottom right; the default HUD minimap is about 290 px tall at 1080p)
+  return { x: b.x + b.width - OVERLAY_W - 12, y: b.y + b.height - Math.round(300 * s) - OVERLAY_H, width: OVERLAY_W, height: OVERLAY_H };
+}
+function updateOverlay(d) {
+  if (d) overlayData = d;
+  const L = overlayData;
+  const b = L && L.game && L.game.build;
+  const want = settings.overlay && settings.overlay.show !== false && b && !b.loading && !b.failed && L.phase === 'InProgress';
+  if (!want) { if (overlay && !overlay.isDestroyed() && overlay.isVisible()) overlay.hide(); return; }
+  if (!overlay || overlay.isDestroyed()) {
+    overlay = new BrowserWindow({
+      ...overlayBounds(), frame: false, transparent: true, backgroundColor: '#00000000', resizable: false, movable: false,
+      minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true, focusable: false, hasShadow: false,
+      alwaysOnTop: true, show: false,
+      webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, spellcheck: false },
+    });
+    overlay.setAlwaysOnTop(true, 'screen-saver');
+    overlay.setIgnoreMouseEvents(true);
+    overlay.setMenu(null);
+    overlay.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
+    overlay.webContents.on('did-finish-load', () => { overlay.webContents.send('overlay', overlayPayload()); overlay.showInactive(); });
+    return;
+  }
+  overlay.setBounds(overlayBounds());
+  overlay.webContents.send('overlay', overlayPayload());
+  if (!overlay.isVisible()) overlay.showInactive();
+}
+function overlayPayload() {
+  const b = overlayData && overlayData.game && overlayData.game.build;
+  if (!b || !league) return null;
+  const pics = {};
+  for (const id of [...b.boots, ...b.core, ...b.later]) { const v = league.icons.get('item:' + id); if (v) pics['item:' + id] = v; }
+  if (b.champ && b.champ.key && league.icons.get(b.champ.key)) pics[b.champ.key] = league.icons.get(b.champ.key);
+  return { build: b, pics, theme: settings.theme, place: (settings.overlay && settings.overlay.place) || 'minimap' };
 }
 
 // ---------------------------------------------------------------- tray
@@ -818,7 +868,7 @@ app.whenReady().then(() => {
       if (d.type === 'game-start') toIsland('peek', { kind: 'league', title: 'Game loading', sub: d.queue ? `${d.queue} · ranks in the notch` : 'Ranks in the notch', ms: 4000 });
       else if (d.type === 'cs-start') toIsland('peek', { kind: 'league', title: 'Champ select', sub: 'Runes, your stats and the draft are in the notch', ms: 4000 });
       else if (d.type === 'cs-counter') toIsland('peek', { kind: 'league', title: `Counter picks vs ${d.name}`, sub: `${d.role ? d.role + ' · ' : ''}head-to-head win rates in the notch`, ms: 4000 });
-      else { state.league = { ...d, icons: { ...((state.league && state.league.icons) || {}), ...(d.icons || {}) } }; toIsland('league', d); }
+      else { updateOverlay(d); state.league = { ...d, icons: { ...((state.league && state.league.icons) || {}), ...(d.icons || {}) } }; toIsland('league', d); }
     },
     log: helperLog,
     cacheDir: app.getPath('userData'),

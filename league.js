@@ -369,7 +369,13 @@ class League {
     const icons = [...a.starter, ...a.boots, ...want].map(i => 'item:' + i);
     if (a.runes) icons.push('rune:' + a.runes.keystoneId, 'rune:' + a.runes.secondary);
     if (icons.some(k => !this.icons.has(k))) this.loadIcons(icons);
+    if (!this.itemNames && !this.itemNamesLoading && this.ddVersion) {
+      this.itemNamesLoading = true;
+      this.ddJson('item.json').then(d => { this.itemNames = Object.fromEntries(Object.entries((d && d.data) || {}).map(([k, v]) => [k, v.name])); this.emit(); }).catch(() => { this.itemNamesLoading = false; });
+    }
+    const nm = this.itemNames || {};
     return {
+      names: Object.fromEntries([...a.starter, ...a.boots, ...a.core, ...a.later].map(i => [i, nm[i] || ''])),
       champ, pos: m.pos, mode: m.mode, level: m.level, owned: m.items,
       starter: a.starter, boots: a.boots, core: a.core, later: a.later, skills: a.skills, maxOrder: a.maxOrder,
       runes: a.runes && { keystone: a.runes.keystone, keystoneId: a.runes.keystoneId, primaryName: a.runes.primaryName, secondaryName: a.runes.secondaryName, secondary: a.runes.secondary },

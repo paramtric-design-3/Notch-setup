@@ -38,6 +38,9 @@ function render() {
   $('#login').checked = !!S.launchAtLogin;
   renderDisplays();
   $('#msgAll').checked = !!S.messageAllApps;
+  const ov = S.overlay || { show: true, place: 'minimap' };
+  $('#ovShow').checked = ov.show !== false;
+  document.querySelectorAll('#ovPlace button').forEach(b => b.classList.toggle('on', b.dataset.v === (ov.place || 'minimap')));
   if (document.activeElement !== $('#city')) $('#city').value = S.city || '';
   if (document.activeElement !== $('#msgApps')) $('#msgApps').value = S.messageApps || '';
 
@@ -84,6 +87,8 @@ function bindText(id, key, savedId) {
   document.querySelectorAll('#theme button').forEach(b => b.onclick = () => save({ theme: b.dataset.v }));
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
+  $('#ovShow').onchange = e => save({ overlay: { ...(S.overlay || {}), show: e.target.checked } });
+  document.querySelectorAll('#ovPlace button').forEach(b => b.onclick = () => save({ overlay: { ...(S.overlay || {}), place: b.dataset.v } }));
   bindText('#city', 'city', '#citySaved');
   bindText('#msgApps', 'messageApps', '#appsSaved');
   api.on('settings', s => { S = s; render(); });

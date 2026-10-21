@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>FJBC Notch overlay</title>
+  <style>
+    html, body { margin: 0; background: transparent; overflow: hidden; font: 12px/1.3 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: #ECECEC; -webkit-font-smoothing: antialiased; user-select: none; }
+    #o { position: absolute; right: 0; bottom: 0; display: none; flex-direction: column; gap: 6px; padding: 9px 11px; border-radius: 14px; background: rgba(17, 17, 17, .82); box-shadow: 0 0 0 1px rgba(255, 255, 255, .07), 0 6px 20px rgba(0, 0, 0, .45); max-width: 276px; }
+    #o.left { right: auto; left: 0; }
+    #o.show { display: flex; }
+    .next { display: flex; align-items: center; gap: 9px; }
+    .next img, .next .ph { width: 38px; height: 38px; border-radius: 8px; box-shadow: 0 0 0 2px #F29A4A; flex: none; background: #222; }
+    .nl { display: flex; flex-direction: column; min-width: 0; }
+    .nl small { font-size: 9.5px; letter-spacing: .6px; text-transform: uppercase; color: #F29A4A; font-weight: 700; }
+    .nl b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .path { display: flex; align-items: center; gap: 4px; }
+    .it { position: relative; width: 24px; height: 24px; border-radius: 5px; overflow: hidden; background: #222; flex: none; }
+    .it img { width: 100%; height: 100%; display: block; }
+    .it.own img { opacity: .3; }
+    .it.own::after { content: ""; position: absolute; inset: 0; background: center / 14px no-repeat url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236fd08a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12.5l4.5 4.5L19 7.5'/></svg>"); }
+    .it.nx { box-shadow: inset 0 0 0 2px #F29A4A; }
+    .sep { color: #777; font-size: 11px; }
+    .meta { display: flex; align-items: center; gap: 6px; color: #9A9A9A; font-size: 10.5px; }
+    .meta i { font-style: normal; font-weight: 700; font-size: 10.5px; color: #2A1606; background: #F29A4A; border-radius: 4px; padding: 0 5px; }
+    .done b { color: #6fd08a; }
+  </style>
+</head>
+<body>
+  <div id="o"></div>
+  <script src="overlay.js"></script>
+</body>
+</html>
