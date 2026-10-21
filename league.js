@@ -193,10 +193,10 @@ class League {
         const st = p.stats || {};
         const tl = p.timeline || {};
         const lane = tl.lane === 'BOTTOM' ? (tl.role === 'DUO_SUPPORT' ? 'utility' : 'bottom') : ({ TOP: 'top', JUNGLE: 'jungle', MIDDLE: 'middle', MID: 'middle' }[tl.lane] || '');
-        return { champ: p.championId, win: !!st.win, k: st.kills || 0, d: st.deaths || 0, a: st.assists || 0, lane, queue: g.queueId };
+        return { champ: p.championId, win: !!st.win, k: st.kills || 0, d: st.deaths || 0, a: st.assists || 0, lane, queue: g.queueId, at: g.gameCreation || 0, dur: g.gameDuration || 0, remake: (g.gameDuration || 0) > 0 && g.gameDuration < 300 };
       }).filter(g => g.champ);
       await this.loadChampions();
-      this.loadIcons(this.topChamps('', 6).map(c => c.key).filter(Boolean));
+      this.loadIcons([...this.topChamps('', 6), ...this.history.slice().sort((a, b) => b.at - a.at).slice(0, 6).map(g => this.champ(g.champ))].map(c => c && c.key).filter(Boolean));
     } catch (e) { this.log('league history: ' + e.message); }
   }
   statsFor(champId) {
@@ -855,6 +855,7 @@ class League {
         counterPicks: (this.cs.counterPicks || []).map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
         enemies: this.cs.enemies.map(e => ({ ...e, icon: this.icons.get(e.key) || null, counters: e.guess ? this.countersOf(e.id, e.guess) : [] })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
+      recent: this.history ? this.history.slice().sort((a, b) => b.at - a.at).slice(0, 6).map(g => ({ ...this.champ(g.champ), icon: this.icons.get((this.champ(g.champ) || {}).key) || null, win: g.win, remake: g.remake, k: g.k, d: g.d, a: g.a, lane: g.lane, queue: QUEUES[g.queue] || 'Custom', at: g.at, dur: g.dur })) : [],
       game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players, build: this.gameBuild() },
       meta: this.meta ? Object.fromEntries(Object.keys(this.meta).map(l => [l, this.metaFor(l, 10).map(({ icon, ...c }) => c)])) : null,
       mainLane: this.mainLane(),

@@ -665,12 +665,23 @@ function leagueChampSelect(cs) {
 function leagueChampions(L) {
   const t = el('div', 'tile league game champs clickable');
   const list = L.top || [];
+  const ago = ms => { const m = Math.round((Date.now() - ms) / 60000); return !ms ? '' : m < 60 ? `${Math.max(1, m)}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
+  const QSHORT = { 'Ranked Solo/Duo': 'Solo/Duo', 'Ranked Flex': 'Flex', 'Normal Draft': 'Draft', 'Normal Blind': 'Blind', 'Co-op vs AI': 'Co-op' };
+  const recent = L.recent || [];
   t.innerHTML = `
-    <div class="lsplit">
+    <div class="lsplit three">
       <div class="lcol">
-      <div class="lcolhead"><span class="cstatus">Your champions</span><span class="muted">Last 50 games · click an empty spot to close</span></div>
-      <div class="cslist">${list.length ? list.map(c => `
-        <button class="cschamp" data-url="${esc(opggUrl(c, ''))}">${chIcon(c, 'csbig sm')}<span class="csname">${esc(c.name)}</span><span class="csstat">${statLine(c.stats)}</span></button>`).join('') : '<div class="muted">Play a few games and your champions show up here.</div>'}</div>
+        <div class="lcolhead"><span class="cstatus">Last games</span><span class="muted">Click an empty spot to close</span></div>
+        <div class="lgames">${recent.length ? recent.map(g => `
+          <button class="lgame ${g.remake ? 'remake' : g.win ? 'win' : 'loss'}" data-url="${esc(opggUrl(g, ''))}" title="${esc(g.name)} · ${esc(g.queue)}${g.dur ? ' · ' + Math.round(g.dur / 60) + ' min' : ''}">
+            ${chIcon(g, 'lch')}<span class="lgres">${g.remake ? 'Remake' : g.win ? 'Win' : 'Loss'}</span>
+            <span class="lgkda"><b>${g.k}/${g.d}/${g.a}</b><span class="muted">${esc(QSHORT[g.queue] || g.queue)}</span></span>
+            <span class="muted lgago">${ago(g.at)}</span></button>`).join('') : '<div class="muted">No recent games yet.</div>'}</div>
+      </div>
+      <div class="lcol">
+        <div class="lcolhead"><span class="cstatus">Your champions</span><span class="muted">Last 50 games</span></div>
+        <div class="lchamps">${list.length ? list.map(c => `
+          <button class="lchamp" data-url="${esc(opggUrl(c, ''))}">${chIcon(c, 'lch')}<span class="ellipsis lcn">${esc(c.name)}</span><span class="lcs">${c.stats ? `<b class="${Math.round(100 * c.stats.wins / c.stats.games) >= 55 ? 'hot' : ''}">${Math.round(100 * c.stats.wins / c.stats.games)}%</b> ${c.stats.games}g · ${c.stats.kda}` : ''}</span></button>`).join('') : '<div class="muted">Play a few games and your champions show up here.</div>'}</div>
       </div>
       ${tierList(L)}
     </div>`;
