@@ -578,7 +578,11 @@ function leagueChampSelect(cs) {
     body = `<div class="ucols">
       <div class="ucol"><div class="uhead">Suggested for ${esc(pos || 'you')}<span class="muted">Why</span></div>
         ${(cs.picks || []).length ? cs.picks.map(c => `<button class="urow pick" data-url="${esc(opggUrl(c, lane))}" title="${esc(c.name)} build on OP.GG">${chIcon(c)}<span class="umid"><span class="ellipsis">${esc(c.name)}</span><span class="muted ellipsis usub">${esc(c.why)}</span></span><span class="uval">${c.tier ? tierPill(c.tier) : ''}</span></button>`).join('') : '<div class="muted uempty">Suggestions appear once OP.GG\'s tier list has loaded</div>'}</div>
-      <div class="ucol">${beat.length
+      <div class="ucol">${cs.clearOpp && ((cs.counterPicks || []).length || cs.counterPending)
+        ? `<div class="uhead">Counter picks vs ${esc(cs.clearOpp.name)}<span class="muted">Your win rate</span></div>${(cs.counterPicks || []).length
+            ? ulist(cs.counterPicks.map(c => ({ ...c, lane, sub: c.mine || games(c.games) })), c => c.winRate - 0.42, c => pct0(c.winRate) + ' WR', c => c.winRate >= 0.5 ? 'good' : 'bad', '')
+            : ''}${cs.counterPending ? `<div class="muted uempty">Checking ${cs.counterPending} more matchup${cs.counterPending === 1 ? '' : 's'} on OP.GG…</div>` : ''}`
+        : beat.length
         ? `<div class="uhead">Beats ${esc(vs.name)}<span class="muted">Their win rate</span></div>${ulist(beat.map(c => ({ ...c, lane, sub: '' })), c => c.winRate, c => pct0(c.winRate) + ' WR', () => 'good', '')}`
         : `<div class="uhead">Strongest ${esc(pos || '')} picks<span class="muted">Win rate</span></div>${ulist((cs.laneTop || []).slice(0, 8).map(c => ({ ...c, lane })), c => c.winRate - 0.45, c => pct0(c.winRate) + ' WR', () => 'good', 'Loading the tier list…')}`}</div>
     </div>`;

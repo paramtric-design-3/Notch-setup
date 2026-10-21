@@ -8,7 +8,7 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const { Opgg, POS, nameCandidates } = require('./opgg');
+const { Opgg, POS, nameCandidates, findWinRate } = require('./opgg');
 
 const LIVE_PORT = 2999;
 const OUR_POS = { top: 'top', jungle: 'jungle', mid: 'middle', adc: 'bottom', support: 'utility' };
@@ -71,6 +71,7 @@ class League {
     this.opgg = new Opgg({ fetchImpl: this.fetch, log: this.log });
     this.analysis = new Map();      // `${champId}:${position}` -> { at, data }
     this.opggNames = new Map();     // champId -> the name OP.GG knows it by
+    this.matchups = new Map();      // `${mine}:${theirs}:${lane}` -> { winRate, games } | null
     this.sentIcons = new Set();
     this.meta = null; this.metaAt = 0;
     try {
@@ -275,6 +276,13 @@ class League {
     }
     const opponent = myPos ? enemies.find(e => e.guess === myPos) || null : null;
     if (opponent) this.loadOpponent(opponent.id, myPos);
+    // Lane opponent is clear (they picked a champion that mostly plays your lane): look up how
+    // the likely picks do against them, head to head.
+    const clearOpp = opponent && opponent.sure ? opponent : null;
+    if (clearOpp && !mine.locked) {
+      this.loadCounterPicks(clearOpp, myPos, allies, enemies);
+      if (this.counterPeekFor !== clearOpp.id) { this.counterPeekFor = clearOpp.id; this.send({ type: 'cs-counter', name: clearOpp.name, role: ({ top: 'Top', jungle: 'Jungle', middle: 'Mid', bottom: 'Bot', utility: 'Support' })[myPos] || '' }); }
+    }
     for (const e of enemies) if (e.guess) this.queueAnalysis(e.id, e.guess);
     for (const a of allies) {
       const pos = a.position || a.guess;
@@ -287,7 +295,7 @@ class League {
       allies, enemies, bans: [...new Set([...banList, ...actionBans])].map(id => this.champ(id)),
       runes: this.csRunes, ideas: this.topChamps(mine.position || '', 4),
       opgg: this.opggView(this.csOpgg), meta: mine.position ? this.metaFor(mine.position, 5) : [],
-      myPos, opponent: opponent && { ...opponent }, picks: [], banSides, stage, enemyRows, opggFailed: !!this.csOpggFailed,
+      myPos, opponent: opponent && { ...opponent }, clearOpp: clearOpp && { id: clearOpp.id, name: clearOpp.name }, picks: [], banSides, stage, enemyRows, opggFailed: !!this.csOpggFailed,
     };
     this.csUnavailable = new Set([...this.cs.bans.filter(Boolean).map(b => b.id), ...enemies.map(e => e.id), ...allies.filter(a => a.champ && !a.me).map(a => a.champ.id)]);
     this.refreshPicks();
@@ -298,6 +306,55 @@ class League {
     const best = Object.entries(r).sort((a, b) => b[1] - a[1])[0];
     return best ? OUR_POS[best[0]] : '';
   }
+  // Head-to-head win rates (OP.GG lane matchups) for the picks worth considering against your
+  // lane opponent: champions known to beat them, your own champions in this role and the patch's best.
+  loadCounterPicks(opp, myPos, allies, enemies) {
+    const lane = POS[myPos];
+    if (!lane) return;
+    const key = `${opp.id}:${lane}`;
+    const taken = new Set([...allies.filter(a => a.champ && !a.me).map(a => a.champ.id), ...enemies.map(e => e.id)]);
+    const known = this.analysis.get(`${opp.id}:${lane}`);
+    const cands = [
+      ...((known && known.data && known.data.counters) || []).map(c => c.id),
+      ...this.topChamps(myPos, 6).map(c => c.id),
+      ...((this.meta && this.meta[lane]) || []).slice(0, 10).map(m => m.id),
+    ].filter(id => id && !taken.has(id));
+    const todo = [...new Set(cands)].slice(0, 16).filter(id => !this.matchups.has(`${id}:${opp.id}:${lane}`));
+    if (!todo.length) { if (this.counterKey !== key) { this.counterKey = key; this.refreshPicks(); } return; }
+    this.counterKey = key;
+    for (const id of todo) this.matchups.set(`${id}:${opp.id}:${lane}`, undefined);   // pending
+    const run = async id => {
+      const k = `${id}:${opp.id}:${lane}`;
+      const me = this.champs[id], them = this.champs[opp.id];
+      let res = null;
+      if (me && them) {
+        const mine = this.opggNames.has(id) ? [this.opggNames.get(id)] : nameCandidates(me.name, me.key);
+        const theirs = this.opggNames.has(opp.id) ? [this.opggNames.get(opp.id)] : nameCandidates(them.name, them.key);
+        for (const a of mine) {
+          let ok = false;
+          for (const b of theirs) {
+            try {
+              const out = await this.opgg.call('lol_get_lane_matchup_guide', { position: lane, my_champion: a, opponent_champion: b, lang: 'en_US' });
+              this.opggNames.set(id, a); this.opggNames.set(opp.id, b); ok = true;
+              res = findWinRate(out);
+              if (!this.matchupSampled) {
+                this.matchupSampled = true;
+                try { fs.writeFileSync(path.join(this.cacheDir, 'opgg-matchup-sample.json'), JSON.stringify({ at: new Date().toISOString(), args: { a, b, lane }, found: res, text: String((out && out.__text) || '').slice(0, 20000) }, null, 1)); } catch { /* ignore */ }
+              }
+              break;
+            } catch (e) { if (!/champion|not found|invalid/i.test(e.message)) { this.log(`opgg matchup ${me.name} vs ${them.name}: ${e.message}`); ok = true; break; } }
+          }
+          if (ok) break;
+        }
+      }
+      this.matchups.set(k, res);
+      if (this.cs) { this.refreshPicks(); this.emit(); }
+    };
+    const queue = todo.slice();
+    for (let w = 0; w < 3; w++) (async () => { while (queue.length) await run(queue.shift()); })();
+    this.refreshPicks();
+  }
+
   laneWinRate(id, position) {
     const m = ((this.meta && this.meta[POS[position]]) || []).find(x => x.id === id);
     return m ? m.winRate : 0;
@@ -317,6 +374,24 @@ class League {
   refreshPicks() {
     if (!this.cs) return;
     this.cs.picks = this.suggestPicks(this.cs.myPos, this.cs.opponent, this.csUnavailable || new Set());
+    const opp = this.cs.clearOpp, cl = POS[this.cs.myPos];
+    if (opp && cl) {
+      const pool = new Map(this.topChamps(this.cs.myPos, 10).filter(c => c.stats).map(c => [c.id, c.stats]));
+      const rows = [], unav = this.csUnavailable || new Set();
+      let pending = 0;
+      for (const [k, v] of this.matchups) {
+        const [id, oid, l] = k.split(':');
+        if (+oid !== opp.id || l !== cl) continue;
+        if (v === undefined) { pending++; continue; }
+        if (!v || unav.has(+id)) continue;
+        const st = pool.get(+id);
+        rows.push({ ...this.champ(+id), winRate: v.winRate, games: v.games, mine: st ? `you ${Math.round(100 * st.wins / st.games)}% · ${st.games}g` : '' });
+      }
+      rows.sort((a, b) => b.winRate - a.winRate);
+      this.cs.counterPicks = rows.slice(0, 10);
+      this.cs.counterPending = pending;
+      this.loadIcons(this.cs.counterPicks.map(c => c.key).filter(Boolean));
+    } else { this.cs.counterPicks = []; this.cs.counterPending = 0; }
     const lane = POS[this.cs.myPos];
     const list = (this.meta && this.meta[lane]) || [];
     this.cs.banList = list.slice().sort((a, b) => b.banRate - a.banRate).slice(0, 10).map(m => ({ ...this.champ(m.id), banRate: m.banRate, winRate: m.winRate, games: m.play, banned: (this.csUnavailable || new Set()).has(m.id) }));
@@ -490,6 +565,10 @@ class League {
     for (const [id, st] of mine) {
       const w = st.wins / st.games;
       if (st.games >= 2 && w >= 0.45) add(id, `you ${Math.round(100 * w)}% · ${st.games}g`, 1.5 + w + Math.min(st.games, 10) / 10);
+    }
+    if (opponent) for (const [k, v] of this.matchups) {
+      const [id, oid, l] = k.split(':');
+      if (v && +oid === opponent.id && l === lane && v.winRate >= 0.5) add(+id, `${Math.round(100 * v.winRate)}% vs ${opponent.name}`, 2 + (v.winRate - 0.5) * 30);
     }
     for (const m of ((this.meta && this.meta[lane]) || []).slice(0, 8)) add(m.id, `${['', 'OP', 'Strong', 'Good', 'Average', 'Weak'][m.tier] || 'Meta'} tier`, (6 - (m.tier || 5)) * 0.6);
     return [...out.values()].sort((a, b) => b.score - a.score).slice(0, 5).map(x => {
@@ -730,6 +809,7 @@ class League {
         banSides: this.cs.banSides && Object.fromEntries(Object.entries(this.cs.banSides).map(([k, ids]) => [k, ids.map(id => { const c = id ? this.champ(id) : null; return c && { ...c, icon: this.icons.get(c.key) || null }; })])),
         ideas: this.cs.ideas.map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
         picks: (this.cs.picks || []).map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
+        counterPicks: (this.cs.counterPicks || []).map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
         enemies: this.cs.enemies.map(e => ({ ...e, icon: this.icons.get(e.key) || null, counters: e.guess ? this.countersOf(e.id, e.guess) : [] })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
       game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players },

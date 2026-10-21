@@ -136,9 +136,12 @@ class Opgg {
       }
     }
     const text = ((result && result.content) || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+    this.lastText = text;
     if (result && result.isError) throw new Error(text.slice(0, 160) || 'tool error');
     if (result && result.structuredContent && !text) return result.structuredContent;
-    return parse(text);
+    const out = parse(text);
+    if (out && typeof out === 'object') Object.defineProperty(out, '__text', { value: text, enumerable: false });
+    return out;
   }
 }
 
@@ -155,4 +158,28 @@ function nameCandidates(name, key) {
   return [...new Set([fromName, fromKey, glued].filter(Boolean))];
 }
 
-module.exports = { Opgg, parse, POS, nameCandidates };
+// Finds the win rate in an answer whose exact shape isn't known: the shallowest object with a
+// win-rate field (0..1 or 0..100), plus its game count if it has one.
+function findWinRate(obj) {
+  const keys = ['my_win_rate', 'win_rate', 'winrate', 'winRate', 'my_champion_win_rate'];
+  const queue = [obj];
+  for (let n = 0; queue.length && n < 4000; n++) {
+    const o = queue.shift();
+    if (!o || typeof o !== 'object') continue;
+    if (!Array.isArray(o)) {
+      for (const k of keys) {
+        let v = o[k];
+        if (typeof v === 'string') v = parseFloat(v);
+        if (typeof v === 'number' && isFinite(v) && v > 0) {
+          const games = +(o.play || o.games || o.total || o.count || 0) || 0;
+          return { winRate: v > 1 ? v / 100 : v, games };
+        }
+      }
+      if (typeof o.win === 'number' && typeof o.play === 'number' && o.play > 0) return { winRate: o.win / o.play, games: o.play };
+    }
+    for (const v of Object.values(o)) if (v && typeof v === 'object') queue.push(v);
+  }
+  return null;
+}
+
+module.exports = { Opgg, parse, POS, nameCandidates, findWinRate };
