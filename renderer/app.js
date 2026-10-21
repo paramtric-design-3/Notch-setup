@@ -451,8 +451,34 @@ function leagueGame(g) {
   }).join('');
   t.innerHTML = `
     <div class="lhead"><span class="cstatus">${I.trophy}${esc(g.queue || 'In game')}</span><span class="muted">Win rate and form: this season · last 10 games</span></div>
+    ${gameBuild(g.build)}
     <div class="lteams"><div class="lteam blue">${side('blue')}</div><div class="lteam red">${side('red')}</div></div>`;
   return t;
+}
+
+// Your build in game: OP.GG's items with what you own ticked and the next one highlighted,
+// and the skill order with the next level-up highlighted.
+function gameBuild(b) {
+  if (!b) return '';
+  const title = `<span class="gbtitle">${chIcon(b.champ, 'lch')}<b>Your build</b><span class="muted">${esc((b.champ && b.champ.name) || '')}${b.mode === 'aram' ? ' · ARAM' : b.pos ? ' · ' + esc(ROLE[b.pos] || '') : ''} · OP.GG</span></span>`;
+  if (b.loading || b.failed) return `<div class="gbuild">${title}<span class="muted">${b.failed ? 'OP.GG has no build for this champion here' : 'Loading the build…'}</span></div>`;
+  const owned = (b.owned || []).slice();
+  const has = id => { const i = owned.indexOf(id); if (i < 0) return false; owned.splice(i, 1); return true; };
+  const want = [...b.boots, ...b.core, ...b.later];
+  const got = new Set(want.filter(id => (b.owned || []).includes(id)));
+  const next = [...b.core, ...b.boots, ...b.later].find(id => !got.has(id));
+  const item = (id, label) => {
+    const own = got.has(id) && has(id);
+    return `<span class="gitem ${own ? 'own' : ''} ${id === next ? 'next' : ''}" title="${esc(label)}${own ? ' · you have it' : id === next ? ' · buy next' : ''}">${imgIcon('item:' + id, '')}${own ? `<i>${I.check}</i>` : ''}${id === next ? '<em>Next</em>' : ''}</span>`;
+  };
+  const lvl = b.level || 1;
+  const skills = (b.skills || []).map((k, i) => `<i class="${i < lvl ? 'done' : ''} ${i === lvl ? 'nxt' : ''} ${k === 'R' ? 'r' : ''}" title="Level ${i + 1}">${esc(k)}</i>`).join('');
+  return `<div class="gbuild">
+    ${title}
+    <span class="gitems"><span class="glabel">Start</span>${b.starter.map(id => `<span class="gitem start">${imgIcon('item:' + id, 'Start')}</span>`).join('')}<span class="oarrow">›</span>${b.boots.map(id => item(id, 'Boots')).join('')}${b.core.map(id => item(id, 'Core')).join('')}${b.later.length ? `<span class="oarrow">›</span>${b.later.map(id => item(id, 'Later')).join('')}` : ''}</span>
+    <span class="gskills">${b.maxOrder.length ? `<span class="omax">${b.maxOrder.map(k => `<i>${esc(k)}</i>`).join('<span class="oarrow">›</span>')}</span>` : ''}<span class="oskills">${skills}</span></span>
+    ${b.runes ? `<span class="grunes">${imgIcon('rune:' + b.runes.keystoneId, b.runes.keystone)}<b>${esc(b.runes.keystone)}</b>${imgIcon('rune:' + b.runes.secondary, b.runes.secondaryName)}</span>` : ''}
+  </div>`;
 }
 
 // champ select helper and your champions

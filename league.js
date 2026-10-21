@@ -264,6 +264,7 @@ class League {
     for (const e of enemies) if (enemyGuess[e.id]) { e.guess = enemyGuess[e.id].position; e.sure = enemyGuess[e.id].sure; }
     // No assigned role (blind pick, normals): use your champion's estimated role, or its main lane.
     let myPos = mine.position || mine.guess || '';
+    if (myPos) this.lastMyPos = myPos;
     if (!myPos && mine.champ) myPos = this.mainLaneOf(mine.champ.id);
     const myChamp = mine.champ ? mine.champ.id : 0;
     if (myChamp !== this.csChamp || myPos !== this.csPos) {
@@ -353,6 +354,27 @@ class League {
     const queue = todo.slice();
     for (let w = 0; w < 3; w++) (async () => { while (queue.length) await run(queue.shift()); })();
     this.refreshPicks();
+  }
+
+  gameBuild() {
+    const m = this.game && this.game.mine;
+    if (!m || !m.champId || !m.mode) return null;
+    const lane = m.mode === 'aram' ? 'none' : (POS[m.pos] || 'none');
+    const hit = this.analysis.get(m.mode === 'ranked' ? `${m.champId}:${lane}` : `${m.champId}:${lane}:${m.mode}`);
+    const champ = this.champ(m.champId);
+    if (!hit) return { loading: true, champ, pos: m.pos, mode: m.mode };
+    const a = hit.data;
+    if (!a) return { failed: true, champ, pos: m.pos, mode: m.mode };
+    const want = [...a.core, ...a.later];
+    const icons = [...a.starter, ...a.boots, ...want].map(i => 'item:' + i);
+    if (a.runes) icons.push('rune:' + a.runes.keystoneId, 'rune:' + a.runes.secondary);
+    if (icons.some(k => !this.icons.has(k))) this.loadIcons(icons);
+    return {
+      champ, pos: m.pos, mode: m.mode, level: m.level, owned: m.items,
+      starter: a.starter, boots: a.boots, core: a.core, later: a.later, skills: a.skills, maxOrder: a.maxOrder,
+      runes: a.runes && { keystone: a.runes.keystone, keystoneId: a.runes.keystoneId, primaryName: a.runes.primaryName, secondaryName: a.runes.secondaryName, secondary: a.runes.secondary },
+      winRate: a.winRate, tier: a.tier,
+    };
   }
 
   laneWinRate(id, position) {
@@ -592,9 +614,9 @@ class League {
   }
 
   // Counters, build, skills and runes for one champion in one lane.
-  async loadAnalysis(champId, position, cacheOnly = false) {
-    const lane = POS[position] || 'none';
-    const id = `${champId}:${lane}`;
+  async loadAnalysis(champId, position, cacheOnly = false, gameMode = 'ranked') {
+    const lane = gameMode === 'aram' ? 'none' : (POS[position] || 'none');
+    const id = gameMode === 'ranked' ? `${champId}:${lane}` : `${champId}:${lane}:${gameMode}`;
     const hit = this.analysis.get(id);
     if (hit && Date.now() - hit.at < META_TTL) { if (!cacheOnly) this.useAnalysis(champId, hit.data); return; }
     const c = this.champs && this.champs[champId];
@@ -603,7 +625,7 @@ class League {
     let data = null, lastErr = null;
     for (const name of names) {
       try {
-        const out = await this.opgg.call('lol_get_champion_analysis', { champion: name, position: lane, game_mode: 'ranked', lang: 'en_US', desired_output_fields: ['data'] });
+        const out = await this.opgg.call('lol_get_champion_analysis', { champion: name, position: lane, game_mode: gameMode, lang: 'en_US', desired_output_fields: ['data'] });
         const d = out && (out.data || out);
         if (d && (d.summary || d.core_items || d.runes)) { data = d; this.opggNames.set(champId, name); break; }
       } catch (e) { lastErr = e; }
@@ -628,6 +650,11 @@ class League {
       counters: (data.weak_counters || []).filter(x => x && x.champion_id).map(counter).slice(0, 4),
       goodVs: (data.strong_counters || []).filter(x => x && x.champion_id).map(counter).slice(0, 4),
       starter: ids(data.starter_items), boots: ids(data.boots), core: ids(data.core_items),
+      // late items: the most picked 4th, 5th and 6th item (skipping ones already in the core)
+      later: [data.fourth_items, data.fifth_items, data.sixth_items].reduce((acc, l) => {
+        const pick = (Array.isArray(l) ? l : []).map(ids).flat().find(x => !ids(data.core_items).includes(x) && !acc.includes(x));
+        return pick ? [...acc, pick] : acc;
+      }, []),
       spells: ids(data.summoner_spells),
       skills: ((data.skills && data.skills.order) || []).slice(0, 15),
       maxOrder: ((data.skill_masteries && data.skill_masteries.ids) || []).filter(x => typeof x === 'string'),
@@ -660,7 +687,7 @@ class League {
     return { ...a, counters: a.counters.map(ch), goodVs: a.goodVs.map(ch) };
   }
 
-  endGame() { this.game = null; this.gameKey = ''; this.players.clear(); }
+  endGame() { this.game = null; this.gameKey = ''; this.gameBuildKey = ''; this.players.clear(); }
 
   async loadGame() {
     let live;
@@ -680,6 +707,22 @@ class League {
     }
     const meId = live.activePlayer && (live.activePlayer.riotId || live.activePlayer.summonerName);
     this.game.time = Math.round((live.gameData && live.gameData.gameTime) || 0);
+    // Your build for this game (OP.GG), with what you already own.
+    const meP = live.allPlayers.find(p => meId && ((p.riotId || p.summonerName) === meId || p.summonerName === meId));
+    if (meP) {
+      await this.loadChampions();
+      const key = String(meP.rawChampionName || '').replace(/^game_character_displayname_/, '');
+      const cid = this.champIdOf(key || meP.championName);
+      const gm = String((live.gameData && live.gameData.gameMode) || '').toUpperCase();
+      const mode = gm === 'ARAM' ? 'aram' : gm === 'CLASSIC' ? 'ranked' : '';
+      let pos = ({ TOP: 'top', JUNGLE: 'jungle', MIDDLE: 'middle', MID: 'middle', BOTTOM: 'bottom', UTILITY: 'utility', SUPPORT: 'utility' })[String(meP.position || '').toUpperCase()] || '';
+      if (!pos && mode === 'ranked') pos = (this.cs && this.cs.myPos) || this.lastMyPos || this.mainLaneOf(cid);
+      this.game.mine = { champId: cid, pos, mode, level: (live.activePlayer && live.activePlayer.level) || meP.level || 1, items: (meP.items || []).map(i => i.itemID).filter(Boolean) };
+      if (cid && mode) {
+        const bk = `${cid}:${pos}:${mode}`;
+        if (this.gameBuildKey !== bk) { this.gameBuildKey = bk; this.loadAnalysis(cid, pos, true, mode).then(() => this.emit()); }
+      }
+    }
     this.game.players = live.allPlayers.map(p => {
       const riotId = p.riotId || (p.riotIdGameName ? `${p.riotIdGameName}#${p.riotIdTagLine}` : p.summonerName) || '';
       const [name, tag] = riotId.split('#');
@@ -812,7 +855,7 @@ class League {
         counterPicks: (this.cs.counterPicks || []).map(i => ({ ...i, icon: this.icons.get(i.key) || null })),
         enemies: this.cs.enemies.map(e => ({ ...e, icon: this.icons.get(e.key) || null, counters: e.guess ? this.countersOf(e.id, e.guess) : [] })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
-      game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players },
+      game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players, build: this.gameBuild() },
       meta: this.meta ? Object.fromEntries(Object.keys(this.meta).map(l => [l, this.metaFor(l, 10).map(({ icon, ...c }) => c)])) : null,
       mainLane: this.mainLane(),
     };
