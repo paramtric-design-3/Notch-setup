@@ -697,3 +697,11 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .lrank { display: flex; align-items: center; min-width: 0; }
 .league .lbig:has(.lembbig) { width: auto; height: 36px; display: flex; justify-content: center; margin: 2px auto 4px; }
 .league .lbig .lembbig { height: 36px; max-width: 60px; }
+/* whose turn it is, like the client */
+.league .uteam.blue .uplayer.turn { border-left-color: #2ec4c4; background: linear-gradient(90deg, rgba(46, 196, 196, .2), transparent 70%); }
+.league .uteam.red .uplayer.turn { border-left-color: #ff4d4d; background: linear-gradient(90deg, rgba(255, 77, 77, .2), transparent 70%); }
+.league .uplayer.turn .ustat, .league .uplayer.nextup .ustat { color: var(--text); font-weight: 600; }
+.league .uplayer.turn .uch { animation: turnpulse 1.4s ease-in-out infinite; }
+@keyframes turnpulse { 50% { box-shadow: 0 0 0 2.5px #2ec4c4; } }
+.league .uteam.red .uplayer.turn .uch { animation-name: turnpulse-red; }
+@keyframes turnpulse-red { 50% { box-shadow: 0 0 0 2.5px #ff4d4d; } }

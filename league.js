@@ -231,16 +231,40 @@ class League {
     const actions = (s.actions || []).flat();
     const lockedCells = new Set(actions.filter(a => a.type === 'pick' && a.completed).map(a => a.actorCellId));
     const inProgress = new Set(actions.filter(a => a.isInProgress && !a.completed).map(a => a.actorCellId));
-    const status = (cell, locked) => locked ? 'Locked in' : inProgress.has(cell) ? (actions.find(a => a.isInProgress && a.actorCellId === cell).type === 'ban' ? 'Banning' : 'Picking') : 'Waiting';
+    // Pick order and "Picking next", like the client: actions come in turns (one array per turn).
+    const turns = (s.actions || []).filter(Array.isArray);
+    const pickTurn = new Map();
+    turns.forEach((turn, i) => { for (const a of turn) if (a.type === 'pick' && !pickTurn.has(a.actorCellId)) pickTurn.set(a.actorCellId, i); });
+    const curTurn = turns.findIndex(t => t.some(a => a.isInProgress && !a.completed));
+    const nextPickers = new Set();
+    if (curTurn >= 0) {
+      const nt = turns.slice(curTurn + 1).find(t => t.some(a => a.type === 'pick' && !a.completed));
+      for (const a of nt || []) if (a.type === 'pick') nextPickers.add(a.actorCellId);
+    }
+    const order = cell => (pickTurn.has(cell) ? pickTurn.get(cell) : 99) * 10 + (cell % 10) / 10;
+    const status = (cell, locked) => locked ? 'Locked in' : inProgress.has(cell) ? (actions.find(a => a.isInProgress && a.actorCellId === cell).type === 'ban' ? 'Banning…' : 'Picking…') : nextPickers.has(cell) ? 'Picking next…' : 'Waiting';
+    // Anonymous names in ranked ("Murk Wolf"), from the client's per-player info, asked once per champ select.
+    const gameId = (s.gameId || s.id || '') + ':' + s.localPlayerCellId;
+    if (this.aliasFor !== gameId) { this.aliasFor = gameId; this.aliases = new Map(); }
+    for (const p of [...s.myTeam, ...(s.theirTeam || [])]) {
+      if (p.cellId == null || this.aliases.has(p.cellId)) continue;
+      this.aliases.set(p.cellId, '');
+      this.lcuGet(`/lol-champ-select/v1/summoners/${p.cellId}`).then(x => {
+        const n = x && (x.gameName || x.displayName || x.summonerName || '');
+        if (n) { this.aliases.set(p.cellId, n); }
+      }).catch(() => {});
+    }
     const allies = s.myTeam.map(p => {
       const id = p.championId || p.championPickIntent || 0;
       const locked = !!p.championId && lockedCells.has(p.cellId);
       return {
         me: p.cellId === meCell, position: p.assignedPosition || '', champ: this.champ(id), locked,
-        name: p.gameName || p.summonerName || '', status: status(p.cellId, locked), spells: [p.spell1Id, p.spell2Id].filter(x => x > 0),
+        name: p.gameName || p.summonerName || this.aliases.get(p.cellId) || '', status: status(p.cellId, locked), cell: p.cellId, turn: inProgress.has(p.cellId), spells: [p.spell1Id, p.spell2Id].filter(x => x > 0),
       };
     });
-    const enemyRows = (s.theirTeam || []).map((p, i) => ({ champ: p.championId ? this.champ(p.championId) : null, status: p.championId ? (lockedCells.has(p.cellId) ? 'Locked in' : 'Hovering') : status(p.cellId, false), n: i + 1 }));
+    allies.sort((a, b) => order(a.cell) - order(b.cell));
+    const enemyRows = (s.theirTeam || []).map((p, i) => ({ champ: p.championId ? this.champ(p.championId) : null, status: p.championId ? (lockedCells.has(p.cellId) ? 'Locked in' : 'Hovering') : status(p.cellId, false), n: i + 1, cell: p.cellId, turn: inProgress.has(p.cellId) }))
+      .sort((a, b) => order(a.cell) - order(b.cell)).map((r, i) => ({ ...r, n: i + 1 }));
     const cur = actions.find(a => a.isInProgress && !a.completed);
     const stage = cur ? cur.type : (timer.phase === 'FINALIZATION' ? 'final' : (timer.phase === 'PLANNING' ? 'ban' : 'pick'));
     const mine = allies.find(a => a.me) || {};
@@ -303,6 +327,13 @@ class League {
     this.refreshPicks();
     this.loadIcons([...allies.map(a => a.champ && a.champ.key), ...enemies.map(e => e.key), ...this.cs.bans.map(b => b && b.key), ...this.cs.ideas.map(i => i.key), ...this.cs.meta.map(m => m.key), ...this.cs.picks.map(m => m.key), ...(this.cs.banList || []).map(m => m.key), ...(this.cs.laneTop || []).map(m => m.key), ...allies.flatMap(a => (a.spells || []).map(x => 'spell:' + x))].filter(Boolean));
   }
+  // Is this champion really played in this lane (OP.GG play rates)? Unknown champions pass.
+  playsLane(id, lane) {
+    const r = this.roleRates && this.roleRates[id];
+    if (!r || !lane) return true;
+    const max = Math.max(...Object.values(r), 0);
+    return (r[lane] || 0) >= Math.max(0.05, max * 0.15);
+  }
   mainLaneOf(id) {
     const r = (this.roleRates && this.roleRates[id]) || {};
     const best = Object.entries(r).sort((a, b) => b[1] - a[1])[0];
@@ -317,7 +348,7 @@ class League {
     const taken = new Set([...allies.filter(a => a.champ && !a.me).map(a => a.champ.id), ...enemies.map(e => e.id)]);
     const known = this.analysis.get(`${opp.id}:${lane}`);
     const cands = [
-      ...((known && known.data && known.data.counters) || []).map(c => c.id),
+      ...((known && known.data && known.data.counters) || []).map(c => c.id).filter(id => this.playsLane(id, lane)),
       ...this.topChamps(myPos, 6).map(c => c.id),
       ...((this.meta && this.meta[lane]) || []).slice(0, 10).map(m => m.id),
     ].filter(id => id && !taken.has(id));
@@ -398,7 +429,8 @@ class League {
   }
   countersOf(id, position) {
     const a = this.analysis.get(`${id}:${POS[position]}`);
-    return ((a && a.data && a.data.counters) || []).slice(0, 3).map(c => ({ ...this.champ(c.id), ...(this.champs && this.champs[c.id] ? {} : { name: c.name }), winRate: 1 - c.winRate }));
+    const myLane = this.cs && POS[this.cs.myPos];
+    return ((a && a.data && a.data.counters) || []).filter(c => this.playsLane(c.id, myLane)).slice(0, 3).map(c => ({ ...this.champ(c.id), ...(this.champs && this.champs[c.id] ? {} : { name: c.name }), winRate: 1 - c.winRate }));
   }
   refreshPicks() {
     if (!this.cs) return;
@@ -590,7 +622,7 @@ class League {
     };
     const mine = new Map(this.topChamps(position, 8).filter(c => c.stats).map(c => [c.id, c.stats]));
     const vs = opponent && this.analysis.get(`${opponent.id}:${lane}`);
-    for (const c of (vs && vs.data && vs.data.counters) || []) add(c.id, `beats ${opponent.name} ${Math.round(100 * (1 - c.winRate))}%`, 3 + (1 - c.winRate - 0.5) * 20, c.name);
+    for (const c of ((vs && vs.data && vs.data.counters) || []).filter(c => this.playsLane(c.id, lane))) add(c.id, `beats ${opponent.name} ${Math.round(100 * (1 - c.winRate))}%`, 3 + (1 - c.winRate - 0.5) * 20, c.name);
     for (const [id, st] of mine) {
       const w = st.wins / st.games;
       if (st.games >= 2 && w >= 0.45) add(id, `you ${Math.round(100 * w)}% · ${st.games}g`, 1.5 + w + Math.min(st.games, 10) / 10);
@@ -654,8 +686,13 @@ class League {
       rank: avg.rank || (ls.tier_data && ls.tier_data.rank) || 0,
       winRate: ls.win_rate || avg.win_rate || 0, pickRate: ls.pick_rate || avg.pick_rate || 0, banRate: ls.ban_rate || avg.ban_rate || 0,
       games: ls.play || avg.play || 0,
-      counters: (data.weak_counters || []).filter(x => x && x.champion_id).map(counter).slice(0, 4),
-      goodVs: (data.strong_counters || []).filter(x => x && x.champion_id).map(counter).slice(0, 4),
+      // counters in this lane (OP.GG's per-position list, where win = this champion's wins), then the general ones
+      counters: (() => {
+        const laneC = ((lanePos && lanePos.counters) || []).filter(x => x && x.champion_id && x.play).map(x => ({ id: x.champion_id, name: x.champion_name || '', winRate: x.win / x.play, games: x.play }));
+        const seen = new Set(laneC.map(x => x.id));
+        return [...laneC, ...(data.weak_counters || []).filter(x => x && x.champion_id && !seen.has(x.champion_id)).map(counter)].slice(0, 8);
+      })(),
+      goodVs: (data.strong_counters || []).filter(x => x && x.champion_id).map(counter).slice(0, 8),
       starter: ids(data.starter_items), boots: ids(data.boots), core: ids(data.core_items),
       // late items: the most picked 4th, 5th and 6th item (skipping ones already in the core)
       later: [data.fourth_items, data.fifth_items, data.sixth_items].reduce((acc, l) => {
@@ -691,7 +728,8 @@ class League {
   opggView(a) {
     if (!a) return null;
     const ch = x => ({ ...this.champ(x.id), ...(this.champs && this.champs[x.id] ? {} : { name: x.name || `#${x.id}` }), winRate: x.winRate, games: x.games });
-    return { ...a, counters: a.counters.map(ch), goodVs: a.goodVs.map(ch) };
+    const mine = x => this.playsLane(x.id, a.lane);
+    return { ...a, counters: a.counters.filter(mine).slice(0, 5).map(ch), goodVs: a.goodVs.filter(mine).slice(0, 5).map(ch) };
   }
 
   endGame() { this.game = null; this.gameKey = ''; this.gameBuildKey = ''; this.players.clear(); }

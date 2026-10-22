@@ -585,10 +585,10 @@ function leagueChampSelect(cs) {
   // ---- teams (left)
   const allyRows = cs.allies.map(a => {
     const p = a.position || a.guess;
-    return `<div class="uplayer ${a.me ? 'me' : ''} ${a.champ ? '' : 'vacant'}">
+    return `<div class="uplayer ${a.me ? 'me' : ''} ${a.champ ? '' : 'vacant'} ${a.turn ? 'turn' : ''} ${a.status === 'Picking next…' ? 'nextup' : ''}">
       <span class="urole" title="${esc(ROLE[p] || '')}${!a.position && a.guess ? ' (estimated)' : ''}">${roleIcon(p)}${!a.position && a.guess && !a.sure ? '<i>?</i>' : ''}</span>
       ${chIcon(a.champ, 'uch' + (a.champ && !a.locked ? ' hover' : ''))}
-      <span class="uname"><b class="ellipsis">${esc(a.name || (a.me ? 'You' : ROLE[p] || 'Teammate'))}</b><span class="ustat ${a.champ && !a.locked ? 'hovering' : ''}">${a.locked ? 'Locked in' : a.champ ? `Hovering <b>${esc(a.champ.name)}</b>${a.status === 'Picking' ? ' · picking now' : ''}` : esc(a.status)}</span></span>
+      <span class="uname"><b class="ellipsis">${esc(a.name || (a.me ? 'You' : ROLE[p] || 'Teammate'))}</b><span class="ustat ${a.champ && !a.locked ? 'hovering' : ''}">${a.locked ? 'Locked in' : a.champ ? `Hovering <b>${esc(a.champ.name)}</b>${a.status === 'Picking…' ? ' · picking now' : ''}` : esc(a.status)}</span></span>
       <span class="uwr">${a.winRate ? `<b>${pct0(a.winRate)}</b><span class="muted">${esc(ROLE[p] || '')} WR</span>` : ''}</span>
       <span class="uspells">${(a.spells || []).map(x => imgIcon('spell:' + x, 'Summoner spell')).join('')}</span>
     </div>`;
@@ -597,7 +597,7 @@ function leagueChampSelect(cs) {
   const enemyRows = (cs.enemyRows || cs.enemies.map((e, i) => ({ champ: e, status: 'Locked in', n: i + 1 }))).map(r => {
     const e = r.champ && (byId.get(r.champ.id) || r.champ);
     const isOpp = e && cs.opponent && cs.opponent.id === e.id;
-    return `<div class="uplayer enemy ${e ? '' : 'vacant'} ${isOpp ? 'opp' : ''}">
+    return `<div class="uplayer enemy ${e ? '' : 'vacant'} ${isOpp ? 'opp' : ''} ${r.turn ? 'turn' : ''}">
       ${chIcon(e, 'uch')}
       <span class="uname"><b class="ellipsis">${e ? esc(e.name) : 'Enemy ' + r.n}</b><span class="ustat">${e && e.guess ? `<span class="upred">${roleIcon(e.guess)}${esc(ROLE[e.guess])}${e.sure ? '' : '?'}</span>${isOpp ? ' your lane' : ' predicted'}` : esc(r.status)}</span></span>
       <span class="uwr">${e && e.winRate ? `<b>${pct0(e.winRate)}</b><span class="muted">${esc(ROLE[e.guess] || '')} WR</span>` : ''}</span>
