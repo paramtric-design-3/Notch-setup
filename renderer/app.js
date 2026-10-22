@@ -307,7 +307,9 @@ const TILE = {
     t.classList.add('clickable');
     t.title = 'Show your champions and the tier list';
     if (size === 1) {
-      t.innerHTML = `<div class="lbig">${I.trophy}</div>${me.solo ? rankPill(me.solo) : '<span class="muted">Unranked</span>'}`;
+      const best = me.solo || me.flex;
+      const em = best && LICON['tier:' + best.tier];
+      t.innerHTML = `<div class="lbig">${em ? `<img class="lembbig" src="${em}" alt="">` : I.trophy}</div>${best ? `<span class="lpill" style="--tier:${(TIER[best.tier] || [0, '#888'])[1]}">${(TIER[best.tier] || [best.tier[0]])[0]}${DIV[best.division] || ''}<span class="llp">${best.lp} LP</span></span>` : '<span class="muted">Unranked</span>'}`;
       return t;
     }
     t.innerHTML = `
@@ -428,7 +430,8 @@ function rankPill(r) {
   if (!r) return '<span class="lpill none">Unranked</span>';
   const [ab, color] = TIER[r.tier] || [r.tier.slice(0, 1), '#888'];
   const div = DIV[r.division] ? DIV[r.division] : '';
-  return `<span class="lpill" style="--tier:${color}">${ab}${div}<span class="llp">${r.lp} LP</span></span>`;
+  const em = LICON['tier:' + r.tier];
+  return `${em ? `<img class="lemb" src="${em}" alt="" title="${esc(r.tier.charAt(0) + r.tier.slice(1).toLowerCase())}${r.division ? ' ' + esc(r.division) : ''}">` : ''}<span class="lpill" style="--tier:${color}">${ab}${div}<span class="llp">${r.lp} LP</span></span>`;
 }
 function wr(r) {
   const games = (r.wins || 0) + (r.losses || 0);
@@ -444,7 +447,7 @@ function leagueGame(g) {
     return `<div class="lp ${p.me ? 'me' : ''}">
       <span class="lch">${p.icon ? `<img src="${p.icon}" alt="">` : esc((p.champ || '?').slice(0, 2))}</span>
       <span class="lname ellipsis" title="${esc(p.name)}#${esc(p.tag)} · ${esc(p.champ)}">${esc(p.name)}</span>
-      ${p.bot ? '<span class="lpill none">Bot</span>' : p.loading ? '<span class="lpill none">…</span>' : rankPill(r)}
+      <span class="lrank">${p.bot ? '<span class="lpill none">Bot</span>' : p.loading ? '<span class="lpill none">…</span>' : rankPill(r)}</span>
       <span class="lwr">${r ? wr(r) : ''}</span>
       <span class="lform">${form}</span>
     </div>`;

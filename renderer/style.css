@@ -408,7 +408,7 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .lteams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .league .lteam { display: flex; flex-direction: column; gap: 3px; padding-left: 8px; border-left: 2px solid #4a7bd0; }
 .league .lteam.red { border-left-color: #d0584a; }
-.league .lp { display: grid; grid-template-columns: 24px minmax(0, 1fr) 84px 72px 54px; align-items: center; gap: 8px; height: 26px; padding: 0 6px 0 2px; border-radius: 7px; }
+.league .lp { display: grid; grid-template-columns: 24px minmax(0, 1fr) 104px 72px 54px; align-items: center; gap: 8px; height: 26px; padding: 0 6px 0 2px; border-radius: 7px; }
 .league .lp.me { background: var(--btn-on); }
 .league .lp.me .lname { color: var(--accent); font-weight: 600; }
 .league .lch { width: 24px; height: 24px; border-radius: 6px; overflow: hidden; background: var(--btn); display: grid; place-items: center; font-size: 10px; color: var(--text-2); }
@@ -689,3 +689,11 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .lcs b { color: var(--text); }
 .league .lcs b.hot { color: var(--accent); }
 .league .lsplit.three .ltlist { gap: 2px 10px; }
+/* rank emblems */
+.league .lemb { height: 18px; width: auto; max-width: 30px; object-fit: contain; vertical-align: middle; margin-right: 4px; flex: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+.tile.league:not(.game) .lrow .lemb { height: 28px; max-width: 44px; margin-right: 6px; }
+.league .lbig .lembbig { height: 40px; width: auto; max-width: 64px; object-fit: contain; display: block; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
+.league .lp .lemb { height: 18px; }
+.league .lrank { display: flex; align-items: center; min-width: 0; }
+.league .lbig:has(.lembbig) { width: auto; height: 36px; display: flex; justify-content: center; margin: 2px auto 4px; }
+.league .lbig .lembbig { height: 36px; max-width: 60px; }

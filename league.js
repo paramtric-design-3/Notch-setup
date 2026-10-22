@@ -51,7 +51,8 @@ function rankOf(entry) {
 }
 
 class League {
-  constructor({ send, log, cacheDir, fetchImpl }) {
+  constructor({ send, log, cacheDir, fetchImpl, trimImage }) {
+    this.trimImage = trimImage || null;   // (png Buffer) => smaller png Buffer, cut to the emblem
     this.send = send;               // (data) => void, to the island
     this.log = log || (() => {});
     this.cacheDir = cacheDir;
@@ -847,7 +848,53 @@ class League {
     } catch (e) { this.iconRetryAt = Date.now() + 60 * 1000; this.log('league icons: ' + e.message); }
   }
 
+  // Rank emblems (Iron … Challenger): from the League client itself, or CommunityDragon (which
+  // mirrors the client's files) when the client doesn't hand them out. Cut to size and cached.
+  async loadTierIcons(tiers) {
+    this.tierBusy = this.tierBusy || new Set();
+    for (const t of [...new Set(tiers)].filter(t => t && !this.icons.has('tier:' + t) && !this.tierBusy.has(t))) {
+      if (Date.now() < ((this.tierRetry || {})[t] || 0)) continue;
+      this.tierBusy.add(t);
+      try {
+        const name = t.toLowerCase();
+        const dir = path.join(this.cacheDir, 'tiers');
+        const file = path.join(dir, `${name}.png`);
+        let buf = null;
+        try { buf = fs.readFileSync(file); } catch {
+          const p = `/lol-static-assets/images/ranked-emblem/emblem-${name}.png`;
+          if (this.lcu) buf = await this.lcuBinary(p).catch(() => null);
+          if (!buf) {
+            const res = await this.fetch(`https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${name}.png`);
+            if (res.ok) buf = Buffer.from(await res.arrayBuffer());
+          }
+          if (buf && this.trimImage) { try { buf = this.trimImage(buf) || buf; } catch { /* keep the original */ } }
+          if (buf) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(file, buf); }
+        }
+        if (buf) { this.icons.set('tier:' + t, 'data:image/png;base64,' + buf.toString('base64')); this.emit(); }
+        else (this.tierRetry = this.tierRetry || {})[t] = Date.now() + 60 * 1000;
+      } catch (e) { (this.tierRetry = this.tierRetry || {})[t] = Date.now() + 60 * 1000; this.log('league emblem: ' + e.message); }
+      finally { this.tierBusy.delete(t); }
+    }
+  }
+  lcuBinary(p) {
+    return new Promise((resolve, reject) => {
+      if (!this.lcu) return reject(new Error('no client'));
+      const r = https.request({ host: '127.0.0.1', port: this.lcu.port, path: p, method: 'GET', agent, timeout: 5000, headers: { Authorization: 'Basic ' + Buffer.from('riot:' + this.lcu.token).toString('base64') } }, res => {
+        const chunks = []; res.on('data', c => chunks.push(c));
+        res.on('end', () => res.statusCode === 200 && /image/.test(res.headers['content-type'] || 'image') ? resolve(Buffer.concat(chunks)) : reject(new Error(`HTTP ${res.statusCode}`)));
+      });
+      r.on('timeout', () => r.destroy(new Error('timeout')));
+      r.on('error', reject);
+      r.end();
+    });
+  }
+
   emit() {
+    // emblems for every rank on screen
+    const tiers = [];
+    if (this.me) for (const r of [this.me.solo, this.me.flex]) if (r && r.tier) tiers.push(r.tier);
+    if (this.game) for (const p of this.game.players || []) if (p.rank && p.rank.tier) tiers.push(p.rank.tier);
+    if (tiers.some(t => !this.icons.has('tier:' + t))) this.loadTierIcons(tiers);
     const data = {
       type: 'state', client: !!this.lcu, phase: this.phase, mode: this.mode || '',
       me: this.me && { name: this.me.name, tag: this.me.tag, solo: this.me.solo, flex: this.me.flex },
