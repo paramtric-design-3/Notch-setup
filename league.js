@@ -806,7 +806,16 @@ class League {
     const meId = live.activePlayer && (live.activePlayer.riotId || live.activePlayer.summonerName);
     this.game.time = Math.round((live.gameData && live.gameData.gameTime) || 0);
     // Your build for this game (OP.GG), with what you already own.
-    const meP = live.allPlayers.find(p => meId && ((p.riotId || p.summonerName) === meId || p.summonerName === meId));
+    // Find yourself among the players: the game names players in a few ways (riotId "Name#TAG",
+    // riotIdGameName, summonerName), and which ones are filled in varies.
+    const norm = x => String(x || '').toLowerCase().replace(/\s+/g, '');
+    const ap = live.activePlayer || {};
+    const mine = new Set([ap.riotId, ap.summonerName, ap.riotIdGameName, ap.riotIdGameName && ap.riotIdTagLine ? `${ap.riotIdGameName}#${ap.riotIdTagLine}` : '',
+      this.me && this.me.name, this.me && this.me.tag ? `${this.me.name}#${this.me.tag}` : ''].filter(Boolean).flatMap(x => [norm(x), norm(String(x).split('#')[0])]));
+    const ids = p => [p.riotId, p.summonerName, p.riotIdGameName, p.riotIdGameName && p.riotIdTagLine ? `${p.riotIdGameName}#${p.riotIdTagLine}` : ''].filter(Boolean).map(norm);
+    let meP = live.allPlayers.find(p => ids(p).some(x => mine.has(x)));
+    if (!meP) meP = live.allPlayers.find(p => ids(p).some(x => mine.has(x.split('#')[0])));
+    if (!meP && this.mineWhy !== 'nome') { this.mineWhy = 'nome'; this.log(`league build: you not found among players; you: ${[...mine].join('/') || '-'}; players: ${live.allPlayers.map(p => ids(p)[0] || '?').join(', ')}`); }
     if (meP) {
       await this.loadChampions();
       const key = String(meP.rawChampionName || '').replace(/^game_character_displayname_/, '');
@@ -833,7 +842,7 @@ class League {
       return {
         team: p.team === 'CHAOS' ? 'red' : 'blue', champ: p.championName || champKey, champKey,
         icon: this.icons.get(champKey) || null, name: name || p.summonerName || '?', tag: tag || '',
-        me: !!meId && (riotId === meId || p.summonerName === meId), bot: !!p.isBot,
+        me: meP ? p === meP : !!meId && (riotId === meId || p.summonerName === meId), bot: !!p.isBot,
         position: p.position || '', ...(info || { loading: !p.isBot }),
       };
     });
