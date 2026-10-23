@@ -273,8 +273,9 @@ function overlayBounds() {
   const place = (settings.overlay && settings.overlay.place) || 'minimap';
   const c = settings.overlay && settings.overlay.custom;   // dragged by you: a spot relative to the game window/screen
   if (place === 'custom' && c) {
-    const x = Math.round(b.x + c.fx * b.width), y = Math.round(b.y + c.fy * b.height);
-    return { x: Math.min(Math.max(x, b.x), b.x + b.width - OVERLAY_W), y: Math.min(Math.max(y, b.y), b.y + b.height - OVERLAY_H), width: OVERLAY_W, height: OVERLAY_H };
+    // exactly where you dropped it; only when the game window has changed size or place, scale with it
+    if (c.x != null && c.bw === b.width && c.bh === b.height && c.bx === b.x && c.by === b.y) return { x: c.x, y: c.y, width: OVERLAY_W, height: OVERLAY_H };
+    return { x: Math.round(b.x + c.fx * b.width), y: Math.round(b.y + c.fy * b.height), width: OVERLAY_W, height: OVERLAY_H };
   }
   if (place === 'top') return { x: b.x + b.width - OVERLAY_W - 16, y: b.y + Math.round(90 * s), width: OVERLAY_W, height: OVERLAY_H };
   if (place === 'left') return { x: b.x + 16, y: b.y + Math.round(b.height * 0.42), width: OVERLAY_W, height: OVERLAY_H };
@@ -331,7 +332,7 @@ ipcMain.on('overlay-drag', (_e, on) => {
     clearInterval(overlayDrag.timer); overlayDrag = null;
     const b = overlay.getBounds();
     const base = gameWin && gameWin !== 'min' && gameWin.width > 200 ? gameWin : screen.getPrimaryDisplay().bounds;
-    applySettings({ overlay: { ...(settings.overlay || {}), place: 'custom', custom: { fx: (b.x - base.x) / base.width, fy: (b.y - base.y) / base.height } } });
+    applySettings({ overlay: { ...(settings.overlay || {}), place: 'custom', custom: { x: b.x, y: b.y, bx: base.x, by: base.y, bw: base.width, bh: base.height, fx: (b.x - base.x) / base.width, fy: (b.y - base.y) / base.height } } });
     overlay.setIgnoreMouseEvents(true, { forward: true });
   }
 });

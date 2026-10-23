@@ -25,18 +25,19 @@ window.notch.on('overlay', p => {
     <div class="meta"><span>OP.GG</span></div>`;
 });
 
-// Grip: hovering it makes the overlay take the mouse (everything else stays click-through), and
-// dragging moves it.
+// Hovering the tile makes the overlay take the mouse (the rest of the window stays click-through),
+// and dragging anywhere on it moves it.
 let overGrip = false, dragging = false;
 document.addEventListener('mousemove', e => {
-  const on = !!(e.target && e.target.closest && e.target.closest('.grip'));
+  const on = !!(e.target && e.target.closest && e.target.closest('#o'));
   if (on !== overGrip && !dragging) { overGrip = on; window.notch.send('overlay-mouse', on); }
 });
 document.addEventListener('mousedown', e => {
-  if (!e.target.closest('.grip')) return;
+  if (!e.target.closest('#o')) return;
   e.preventDefault(); dragging = true; document.body.classList.add('dragging');
   window.notch.send('overlay-drag', true);
 });
 const stop = () => { if (!dragging) return; dragging = false; overGrip = false; document.body.classList.remove('dragging'); window.notch.send('overlay-drag', false); };
 document.addEventListener('mouseup', stop);
 window.addEventListener('blur', stop);
+document.addEventListener('mouseleave', () => { if (overGrip && !dragging) { overGrip = false; window.notch.send('overlay-mouse', false); } });

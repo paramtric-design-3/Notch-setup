@@ -6,7 +6,7 @@
   <title>FJBC Notch overlay</title>
   <style>
     html, body { margin: 0; background: transparent; overflow: hidden; font: 12px/1.3 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: #ECECEC; -webkit-font-smoothing: antialiased; user-select: none; }
-    #o { position: absolute; right: 0; bottom: 0; display: none; flex-direction: column; gap: 6px; padding: 9px 11px; border-radius: 14px; background: rgba(17, 17, 17, .82); box-shadow: 0 0 0 1px rgba(255, 255, 255, .07), 0 6px 20px rgba(0, 0, 0, .45); max-width: 276px; }
+    #o { cursor: grab; position: absolute; right: 0; bottom: 0; display: none; flex-direction: column; gap: 6px; padding: 9px 11px; border-radius: 14px; background: rgba(17, 17, 17, .82); box-shadow: 0 0 0 1px rgba(255, 255, 255, .07), 0 6px 20px rgba(0, 0, 0, .45); max-width: 276px; }
     #o.left { right: auto; left: 0; }
     #o.show { display: flex; }
     .next { display: flex; align-items: center; gap: 9px; }
@@ -26,7 +26,7 @@
     .done b { color: #6fd08a; }
     .grip { position: absolute; top: 5px; right: 6px; width: 18px; height: 14px; border-radius: 4px; cursor: grab; opacity: .45; display: grid; place-items: center; }
     .grip:hover, body.dragging .grip { opacity: 1; background: rgba(255,255,255,.08); }
-    body.dragging .grip { cursor: grabbing; }
+    body.dragging, body.dragging #o, body.dragging .grip { cursor: grabbing; }
     .grip i { display: block; width: 10px; height: 6px; background: radial-gradient(circle, #ccc 1px, transparent 1.3px) 0 0 / 4px 3px; }
   </style>
 </head>
