@@ -5,7 +5,7 @@ const ON = new Set([
   'settings', 'media', 'art', 'lyrics', 'radios', 'volume', 'brightness', 'dark',
   'weather', 'messages', 'calendar', 'peek', 'displays', 'update', 'pointer', 'outputs', 'league', 'overlay',
 ]);
-const SEND = new Set(['island-size', 'island-open', 'helper', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update']);
+const SEND = new Set(['island-size', 'island-open', 'helper', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update', 'overlay-mouse', 'overlay-drag']);
 const INVOKE = new Set(['get-settings', 'set-settings', 'copy-text', 'initial-state', 'get-displays', 'get-update', 'league-import-runes']);
 
 contextBridge.exposeInMainWorld('notch', {

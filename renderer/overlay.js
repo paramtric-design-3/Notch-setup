@@ -21,5 +21,22 @@ window.notch.on('overlay', p => {
     ${next ? `<div class="next">${img(next) || '<span class="ph"></span>'}<div class="nl"><small>Buy next</small><b>${esc(names[next] || 'Item ' + next)}</b></div></div>`
       : '<div class="next done"><div class="nl"><small>Build</small><b>Full build done ✓</b></div></div>'}
     <div class="path">${path.map((id, i) => `${i === b.boots.length && b.boots.length ? '<span class="sep">›</span>' : ''}${i === b.boots.length + b.core.length && b.later.length ? '<span class="sep">›</span>' : ''}<span class="it ${got.has(id) ? 'own' : ''} ${id === next ? 'nx' : ''}" title="${esc(names[id] || '')}">${img(id)}</span>`).join('')}</div>
+    <span class="grip" title="Drag to move"><i></i></span>
     <div class="meta">${nextSkill && lvl < 18 ? `Level ${lvl + 1}: <i>${esc(nextSkill)}</i>` : ''}${b.maxOrder && b.maxOrder.length ? `<span>Max ${b.maxOrder.map(esc).join(' › ')}</span>` : ''}<span>· OP.GG</span></div>`;
 });
+
+// Grip: hovering it makes the overlay take the mouse (everything else stays click-through), and
+// dragging moves it.
+let overGrip = false, dragging = false;
+document.addEventListener('mousemove', e => {
+  const on = !!(e.target && e.target.closest && e.target.closest('.grip'));
+  if (on !== overGrip && !dragging) { overGrip = on; window.notch.send('overlay-mouse', on); }
+});
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('.grip')) return;
+  e.preventDefault(); dragging = true; document.body.classList.add('dragging');
+  window.notch.send('overlay-drag', true);
+});
+const stop = () => { if (!dragging) return; dragging = false; overGrip = false; document.body.classList.remove('dragging'); window.notch.send('overlay-drag', false); };
+document.addEventListener('mouseup', stop);
+window.addEventListener('blur', stop);

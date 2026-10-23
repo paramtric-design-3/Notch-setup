@@ -271,6 +271,11 @@ function overlayBounds() {
   const b = gameWin && gameWin !== 'min' && gameWin.width > 200 ? gameWin : screen.getPrimaryDisplay().bounds;
   const s = b.height / 1080;
   const place = (settings.overlay && settings.overlay.place) || 'minimap';
+  const c = settings.overlay && settings.overlay.custom;   // dragged by you: a spot relative to the game window/screen
+  if (place === 'custom' && c) {
+    const x = Math.round(b.x + c.fx * b.width), y = Math.round(b.y + c.fy * b.height);
+    return { x: Math.min(Math.max(x, b.x), b.x + b.width - OVERLAY_W), y: Math.min(Math.max(y, b.y), b.y + b.height - OVERLAY_H), width: OVERLAY_W, height: OVERLAY_H };
+  }
   if (place === 'top') return { x: b.x + b.width - OVERLAY_W - 16, y: b.y + Math.round(90 * s), width: OVERLAY_W, height: OVERLAY_H };
   if (place === 'left') return { x: b.x + 16, y: b.y + Math.round(b.height * 0.42), width: OVERLAY_W, height: OVERLAY_H };
   // just above the minimap (bottom right; the default HUD minimap is about 290 px tall at 1080p)
@@ -299,17 +304,38 @@ function updateOverlay(d) {
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, spellcheck: false },
     });
     overlay.setAlwaysOnTop(true, 'screen-saver');
-    overlay.setIgnoreMouseEvents(true);
+    overlay.setIgnoreMouseEvents(true, { forward: true });   // clicks go to the game, but we still see the pointer over the grip
     overlay.setMenu(null);
     overlay.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
     overlay.webContents.on('did-finish-load', () => { overlay.webContents.send('overlay', overlayPayload()); overlay.showInactive(); keepOverlayOnTop(); });
     return;
   }
-  overlay.setBounds(overlayBounds());
+  if (!overlayDrag) overlay.setBounds(overlayBounds());   // not while you drag it
   overlay.webContents.send('overlay', overlayPayload());
   if (!overlay.isVisible()) overlay.showInactive();
   keepOverlayOnTop();
 }
+// Dragging: the grip in the overlay takes the mouse while you hover it; dragging moves the window
+// with the pointer and the spot is saved relative to the game window.
+let overlayDrag = null;
+ipcMain.on('overlay-mouse', (_e, over) => { if (overlay && !overlay.isDestroyed() && !overlayDrag) overlay.setIgnoreMouseEvents(!over, { forward: true }); });
+ipcMain.on('overlay-drag', (_e, on) => {
+  if (!overlay || overlay.isDestroyed()) return;
+  if (on) {
+    const p = screen.getCursorScreenPoint(), b = overlay.getBounds();
+    overlayDrag = { dx: p.x - b.x, dy: p.y - b.y, timer: setInterval(() => {
+      const q = screen.getCursorScreenPoint();
+      overlay.setBounds({ x: q.x - overlayDrag.dx, y: q.y - overlayDrag.dy, width: OVERLAY_W, height: OVERLAY_H });
+    }, 16) };
+  } else if (overlayDrag) {
+    clearInterval(overlayDrag.timer); overlayDrag = null;
+    const b = overlay.getBounds();
+    const base = gameWin && gameWin !== 'min' && gameWin.width > 200 ? gameWin : screen.getPrimaryDisplay().bounds;
+    applySettings({ overlay: { ...(settings.overlay || {}), place: 'custom', custom: { fx: (b.x - base.x) / base.width, fy: (b.y - base.y) / base.height } } });
+    overlay.setIgnoreMouseEvents(true, { forward: true });
+  }
+});
+
 // League's game window puts itself on top when it gets focus, covering the overlay: while the
 // overlay is up, put it back on top every second (without taking focus from the game).
 let overlayTopTimer = null;

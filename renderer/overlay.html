@@ -24,6 +24,10 @@
     .meta { display: flex; align-items: center; gap: 6px; color: #9A9A9A; font-size: 10.5px; }
     .meta i { font-style: normal; font-weight: 700; font-size: 10.5px; color: #2A1606; background: #F29A4A; border-radius: 4px; padding: 0 5px; }
     .done b { color: #6fd08a; }
+    .grip { position: absolute; top: 5px; right: 6px; width: 18px; height: 14px; border-radius: 4px; cursor: grab; opacity: .45; display: grid; place-items: center; }
+    .grip:hover, body.dragging .grip { opacity: 1; background: rgba(255,255,255,.08); }
+    body.dragging .grip { cursor: grabbing; }
+    .grip i { display: block; width: 10px; height: 6px; background: radial-gradient(circle, #ccc 1px, transparent 1.3px) 0 0 / 4px 3px; }
   </style>
 </head>
 <body>

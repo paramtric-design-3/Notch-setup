@@ -41,6 +41,7 @@ function render() {
   const ov = S.overlay || { show: true, place: 'minimap' };
   $('#ovShow').checked = ov.show !== false;
   document.querySelectorAll('#ovPlace button').forEach(b => b.classList.toggle('on', b.dataset.v === (ov.place || 'minimap')));
+  $('#ovCustom').hidden = ov.place !== 'custom';
   if (document.activeElement !== $('#city')) $('#city').value = S.city || '';
   if (document.activeElement !== $('#msgApps')) $('#msgApps').value = S.messageApps || '';
 
