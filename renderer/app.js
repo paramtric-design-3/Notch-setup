@@ -358,6 +358,15 @@ function renderTiles() {
   if (state === 'open') sizeIsland();
 }
 
+// Keep the window the size of what's inside, also when a tile changes on its own (champ select
+// filling in, pictures arriving): otherwise the bottom gets cut off.
+let resizeQueued = false;
+new ResizeObserver(() => {
+  if (state !== 'open' || resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(() => { resizeQueued = false; if (state === 'open') sizeIsland(); });
+}).observe(tilesView);
+
 function rerenderTile(id) {
   if (state !== 'open' || !D.settings) return;
   const cfg = D.settings.tiles.find(t => t.id === id);
@@ -366,6 +375,7 @@ function rerenderTile(id) {
   const fresh = TILE[id](Math.max(1, Math.min(3, cfg.size || 2)));
   if (old) old.replaceWith(fresh); else renderTiles();
   tick();
+  sizeIsland();
 }
 
 // tile actions
