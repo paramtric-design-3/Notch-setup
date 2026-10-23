@@ -43,6 +43,7 @@ function wantCompact() {
 
 let lastOpenSent = null;
 let csShownOnce = false;
+let csPinned = false;   // the pin was set by champ select, not by you
 function setState(next) {
   state = next;
   island.className = 's-' + next;
@@ -120,7 +121,7 @@ api.on('pointer', p => {
 island.addEventListener('click', e => {
   if (e.target.closest('button, pre, a')) return;
   if (state === 'open' && e.target.closest('.tile.league.clickable')) return;   // handled by the tile
-  if (state === 'open') { pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
+  if (state === 'open') { csPinned = false; pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
   else { pinned = true; setState('open'); }
 });
 island.addEventListener('contextmenu', e => { e.preventDefault(); api.send('open-settings'); });
@@ -877,8 +878,12 @@ api.on('league', L => {
   D.league = L;
   const layoutChanged = clientBefore !== !!(L && L.client) || wideBefore !== leagueWide();
   // Champ select opens the notch by itself so the helper is right there.
-  if (L && L.cs && state !== 'open' && !csShownOnce) { csShownOnce = true; pinned = true; setState('open'); }
-  if (!(L && L.cs)) csShownOnce = false;
+  if (L && L.cs && state !== 'open' && !csShownOnce) { csShownOnce = true; pinned = true; csPinned = true; setState('open'); }
+  // Champ select is over: let go of the pin it set, so the notch closes again (and updates can install).
+  if (!(L && L.cs)) {
+    csShownOnce = false;
+    if (csPinned) { csPinned = false; if (pinned) { pinned = false; island.classList.remove('pinned'); if (!hovering) settle(); } }
+  }
   startTicker();
   if (state === 'open') { if (layoutChanged) renderTiles(); else rerenderTile('league'); }
 });
