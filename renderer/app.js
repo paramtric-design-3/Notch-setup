@@ -475,7 +475,8 @@ function leagueGame(g) {
 // and the skill order with the next level-up highlighted.
 function gameBuild(b) {
   if (!b) return '';
-  const title = `<span class="gbtitle">${chIcon(b.champ, 'lch')}<b>Your build</b><span class="muted">${esc((b.champ && b.champ.name) || '')}${b.mode === 'aram' ? ' · ARAM' : b.pos ? ' · ' + esc(ROLE[b.pos] || '') : ''} · OP.GG</span></span>`;
+  const title = `<span class="gbtitle">${chIcon(b.champ, 'lch')}<b>Your build</b><span class="muted">${esc((b.champ && b.champ.name) || '')}${b.mode === 'aram' ? ' · ARAM' : b.mode === 'urf' ? ' · URF' : b.pos ? ' · ' + esc(ROLE[b.pos] || '') : ''} · OP.GG</span></span>`;
+  if (b.unsupported) return '';
   if (b.loading || b.failed) return `<div class="gbuild">${title}<span class="muted">${b.failed ? 'OP.GG has no build for this champion here' : 'Loading the build…'}</span></div>`;
   const owned = (b.owned || []).slice();
   const has = id => { const i = owned.indexOf(id); if (i < 0) return false; owned.splice(i, 1); return true; };

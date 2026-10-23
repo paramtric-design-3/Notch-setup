@@ -284,6 +284,7 @@ function updateOverlay(d) {
     : !L || L.phase !== 'InProgress' ? `not in game (${(L && L.phase) || 'no client'})`
     : !(L.game) ? 'in game, waiting for the game data (port 2999)'
     : !b ? 'in game, champion not found in the game data'
+    : b.unsupported ? `in game, no build for this mode (${b.gm || '?'}, map ${b.mapNo || '?'}${b.champ ? '' : ', champion not found'})`
     : b.loading ? 'in game, loading the OP.GG build'
     : b.failed ? 'in game, OP.GG has no build for this champion'
     : gameWin === 'min' ? 'game minimized' : '';

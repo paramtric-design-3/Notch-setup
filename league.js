@@ -403,8 +403,9 @@ class League {
 
   gameBuild() {
     const m = this.game && this.game.mine;
-    if (!m || !m.champId || !m.mode) return null;
-    const lane = m.mode === 'aram' ? 'none' : (POS[m.pos] || 'none');
+    if (!m) return null;
+    if (!m.champId || !m.mode) return { unsupported: true, gm: m.gm || '', mapNo: m.mapNo || 0, champ: m.champId ? this.champ(m.champId) : null };
+    const lane = m.mode !== 'ranked' ? 'none' : (POS[m.pos] || 'none');
     const hit = this.analysis.get(m.mode === 'ranked' ? `${m.champId}:${lane}` : `${m.champId}:${lane}:${m.mode}`);
     const champ = this.champ(m.champId);
     if (!hit) return { loading: true, champ, pos: m.pos, mode: m.mode };
@@ -667,7 +668,7 @@ class League {
 
   // Counters, build, skills and runes for one champion in one lane.
   async loadAnalysis(champId, position, cacheOnly = false, gameMode = 'ranked') {
-    const lane = gameMode === 'aram' ? 'none' : (POS[position] || 'none');
+    const lane = gameMode !== 'ranked' ? 'none' : (POS[position] || 'none');
     const id = gameMode === 'ranked' ? `${champId}:${lane}` : `${champId}:${lane}:${gameMode}`;
     const hit = this.analysis.get(id);
     if (hit && Date.now() - hit.at < META_TTL) { if (!cacheOnly) this.useAnalysis(champId, hit.data); return; }
@@ -811,10 +812,14 @@ class League {
       const key = String(meP.rawChampionName || '').replace(/^game_character_displayname_/, '');
       const cid = this.champIdOf(key || meP.championName);
       const gm = String((live.gameData && live.gameData.gameMode) || '').toUpperCase();
-      const mode = gm === 'ARAM' ? 'aram' : gm === 'CLASSIC' ? 'ranked' : '';
+      const mapNo = +((live.gameData && live.gameData.mapNumber) || 0);
+      // ARAM by its map (Howling Abyss is map 12), so every ARAM variant (Mayhem…) counts;
+      // Summoner's Rift (map 11) uses the ranked builds.
+      const mode = mapNo === 12 || /ARAM|KIWI/.test(gm) ? 'aram' : gm === 'URF' || gm === 'ARURF' ? 'urf' : (mapNo === 11 || gm === 'CLASSIC') ? 'ranked' : '';
       let pos = ({ TOP: 'top', JUNGLE: 'jungle', MIDDLE: 'middle', MID: 'middle', BOTTOM: 'bottom', UTILITY: 'utility', SUPPORT: 'utility' })[String(meP.position || '').toUpperCase()] || '';
       if (!pos && mode === 'ranked') pos = (this.cs && this.cs.myPos) || this.lastMyPos || this.mainLaneOf(cid);
-      this.game.mine = { champId: cid, pos, mode, level: (live.activePlayer && live.activePlayer.level) || meP.level || 1, items: (meP.items || []).map(i => i.itemID).filter(Boolean) };
+      if (!cid || !mode) { const why = `game ${gm || '?'} on map ${mapNo || '?'}, champion ${key || meP.championName || '?'} -> ${cid || 'not found'}`; if (this.mineWhy !== why) { this.mineWhy = why; this.log('league build: ' + why); } }
+      this.game.mine = { champId: cid, pos, mode, gm, mapNo, level: (live.activePlayer && live.activePlayer.level) || meP.level || 1, items: (meP.items || []).map(i => i.itemID).filter(Boolean) };
       if (cid && mode) {
         const bk = `${cid}:${pos}:${mode}`;
         if (this.gameBuildKey !== bk) { this.gameBuildKey = bk; this.loadAnalysis(cid, pos, true, mode).then(() => this.emit()); }

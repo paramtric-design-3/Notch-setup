@@ -4,7 +4,7 @@ const box = document.getElementById('o');
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 window.notch.on('overlay', p => {
   const b = p && p.build;
-  if (!b) { box.className = ''; return; }
+  if (!b || b.unsupported || b.loading || b.failed) { box.className = ''; return; }
   const pics = p.pics || {};
   const img = id => pics['item:' + id] ? `<img src="${pics['item:' + id]}" alt="">` : '';
   const ownedLeft = (b.owned || []).slice();
