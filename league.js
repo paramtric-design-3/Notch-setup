@@ -89,7 +89,7 @@ class League {
     const was = this.lcu ? `${this.lcu.port}:${this.lcu.token}` : '';
     if (key === was) return;
     this.lcu = info || null;
-    if (!info) { this.me = null; this.phase = 'None'; this.endGame(); }
+    if (!info) { this.me = null; if (this.phase !== 'InProgress') { this.phase = 'None'; this.endGame(); } }
     this.meAt = 0;
     this.tick();
   }
@@ -100,10 +100,23 @@ class League {
     if (this.busy) return;
     this.busy = true;
     try {
-      if (!this.lcu) { this.emit(); return; }
+      // The game itself answers on port 2999 while you play, also when the League client closes
+      // during games (its "Close client during game" setting): go by that first.
+      const liveUp = await request(LIVE_PORT, '/liveclientdata/gamestats', null, 900).then(x => !!x, () => false);
+      if (!this.lcu) {
+        if (liveUp) {
+          if (this.phase !== 'InProgress') this.log('league: in game without the client open, using the game data');
+          this.phase = 'InProgress';
+          this.cs = null;
+          await this.loadGame();
+        } else if (this.phase === 'InProgress') { this.phase = 'None'; this.endGame(); }
+        this.emit();
+        return;
+      }
       // phase: None, Lobby, Matchmaking, ReadyCheck, ChampSelect, GameStart, InProgress, EndOfGame…
       let phase = this.phase;
       try { phase = (await this.lcuGet('/lol-gameflow/v1/gameflow-phase')) || 'None'; } catch { /* client busy */ }
+      if (liveUp && !['GameStart', 'InProgress', 'Reconnect'].includes(phase)) phase = 'InProgress';
       const changed = phase !== this.phase;
       this.phase = phase;
       if (changed && (phase === 'EndOfGame' || phase === 'Lobby' || phase === 'None')) { this.endGame(); this.meAt = 0; }
@@ -973,7 +986,7 @@ class League {
     if (this.game) for (const p of this.game.players || []) if (p.rank && p.rank.tier) tiers.push(p.rank.tier);
     if (tiers.some(t => !this.icons.has('tier:' + t))) this.loadTierIcons(tiers);
     const data = {
-      type: 'state', client: !!this.lcu, phase: this.phase, mode: this.mode || '',
+      type: 'state', client: !!this.lcu || this.phase === 'InProgress', phase: this.phase, mode: this.mode || '',
       me: this.me && { name: this.me.name, tag: this.me.tag, solo: this.me.solo, flex: this.me.flex },
       cs: this.cs && { ...this.cs, me: this.cs.me && { ...this.cs.me, icon: this.icons.get(this.cs.me.key) || this.cs.me.icon },
         allies: this.cs.allies.map(a => ({ ...a, champ: a.champ && { ...a.champ, icon: this.icons.get(a.champ.key) || null } })),
