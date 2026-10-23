@@ -22,7 +22,7 @@ window.notch.on('overlay', p => {
       : '<div class="next done"><div class="nl"><small>Build</small><b>Full build done ✓</b></div></div>'}
     <div class="path">${path.map((id, i) => `${i === b.boots.length && b.boots.length ? '<span class="sep">›</span>' : ''}${i === b.boots.length + b.core.length && b.later.length ? '<span class="sep">›</span>' : ''}<span class="it ${got.has(id) ? 'own' : ''} ${id === next ? 'nx' : ''}" title="${esc(names[id] || '')}">${img(id)}</span>`).join('')}</div>
     <span class="grip" title="Drag to move"><i></i></span>
-    <div class="meta"><span>OP.GG</span></div>`;
+`;
 });
 
 // Hovering the tile makes the overlay take the mouse (the rest of the window stays click-through),
