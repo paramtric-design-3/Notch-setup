@@ -302,12 +302,24 @@ function updateOverlay(d) {
     overlay.setIgnoreMouseEvents(true);
     overlay.setMenu(null);
     overlay.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
-    overlay.webContents.on('did-finish-load', () => { overlay.webContents.send('overlay', overlayPayload()); overlay.showInactive(); });
+    overlay.webContents.on('did-finish-load', () => { overlay.webContents.send('overlay', overlayPayload()); overlay.showInactive(); keepOverlayOnTop(); });
     return;
   }
   overlay.setBounds(overlayBounds());
   overlay.webContents.send('overlay', overlayPayload());
   if (!overlay.isVisible()) overlay.showInactive();
+  keepOverlayOnTop();
+}
+// League's game window puts itself on top when it gets focus, covering the overlay: while the
+// overlay is up, put it back on top every second (without taking focus from the game).
+let overlayTopTimer = null;
+function keepOverlayOnTop() {
+  if (overlayTopTimer) return;
+  overlayTopTimer = setInterval(() => {
+    if (!overlay || overlay.isDestroyed() || !overlay.isVisible()) { clearInterval(overlayTopTimer); overlayTopTimer = null; return; }
+    overlay.setAlwaysOnTop(true, 'screen-saver', 1);
+    overlay.moveTop();
+  }, 1000);
 }
 function overlayPayload() {
   const b = overlayData && overlayData.game && overlayData.game.build;
