@@ -701,9 +701,5 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .uteam.blue .uplayer.turn { border-left-color: #2ec4c4; background: linear-gradient(90deg, rgba(46, 196, 196, .2), transparent 70%); }
 .league .uteam.red .uplayer.turn { border-left-color: #ff4d4d; background: linear-gradient(90deg, rgba(255, 77, 77, .2), transparent 70%); }
 .league .uplayer.turn .ustat, .league .uplayer.nextup .ustat { color: var(--text); font-weight: 600; }
-.league .uplayer.turn .uch { animation: turnpulse 1.4s ease-in-out infinite; }
-@keyframes turnpulse { 50% { box-shadow: 0 0 0 2.5px #2ec4c4; } }
-.league .uteam.red .uplayer.turn .uch { animation-name: turnpulse-red; }
-@keyframes turnpulse-red { 50% { box-shadow: 0 0 0 2.5px #ff4d4d; } }
 /* no blinking: whose turn it is shows only as the highlighted row */
 .league .uplayer.turn .uch, .league .uteam.red .uplayer.turn .uch { animation: none; }

@@ -374,6 +374,7 @@ function rerenderTile(id) {
   if (!cfg || !cfg.show) return;
   const old = tilesView.querySelector(`.tile.${id}`);
   const fresh = TILE[id](Math.max(1, Math.min(3, cfg.size || 2)));
+  if (old && old.outerHTML === fresh.outerHTML) return;   // nothing changed: don't redraw (no flicker)
   if (old) old.replaceWith(fresh); else renderTiles();
   tick();
   sizeIsland();
