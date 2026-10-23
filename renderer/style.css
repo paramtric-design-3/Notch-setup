@@ -721,3 +721,13 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .rshard.on { box-shadow: 0 0 0 1.5px var(--accent); }
 .league .rshard.on img { opacity: 1; filter: none; }
 .league .rhead .muted b { color: var(--text); font-weight: 600; }
+/* champ select: both sides end on the same line */
+.league.ugg .ugrid { align-items: stretch; }
+.league.ugg .uteams { height: 100%; }
+.league.ugg .uteam { flex: 1; }
+.league.ugg .uplayer { flex: 1; height: auto; min-height: 44px; }
+.league.ugg .upanel { height: 100%; box-sizing: border-box; }
+.league.ugg .ubody { flex: 1; display: flex; flex-direction: column; }
+.league.ugg .ubody > .ucols { flex: 1; }
+.league.ugg .ubody > .uload { flex: 1; }
+.league.ugg .uload > .rpage { flex: 1; }
