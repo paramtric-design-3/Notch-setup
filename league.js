@@ -676,12 +676,22 @@ class League {
     if (!c) return;
     const names = this.opggNames.has(champId) ? [this.opggNames.get(champId)] : nameCandidates(c.name, c.key);
     let data = null, lastErr = null;
-    for (const name of names) {
-      try {
-        const out = await this.opgg.call('lol_get_champion_analysis', { champion: name, position: lane, game_mode: gameMode, lang: 'en_US', desired_output_fields: ['data'] });
-        const d = out && (out.data || out);
-        if (d && (d.summary || d.core_items || d.runes)) { data = d; this.opggNames.set(champId, name); break; }
-      } catch (e) { lastErr = e; }
+    // ARAM/URF have no lanes, but OP.GG only takes some position values there: try them in turn
+    // (and remember the one that works).
+    this.modePos = this.modePos || {};
+    const positions = gameMode === 'ranked' ? [lane]
+      : [...new Set([this.modePos[gameMode], 'all', 'none', POS[this.mainLaneOf(champId)], 'mid', 'adc', 'top', 'jungle', 'support'].filter(Boolean))];
+    outer: for (const pos of positions) {
+      for (const name of names) {
+        try {
+          const out = await this.opgg.call('lol_get_champion_analysis', { champion: name, position: pos, game_mode: gameMode, lang: 'en_US', desired_output_fields: ['data'] });
+          const d = out && (out.data || out);
+          if (d && (d.summary || d.core_items || d.runes)) { data = d; this.opggNames.set(champId, name); if (gameMode !== 'ranked') this.modePos[gameMode] = pos; break outer; }
+        } catch (e) {
+          lastErr = e;
+          if (/position/i.test(e.message)) continue outer;   // this position isn't accepted: next one
+        }
+      }
     }
     if (!data) {
       this.log(`opgg ${c.name}/${lane}: ${lastErr ? lastErr.message : 'no data'}`);
@@ -831,7 +841,13 @@ class League {
       this.game.mine = { champId: cid, pos, mode, gm, mapNo, level: (live.activePlayer && live.activePlayer.level) || meP.level || 1, items: (meP.items || []).map(i => i.itemID).filter(Boolean) };
       if (cid && mode) {
         const bk = `${cid}:${pos}:${mode}`;
-        if (this.gameBuildKey !== bk) { this.gameBuildKey = bk; this.loadAnalysis(cid, pos, true, mode).then(() => this.emit()); }
+        const gb = this.gameBuild();
+        const retry = gb && gb.failed && Date.now() - (this.gameBuildAt || 0) > 2 * 60 * 1000;
+        if (this.gameBuildKey !== bk || retry) {
+          this.gameBuildKey = bk; this.gameBuildAt = Date.now();
+          if (retry) { const lane = mode !== 'ranked' ? 'none' : (POS[pos] || 'none'); this.analysis.delete(mode === 'ranked' ? `${cid}:${lane}` : `${cid}:${lane}:${mode}`); }
+          this.loadAnalysis(cid, pos, true, mode).then(() => this.emit());
+        }
       }
     }
     this.game.players = live.allPlayers.map(p => {
