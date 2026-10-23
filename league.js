@@ -723,6 +723,45 @@ class League {
     this.loadIcons([...keys, ...[...a.starter, ...a.boots, ...a.core].map(i => 'item:' + i), ...a.spells.map(i => 'spell:' + i),
       ...(r ? ['rune:' + r.primary, 'rune:' + r.secondary, ...r.perkIds.slice(0, 6).map(x => 'rune:' + x)] : [])]);
     if (this.cs) { this.cs.opgg = this.opggView(a); this.emit(); }
+    if (r && !r.tree) this.attachRuneTree(r).then(() => { if (this.cs && this.csOpgg === a) { this.cs.opgg = this.opggView(a); this.emit(); } });
+  }
+
+  // Every row of both rune trees (Riot's runesReforged), so the page can be drawn like the client:
+  // all choices, the picked ones lit.
+  async attachRuneTree(r) {
+    try {
+      if (!this.ddVersion) return;
+      const d = await this.ddJson('runesReforged.json');
+      const style = id => (d || []).find(x => x.id === id);
+      const p = style(r.primary), sc = style(r.secondary);
+      if (!p || !sc) return;
+      const rows = st => (st.slots || []).map(sl => (sl.runes || []).map(x => ({ id: x.id, name: x.name })));
+      r.tree = { primary: rows(p), secondary: rows(sc).slice(1) };
+      r.shardRows = [[5008, 5005, 5007], [5008, 5010, 5001], [5011, 5013, 5001]];
+      this.loadIcons([...r.tree.primary.flat(), ...r.tree.secondary.flat()].map(x => 'rune:' + x.id));
+      this.loadShardIcons([...new Set(r.shardRows.flat())]);
+    } catch (e) { this.log('rune tree: ' + e.message); }
+  }
+  // Stat shard icons aren't on Data Dragon: from the client, or CommunityDragon.
+  async loadShardIcons(ids) {
+    const FILE = { 5008: 'StatModsAdaptiveForceIcon', 5005: 'StatModsAttackSpeedIcon', 5007: 'StatModsCDRScalingIcon', 5010: 'StatModsMovementSpeedIcon', 5001: 'StatModsHealthPlusIcon', 5011: 'StatModsHealthScalingIcon', 5013: 'StatModsTenacityIcon' };
+    for (const id of ids) {
+      const k = 'shard:' + id;
+      if (this.icons.has(k) || !FILE[id]) continue;
+      this.icons.set(k, null);
+      const dir = path.join(this.cacheDir, 'shards'), file = path.join(dir, `${id}.png`);
+      let buf = null;
+      try { buf = fs.readFileSync(file); } catch {
+        if (this.lcu) buf = await this.lcuBinary(`/lol-game-data/assets/v1/perk-images/StatMods/${FILE[id]}.png`).catch(() => null);
+        if (!buf) {
+          const res = await this.fetch(`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/statmods/${FILE[id].toLowerCase()}.png`).catch(() => null);
+          if (res && res.ok) buf = Buffer.from(await res.arrayBuffer());
+        }
+        if (buf) { try { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(file, buf); } catch { /* ignore */ } }
+      }
+      if (buf) { this.icons.set(k, 'data:image/png;base64,' + buf.toString('base64')); this.emit(); }
+      else this.icons.delete(k);
+    }
   }
 
   opggView(a) {

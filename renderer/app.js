@@ -522,17 +522,24 @@ function opggUrl(champ, lane) {
 }
 // OP.GG's build for the champion you hover or lock: counters, items, skills.
 const SHARDS = { 5001: 'Health scaling', 5002: 'Armor', 5003: 'Magic resist', 5005: 'Attack speed', 5007: 'Ability haste', 5008: 'Adaptive force', 5010: 'Move speed', 5011: 'Health', 5013: 'Tenacity & slow resist' };
-// The full rune page OP.GG suggests (the one Import runes creates).
+// The full rune page OP.GG suggests (the one Import runes creates), drawn like the client:
+// every choice in each row, the picked ones lit, the rest greyed out.
 function runePage(r) {
   if (!r || !r.perkIds || r.perkIds.length < 6) return '';
-  const ids = r.perkIds, names = r.names || [];
-  const rune = (i, cls = '') => `<span class="rpk ${cls}">${imgIcon('rune:' + ids[i], names[i] || '')}<span class="ellipsis">${esc(names[i] || '')}</span></span>`;
-  const shards = ids.slice(6, 9).map(x => `<span class="rshard">${esc(SHARDS[x] || 'Shard ' + x)}</span>`).join('');
+  const picked = new Set(r.perkIds.slice(0, 6));
+  const shards = r.perkIds.slice(6, 9);
+  const names = {};
+  for (const row of [...((r.tree && r.tree.primary) || []), ...((r.tree && r.tree.secondary) || [])]) for (const x of row) names[x.id] = x.name;
+  const dot = (id, on, big) => `<span class="rdot ${on ? 'on' : ''} ${big ? 'big' : ''}" title="${esc(names[id] || '')}">${LICON['rune:' + id] ? `<img src="${LICON['rune:' + id]}" alt="">` : ''}</span>`;
+  const row = (list, big) => `<div class="rrow">${list.map(x => dot(x.id, picked.has(x.id), big)).join('')}</div>`;
+  const head = (id, name) => `<div class="rstyle">${imgIcon('rune:' + id, name)}<b>${esc(name)}</b></div>`;
+  if (!r.tree) return `<div class="rpage"><div class="rhead"><span class="olabel">Rune page</span><span class="muted">Loading…</span></div></div>`;
+  const shardRow = (opts, i) => `<div class="rrow shards">${opts.map(id => `<span class="rshard ${shards[i] === id ? 'on' : ''}" title="${esc(SHARDS[id] || '')}">${LICON['shard:' + id] ? `<img src="${LICON['shard:' + id]}" alt="">` : ''}</span>`).join('')}</div>`;
   return `<div class="rpage">
-    <div class="rhead"><span class="olabel">Rune page</span><span class="muted">OP.GG's most played${r.winRate ? ' · ' + pct0(r.winRate) + ' win' : ''}</span></div>
+    <div class="rhead"><span class="olabel">Rune page</span><span class="muted">OP.GG's most played${r.winRate ? ' · ' + pct0(r.winRate) + ' win' : ''} · <b>${esc(r.keystone)}</b></span></div>
     <div class="rtrees">
-      <div class="rtree"><div class="rstyle">${imgIcon('rune:' + r.primary, r.primaryName)}<b>${esc(r.primaryName)}</b></div>${rune(0, 'key')}<div class="rminor">${rune(1)}${rune(2)}${rune(3)}</div></div>
-      <div class="rtree"><div class="rstyle">${imgIcon('rune:' + r.secondary, r.secondaryName)}<b>${esc(r.secondaryName)}</b></div>${rune(4)}${rune(5)}${shards ? `<div class="rshards">${shards}</div>` : ''}</div>
+      <div class="rtree">${head(r.primary, r.primaryName)}${row(r.tree.primary[0] || [], true)}<i class="rline"></i>${r.tree.primary.slice(1).map(x => row(x)).join('')}</div>
+      <div class="rtree">${head(r.secondary, r.secondaryName)}${r.tree.secondary.map(x => row(x)).join('')}<i class="rline"></i>${(r.shardRows || []).map(shardRow).join('')}</div>
     </div>
   </div>`;
 }
@@ -544,7 +551,6 @@ function opggBlock(o, me) {
   return `<div class="opgg">
     <div class="orow">${tierPill(o.tier)}<span><b>${pct(o.winRate)}</b> win · ${pct(o.pickRate)} pick · ${pct(o.banRate)} ban</span><span class="muted osrc">OP.GG · ranked</span></div>
     <div class="orow"><span class="olabel">Build</span>${o.spells.map(i => imgIcon('spell:' + i, 'Summoner spell')).join('')}<span class="osep"></span>${items(o.starter, 'Start')}<span class="oarrow">›</span>${items(o.boots, 'Boots')}<span class="oarrow">›</span>${items(o.core, 'Core')}</div>
-    ${o.maxOrder.length || o.skills.length ? `<div class="orow"><span class="olabel">Skills</span><span class="omax">${o.maxOrder.map(k => `<i>${esc(k)}</i>`).join('<span class="oarrow">›</span>')}</span><span class="oskills">${o.skills.map(k => `<i class="${k === 'R' ? 'r' : ''}">${esc(k)}</i>`).join('')}</span></div>` : ''}
     ${o.counters.length ? `<div class="orow"><span class="olabel">Counters</span>${cw(o.counters, 'cold')}</div>` : ''}
     ${o.goodVs.length ? `<div class="orow"><span class="olabel">Good vs</span>${cw(o.goodVs, 'hot')}</div>` : ''}
   </div>`;
