@@ -261,10 +261,15 @@ function toIsland(channel, data) {
 // buy and the rest of your build. Clicks go through it.
 let overlay = null;
 let overlayData = null;
+let gameWin = null;              // the League game window (from the helper), or 'min' while minimized
+let overlayWhy = '';
+function overlayLog(why) { if (why !== overlayWhy) { overlayWhy = why; helperLog('overlay: ' + why); } }
 const OVERLAY_W = 300, OVERLAY_H = 150;
 function overlayBounds() {
-  const d = screen.getPrimaryDisplay();
-  const b = d.bounds, s = b.height / 1080;
+  // On top of the game window when we know where it is (any monitor, windowed or borderless),
+  // else the main screen.
+  const b = gameWin && gameWin !== 'min' && gameWin.width > 200 ? gameWin : screen.getPrimaryDisplay().bounds;
+  const s = b.height / 1080;
   const place = (settings.overlay && settings.overlay.place) || 'minimap';
   if (place === 'top') return { x: b.x + b.width - OVERLAY_W - 16, y: b.y + Math.round(90 * s), width: OVERLAY_W, height: OVERLAY_H };
   if (place === 'left') return { x: b.x + 16, y: b.y + Math.round(b.height * 0.42), width: OVERLAY_W, height: OVERLAY_H };
@@ -275,8 +280,16 @@ function updateOverlay(d) {
   if (d) overlayData = d;
   const L = overlayData;
   const b = L && L.game && L.game.build;
-  const want = settings.overlay && settings.overlay.show !== false && b && !b.loading && !b.failed && L.phase === 'InProgress';
-  if (!want) { if (overlay && !overlay.isDestroyed() && overlay.isVisible()) overlay.hide(); return; }
+  const why = !(settings.overlay && settings.overlay.show !== false) ? 'off in settings'
+    : !L || L.phase !== 'InProgress' ? `not in game (${(L && L.phase) || 'no client'})`
+    : !(L.game) ? 'in game, waiting for the game data (port 2999)'
+    : !b ? 'in game, champion not found in the game data'
+    : b.loading ? 'in game, loading the OP.GG build'
+    : b.failed ? 'in game, OP.GG has no build for this champion'
+    : gameWin === 'min' ? 'game minimized' : '';
+  if (why) { overlayLog('hidden: ' + why); if (overlay && !overlay.isDestroyed() && overlay.isVisible()) overlay.hide(); return; }
+  const bb = overlayBounds();
+  overlayLog(`shown at ${bb.x},${bb.y} (${gameWin && gameWin !== 'min' ? `game window ${gameWin.width}x${gameWin.height} at ${gameWin.x},${gameWin.y}` : 'main screen, game window not found'})`);
   if (!overlay || overlay.isDestroyed()) {
     overlay = new BrowserWindow({
       ...overlayBounds(), frame: false, transparent: true, backgroundColor: '#00000000', resizable: false, movable: false,
@@ -445,6 +458,17 @@ async function onHelperMessage(m) {
       if (!settings.peeks.apps) break;
       for (const a of (m.data.opened || []).slice(0, 2)) peekApp(a, 'opened');
       for (const a of (m.data.closed || []).slice(0, 2)) peekApp(a, 'closed');
+      break;
+    }
+    case 'lolwin': {
+      const g = m.data || {};
+      if (g.none) gameWin = g.minimized ? 'min' : null;
+      else {
+        let r = { x: g.x, y: g.y, width: g.w, height: g.h };
+        try { if (process.platform === 'win32') r = screen.screenToDipRect(null, r); } catch { /* keep physical */ }
+        gameWin = r;
+      }
+      updateOverlay();
       break;
     }
     case 'lcu': league && league.setClient(m.data && m.data.port ? { port: m.data.port, token: m.data.token } : null); break;

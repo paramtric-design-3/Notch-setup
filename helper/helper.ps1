@@ -39,6 +39,20 @@ public static class NotchNative {
         keybd_event(0x5B, 0, 0, UIntPtr.Zero);
         keybd_event(0x5B, 0, 2, UIntPtr.Zero);
     }
+    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string title);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+    // The League game window (not the client): "League of Legends (TM) Client", class RiotWindowClass.
+    public static string GameWindow() {
+        IntPtr h = FindWindow("RiotWindowClass", null);
+        if (h == IntPtr.Zero) h = FindWindow(null, "League of Legends (TM) Client");
+        if (h == IntPtr.Zero || !IsWindowVisible(h)) return "";
+        if (IsIconic(h)) return "min";
+        RECT r; if (!GetWindowRect(h, out r)) return "";
+        return r.Left + "," + r.Top + "," + (r.Right - r.Left) + "," + (r.Bottom - r.Top);
+    }
     public static void BroadcastTheme() {
         UIntPtr r;
         SendMessageTimeout((IntPtr)0xffff, 0x1A, UIntPtr.Zero, "ImmersiveColorSet", 2, 200, out r);
@@ -378,6 +392,14 @@ function Poll-League {
         $port = [regex]::Match($p.CommandLine, '--app-port=(\d+)').Groups[1].Value
         $token = [regex]::Match($p.CommandLine, '--remoting-auth-token=([\w-]+)').Groups[1].Value
         if ($port -and $token) { $info = "$port|$token" }
+    }
+    # the game window, for the in-game overlay
+    $gw = ''
+    try { $gw = [NotchNative]::GameWindow() } catch { }
+    if ($gw -ne $script:lastGameWin) {
+        $script:lastGameWin = $gw
+        if ($gw -and $gw -ne 'min') { $g = $gw -split ','; Emit 'lolwin' ([ordered]@{ x = [int]$g[0]; y = [int]$g[1]; w = [int]$g[2]; h = [int]$g[3] }) }
+        else { Emit 'lolwin' ([ordered]@{ none = $true; minimized = ($gw -eq 'min') }) }
     }
     if ($info -ne $script:lastLcu) {
         $script:lastLcu = $info
