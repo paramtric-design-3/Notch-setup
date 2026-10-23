@@ -492,7 +492,6 @@ function gameBuild(b) {
   return `<div class="gbuild">
     ${title}
     <span class="gitems"><span class="glabel">Start</span>${b.starter.map(id => `<span class="gitem start">${imgIcon('item:' + id, 'Start')}</span>`).join('')}<span class="oarrow">›</span>${b.boots.map(id => item(id, 'Boots')).join('')}${b.core.map(id => item(id, 'Core')).join('')}${b.later.length ? `<span class="oarrow">›</span>${b.later.map(id => item(id, 'Later')).join('')}` : ''}</span>
-    <span class="gskills">${b.maxOrder.length ? `<span class="omax">${b.maxOrder.map(k => `<i>${esc(k)}</i>`).join('<span class="oarrow">›</span>')}</span>` : ''}<span class="oskills">${skills}</span></span>
     ${b.runes ? `<span class="grunes">${imgIcon('rune:' + b.runes.keystoneId, b.runes.keystone)}<b>${esc(b.runes.keystone)}</b>${imgIcon('rune:' + b.runes.secondary, b.runes.secondaryName)}</span>` : ''}
   </div>`;
 }

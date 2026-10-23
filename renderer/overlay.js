@@ -22,7 +22,7 @@ window.notch.on('overlay', p => {
       : '<div class="next done"><div class="nl"><small>Build</small><b>Full build done ✓</b></div></div>'}
     <div class="path">${path.map((id, i) => `${i === b.boots.length && b.boots.length ? '<span class="sep">›</span>' : ''}${i === b.boots.length + b.core.length && b.later.length ? '<span class="sep">›</span>' : ''}<span class="it ${got.has(id) ? 'own' : ''} ${id === next ? 'nx' : ''}" title="${esc(names[id] || '')}">${img(id)}</span>`).join('')}</div>
     <span class="grip" title="Drag to move"><i></i></span>
-    <div class="meta">${nextSkill && lvl < 18 ? `Level ${lvl + 1}: <i>${esc(nextSkill)}</i>` : ''}${b.maxOrder && b.maxOrder.length ? `<span>Max ${b.maxOrder.map(esc).join(' › ')}</span>` : ''}<span>· OP.GG</span></div>`;
+    <div class="meta"><span>OP.GG</span></div>`;
 });
 
 // Grip: hovering it makes the overlay take the mouse (everything else stays click-through), and
