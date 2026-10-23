@@ -1,4 +1,4 @@
-// FJBC Notch — island renderer.
+// WALL-E — island renderer.
 'use strict';
 
 const api = window.notch;

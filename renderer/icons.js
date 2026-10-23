@@ -1,4 +1,4 @@
-// Small line icons (currentColor). Drawn for FJBC Notch.
+// Small line icons (currentColor). Drawn for WALL-E.
 'use strict';
 const I = (() => {
   const s = (d, vb = 24, extra = '') =>

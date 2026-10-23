@@ -1,4 +1,4 @@
-// FJBC Notch — League of Legends mode.
+// WALL-E — League of Legends mode.
 // Talks only to the League client on this PC (its local API, the same one tools like
 // Porofessor use) and to the game's live data while a match runs. No Riot account key.
 // Ranks are looked up once the game is loading, never in champ select (Riot doesn't allow
@@ -495,17 +495,17 @@ class League {
     } catch (e) { this.log('league runes: ' + e.message); }
   }
 
-  // Create (or update) a rune page named "Notch: <champion>" and make it current.
+  // Create (or update) a rune page named "WALL-E: <champion>" and make it current.
   // OP.GG's most played page (all 9 choices) is used when it's there, else Riot's recommendation.
   async importRunes() {
     const o = this.csOpgg && this.csOpgg.runes;
     const r = o && o.perkIds.length === 9 ? o : this.csRunes;
     const me = this.cs && this.cs.me;
     if (!r || !me || r.perkIds.length < 6) return { ok: false, error: 'No recommended runes yet' };
-    const body = { name: `Notch: ${me.name}`, primaryStyleId: r.primary, subStyleId: r.secondary, selectedPerkIds: r.perkIds, current: true };
+    const body = { name: `WALL-E: ${me.name}`, primaryStyleId: r.primary, subStyleId: r.secondary, selectedPerkIds: r.perkIds, current: true };
     try {
       const pages = (await this.lcuGet('/lol-perks/v1/pages')) || [];
-      const ours = pages.find(p => /^Notch:/.test(p.name || '') && p.isEditable);
+      const ours = pages.find(p => /^(Notch|WALL-E):/.test(p.name || '') && p.isEditable);
       if (ours) await this.lcuSend('DELETE', `/lol-perks/v1/pages/${ours.id}`);
       try { await this.lcuSend('POST', '/lol-perks/v1/pages', body); } catch (e) {
         if (!/max pages|400/i.test(e.message)) throw e;

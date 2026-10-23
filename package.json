@@ -1,6 +1,6 @@
 {
   "name": "fjbc-notch",
-  "version": "1.40.3",
+  "version": "1.41.0",
   "description": "A Dynamic Island for Windows",
   "main": "main.js",
   "scripts": {
@@ -15,7 +15,7 @@
     "electron": "^44.9.0",
     "electron-builder": "^26.15.3"
   },
-  "productName": "FJBC Notch",
+  "productName": "WALL-E",
   "dependencies": {
     "electron-updater": "^6.8.9"
   },
@@ -25,7 +25,7 @@
   },
   "build": {
     "appId": "com.fjbc.notch",
-    "productName": "FJBC Notch",
+    "productName": "WALL-E",
     "asar": false,
     "files": [
       "main.js",
@@ -50,7 +50,7 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "artifactName": "FJBC-Notch-Setup-${version}.${ext}"
+      "artifactName": "WALL-E-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -58,8 +58,8 @@
       "runAfterFinish": true,
       "createDesktopShortcut": false,
       "createStartMenuShortcut": true,
-      "shortcutName": "FJBC Notch",
-      "uninstallDisplayName": "FJBC Notch",
+      "shortcutName": "WALL-E",
+      "uninstallDisplayName": "WALL-E",
       "deleteAppDataOnUninstall": false
     },
     "publish": [

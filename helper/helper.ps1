@@ -411,7 +411,7 @@ function Poll-League {
 # ------------------------------------------------------------------ apps opening and closing
 $script:apps = @{}
 $script:ignore = @('ApplicationFrameHost', 'TextInputHost', 'explorer', 'SearchHost', 'StartMenuExperienceHost',
-    'ShellExperienceHost', 'LockApp', 'SystemSettingsBroker', 'FJBC Notch', 'powershell', 'conhost', 'dwm', 'Widgets')
+    'ShellExperienceHost', 'LockApp', 'SystemSettingsBroker', 'FJBC Notch', 'WALL-E', 'powershell', 'conhost', 'dwm', 'Widgets')
 
 function Poll-Apps {
     $now = @{}

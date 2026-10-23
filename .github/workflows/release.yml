@@ -61,11 +61,11 @@ jobs:
         shell: pwsh
         run: |
           $v = "${{ steps.check.outputs.version }}"
-          $files = @("dist/FJBC-Notch-Setup-$v.exe", "dist/FJBC-Notch-Setup-$v.exe.blockmap", "dist/latest.yml")
+          $files = @("dist/WALL-E-Setup-$v.exe", "dist/WALL-E-Setup-$v.exe.blockmap", "dist/latest.yml")
           foreach ($f in $files) { if (-not (Test-Path $f)) { Write-Host "::error::Missing $f"; exit 1 } }
           gh release view "v$v" --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -ne 0) {
-            $out = gh release create "v$v" @files --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "FJBC Notch $v" --notes "Download **FJBC-Notch-Setup-$v.exe** below and run it. Installed copies update themselves." 2>&1
+            $out = gh release create "v$v" @files --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "WALL-E $v" --notes "Download **WALL-E-Setup-$v.exe** below and run it. Installed copies update themselves." 2>&1
           } else {
             $out = gh release upload "v$v" @files --repo "${{ github.repository }}" --clobber 2>&1
           }

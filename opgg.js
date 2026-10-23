@@ -1,4 +1,4 @@
-// FJBC Notch — OP.GG open champion data (https://mcp-api.op.gg/mcp).
+// WALL-E — OP.GG open champion data (https://mcp-api.op.gg/mcp).
 // OP.GG publishes counters, builds, runes and lane tier lists through an open MCP endpoint
 // (no key). Answers come in a compact "class notation":
 //   class Foo: a,b,c
@@ -118,7 +118,7 @@ class Opgg {
     if (!this.ready) {
       this.ready = (async () => {
         this.session = null;
-        await this.rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'fjbc-notch', version: '1' } });
+        await this.rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'wall-e', version: '1' } });
         await this.rpc('notifications/initialized', {}, true);
       })().catch(e => { this.ready = null; throw e; });
     }

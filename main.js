@@ -1,4 +1,4 @@
-// FJBC Notch — a Dynamic Island for Windows.
+// WALL-E — a Dynamic Island for Windows.
 // Main process: island window, tray menu, settings, Windows helper, weather,
 // lyrics, messages and calendar.
 'use strict';
@@ -17,6 +17,10 @@ const { League } = require('./league');
 // The window is sized to the island itself (the renderer reports its size), so it
 // catches clicks normally and never covers the apps around it.
 let winSize = { w: 240, h: 40 };
+
+// The app is called WALL-E now, but keeps its old data folder (%APPDATA%\FJBC Notch): your
+// settings, caches and log stay where they are.
+app.setPath('userData', path.join(app.getPath('appData'), 'FJBC Notch'));
 
 // ---------------------------------------------------------------- single instance
 if (!app.requestSingleInstanceLock()) { app.quit(); }
@@ -236,7 +240,7 @@ function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
   settingsWin = new BrowserWindow({
     width: 520, height: 720, minWidth: 460, minHeight: 520,
-    title: 'FJBC Notch settings',
+    title: 'WALL-E settings',
     backgroundColor: settings.theme === 'dark' ? '#111111' : '#F7F8FA',
     autoHideMenuBar: true,
     icon: trayImage(),
@@ -370,7 +374,7 @@ const TILE_NAMES = {
 function buildTrayMenu() {
   if (!tray) return;
   const menu = Menu.buildFromTemplate([
-    { label: `FJBC Notch ${app.getVersion()}`, enabled: false },
+    { label: `WALL-E ${app.getVersion()}`, enabled: false },
     { type: 'separator' },
     {
       label: 'Tiles', submenu: settings.tiles.map(t => ({
@@ -415,7 +419,7 @@ function buildTrayMenu() {
 
 function createTray() {
   tray = new Tray(trayImage());
-  tray.setToolTip('FJBC Notch');
+  tray.setToolTip('WALL-E');
   tray.on('click', openSettings);
   buildTrayMenu();
 }
@@ -529,7 +533,7 @@ async function getJSON(url, timeoutMs = 10000) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { signal: ctl.signal, headers: { 'User-Agent': 'FJBC-Notch/1.0 (personal desktop app)' } });
+    const r = await fetch(url, { signal: ctl.signal, headers: { 'User-Agent': 'WALL-E/1.0 (personal desktop app)' } });
     if (r.status === 404) return null;
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.json();
@@ -609,7 +613,7 @@ async function lookupCover(m) {
       || results.find(x => a && norm(x.artistName).includes(a) && m.album && norm(x.collectionName) === norm(m.album));
     if (!pick || !pick.artworkUrl100) { fs.writeFileSync(miss, ''); return null; }
     const url = pick.artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.');
-    const res = await fetch(url, { headers: { 'User-Agent': 'FJBC-Notch/1.0' } });
+    const res = await fetch(url, { headers: { 'User-Agent': 'WALL-E/1.0' } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const buf = Buffer.from(await res.arrayBuffer());
     fs.writeFileSync(img, buf);
@@ -791,7 +795,7 @@ async function refreshCalendar() {
   const url = (settings.calendarUrl || '').trim().replace(/^webcal:/i, 'https:');
   if (!url) { toIsland('calendar', { error: 'Add a calendar link in Settings' }); return; }
   try {
-    const r = await fetch(url, { headers: { 'User-Agent': 'FJBC-Notch/1.0' } });
+    const r = await fetch(url, { headers: { 'User-Agent': 'WALL-E/1.0' } });
     const txt = await r.text();
     const now = Date.now();
     const next = parseIcs(txt).filter(e => e.start >= now - 15 * 60000).sort((a, b) => a.start - b.start)[0];
@@ -835,7 +839,7 @@ function setupUpdater() {
     if (pct !== update.percent) setUpdate({ percent: pct });
   });
   autoUpdater.on('update-not-available', () => {
-    if (update.manual) toIsland('peek', { kind: 'update', title: 'FJBC Notch is up to date', sub: `Version ${app.getVersion()}` });
+    if (update.manual) toIsland('peek', { kind: 'update', title: 'WALL-E is up to date', sub: `Version ${app.getVersion()}` });
     setUpdate({ state: 'idle', manual: false });
   });
   autoUpdater.on('update-downloaded', info => {
@@ -929,9 +933,9 @@ app.whenReady().then(() => {
   // League of Legends: the helper reports the client; tests can pass NOTCH_LCU=port:token.
   league = new League({
     send: d => {
-      if (d.type === 'game-start') toIsland('peek', { kind: 'league', title: 'Game loading', sub: d.queue ? `${d.queue} · ranks in the notch` : 'Ranks in the notch', ms: 4000 });
-      else if (d.type === 'cs-start') toIsland('peek', { kind: 'league', title: 'Champ select', sub: 'Runes, your stats and the draft are in the notch', ms: 4000 });
-      else if (d.type === 'cs-counter') toIsland('peek', { kind: 'league', title: `Counter picks vs ${d.name}`, sub: `${d.role ? d.role + ' · ' : ''}head-to-head win rates in the notch`, ms: 4000 });
+      if (d.type === 'game-start') toIsland('peek', { kind: 'league', title: 'Game loading', sub: d.queue ? `${d.queue} · ranks in WALL-E` : 'Ranks in WALL-E', ms: 4000 });
+      else if (d.type === 'cs-start') toIsland('peek', { kind: 'league', title: 'Champ select', sub: 'Runes, your stats and the draft are in WALL-E', ms: 4000 });
+      else if (d.type === 'cs-counter') toIsland('peek', { kind: 'league', title: `Counter picks vs ${d.name}`, sub: `${d.role ? d.role + ' · ' : ''}head-to-head win rates in WALL-E`, ms: 4000 });
       else { updateOverlay(d); state.league = { ...d, icons: { ...((state.league && state.league.icons) || {}), ...(d.icons || {}) } }; toIsland('league', d); }
     },
     log: helperLog,
