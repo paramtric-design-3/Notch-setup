@@ -222,6 +222,27 @@ const TILE = {
     return t;
   },
 
+  shelf(size) {
+    const t = el('div', `tile shelf w${size}`);
+    const list = D.shelf || [];
+    if (!list.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.download}</div>${size > 1 ? 'Drop files or folders here to hold them' : 'Drop here'}</div>`; return t; }
+    if (size === 1) {
+      t.innerHTML = `<div class="shfile solo" draggable="true" data-shelfall title="Drag out all ${list.length}">${list[0].icon ? `<img src="${list[0].icon}" alt="">` : I.download}${list.length > 1 ? `<span class="badge">${list.length}</span>` : ''}</div>`;
+      return t;
+    }
+    const shown = list.slice().reverse();   // newest first, one row you can scroll
+    t.innerHTML = `
+      <div class="shhead"><span class="muted">${list.length} held · drag out to a folder</span>
+        <span class="shact">${list.length > 1 ? `<span class="shall" draggable="true" data-shelfall title="Drag all ${list.length} out">All ${list.length}</span>` : ''}<button class="shclear" data-shelfclear title="Clear the shelf">Clear</button></span></div>
+      <div class="shlist">${shown.map(x => `
+        <div class="shfile" draggable="true" data-shelfid="${esc(x.id)}" title="${esc(x.path)}&#10;Drag out to copy or move · double-click to show in its folder">
+          ${x.icon ? `<img src="${x.icon}" alt="">` : `<span class="shph">${x.dir ? 'DIR' : 'FILE'}</span>`}
+          <span class="shname ellipsis">${esc(x.name)}</span>
+          <button class="shx" data-shelfx="${esc(x.id)}" title="Remove from the shelf">×</button>
+        </div>`).join('')}</div>`;
+    return t;
+  },
+
   messages(size) {
     const t = el('div', `tile messages w${size}`);
     const m = D.messages;
@@ -390,6 +411,8 @@ tilesView.addEventListener('click', async e => {
   }
   if (b.dataset.url) { api.send('open-url', b.dataset.url); return; }
   if (b.dataset.cstab) { D.csTab = b.dataset.cstab; rerenderTile('league'); return; }
+  if (b.dataset.shelfx) { D.shelf = await api.invoke('shelf-remove', b.dataset.shelfx); rerenderTile('shelf'); return; }
+  if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); rerenderTile('shelf'); return; }
   if (b.dataset.tierlane) { D.tierLane = b.dataset.tierlane; rerenderTile('league'); return; }
   if (b.dataset.import !== undefined) {
     b.disabled = true; b.textContent = 'Importing…';
@@ -423,6 +446,43 @@ tilesView.addEventListener('click', async e => {
   if (b.dataset.timer === 'toggle') timerToggle();
   if (b.dataset.timer === 'reset') timerReset();
 });
+// Shelf: drag a held file out (Windows does the copy or move), double-click shows it in its folder.
+tilesView.addEventListener('dragstart', e => {
+  const one = e.target.closest('[data-shelfid]'), all = e.target.closest('[data-shelfall]');
+  if (!one && !all) return;
+  e.preventDefault();
+  api.send('shelf-drag', all ? (D.shelf || []).map(x => x.id) : [one.dataset.shelfid]);
+});
+tilesView.addEventListener('wheel', e => {
+  const row = e.target.closest('.shlist');
+  if (row && row.scrollWidth > row.clientWidth) { e.preventDefault(); row.scrollLeft += e.deltaY || e.deltaX; }
+}, { passive: false });
+tilesView.addEventListener('dblclick', e => { const one = e.target.closest('[data-shelfid]'); if (one) api.send('shelf-open', one.dataset.shelfid); });
+// Dropping files on WALL-E: it opens while you drag over it, and holds what you drop.
+const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+let dropDepth = 0;
+const shelfOn = () => D.settings && D.settings.tiles.some(t => t.id === 'shelf' && t.show);
+document.addEventListener('dragenter', e => {
+  if (!hasFiles(e) || !shelfOn()) return;
+  dropDepth++;
+  document.body.classList.add('dropping');
+  hovering = true; clearTimeout(leaveTimer);
+  if (state !== 'open') setState('open');
+});
+document.addEventListener('dragover', e => { if (hasFiles(e) && shelfOn()) { e.preventDefault(); e.dataTransfer.dropEffect = 'link'; } });
+document.addEventListener('dragleave', e => {
+  if (!hasFiles(e)) return;
+  dropDepth = Math.max(0, dropDepth - 1);
+  if (!dropDepth) { document.body.classList.remove('dropping'); pointerLeave(); }
+});
+document.addEventListener('drop', async e => {
+  if (!hasFiles(e) || !shelfOn()) return;
+  e.preventDefault();
+  dropDepth = 0; document.body.classList.remove('dropping');
+  const paths = [...e.dataTransfer.files].map(f => api.pathFor ? api.pathFor(f) : '').filter(Boolean);
+  if (paths.length) { D.shelf = await api.invoke('shelf-add', paths).catch(() => D.shelf); rerenderTile('shelf'); }
+});
+
 tilesView.addEventListener('wheel', e => {
   const b = e.target.closest('[data-q="vol"], [data-q="bright"]');
   if (!b) return;
@@ -877,6 +937,7 @@ api.on('peek', p => {
   else peek(p);
 });
 
+api.on('shelf', list => { D.shelf = list || []; rerenderTile('shelf'); });
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
 api.on('league', L => {
   const wideBefore = leagueWide();
@@ -901,7 +962,7 @@ api.on('league', L => {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();

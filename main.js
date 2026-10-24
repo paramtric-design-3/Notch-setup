@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
     { id: 'controls', show: true, size: 2 },
     { id: 'timer', show: false, size: 2 },
     { id: 'league', show: true, size: 3 },
+    { id: 'shelf', show: true, size: 2 },
   ],
 };
 
@@ -368,7 +369,7 @@ function trayImage() {
 
 const TILE_NAMES = {
   league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages',
-  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer',
+  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf',
 };
 
 function buildTrayMenu() {
@@ -911,7 +912,44 @@ ipcMain.on('open-url', (_e, url) => { if (/^https?:\/\//.test(url)) shell.openEx
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSettingsWindow: true }); return settings; });
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
-ipcMain.handle('initial-state', () => ({ settings, state }));
+ipcMain.handle('initial-state', () => ({ settings, state: { ...state, shelf } }));
+
+// ---------------------------------------------------------------- shelf
+// Drop files or folders on WALL-E to hold them for a while, then drag them out to another folder
+// or app. Only the paths are kept (nothing is copied); the list survives restarts.
+let shelf = [];
+const shelfFile = () => path.join(app.getPath('userData'), 'shelf.json');
+function saveShelf() { try { fs.writeFileSync(shelfFile(), JSON.stringify(shelf.map(({ icon, ...x }) => x))); } catch { /* ignore */ } }
+function sendShelf() { toIsland('shelf', shelf); }
+async function shelfIcon(p) { try { return (await app.getFileIcon(p, { size: 'normal' })).toDataURL(); } catch { return ''; } }
+async function loadShelf() {
+  try {
+    const list = JSON.parse(fs.readFileSync(shelfFile(), 'utf8'));
+    shelf = [];
+    for (const x of list) if (x && x.path && fs.existsSync(x.path)) shelf.push({ ...x, icon: await shelfIcon(x.path) });
+  } catch { shelf = []; }
+  sendShelf();
+}
+ipcMain.handle('shelf-add', async (_e, paths) => {
+  for (const p of (Array.isArray(paths) ? paths : []).slice(0, 50)) {
+    if (typeof p !== 'string' || !p || shelf.some(x => x.path === p)) continue;
+    let st; try { st = fs.statSync(p); } catch { continue; }
+    shelf.push({ id: crypto.randomUUID(), path: p, name: path.basename(p) || p, dir: st.isDirectory(), size: st.isDirectory() ? 0 : st.size, icon: await shelfIcon(p) });
+  }
+  saveShelf(); sendShelf();
+  return shelf;
+});
+ipcMain.handle('shelf-remove', (_e, id) => { shelf = shelf.filter(x => x.id !== id); saveShelf(); sendShelf(); return shelf; });
+ipcMain.handle('shelf-clear', () => { shelf = []; saveShelf(); sendShelf(); return shelf; });
+// Dragging out: Windows takes over from here (Explorer copies, or moves on the same drive / with Shift).
+ipcMain.on('shelf-drag', (e, ids) => {
+  const items = shelf.filter(x => (ids || []).includes(x.id) && fs.existsSync(x.path));
+  if (!items.length) return;
+  let icon = items[0].icon ? nativeImage.createFromDataURL(items[0].icon) : trayImage();
+  if (icon.isEmpty()) icon = trayImage();
+  e.sender.startDrag({ file: items[0].path, files: items.map(x => x.path), icon });
+});
+ipcMain.on('shelf-open', (_e, id) => { const x = shelf.find(y => y.id === id); if (x) shell.showItemInFolder(x.path); });
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('league-import-runes', () => league ? league.importRunes() : { ok: false, error: 'League is not open' });
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
@@ -925,6 +963,7 @@ let quitting = false;
 
 app.whenReady().then(() => {
   loadSettings();
+  setTimeout(loadShelf, 1500);
   app.setLoginItemSettings({ openAtLogin: !!settings.launchAtLogin });
   createIsland();
   createTray();

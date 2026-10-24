@@ -1,7 +1,7 @@
 'use strict';
 const api = window.notch;
 const $ = s => document.querySelector(s);
-const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer' };
+const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf' };
 let S = null;
 
 const save = async patch => { S = await api.invoke('set-settings', patch); render(); };
