@@ -177,7 +177,7 @@ class League {
       }
       const d = await (await this.fetch(`https://ddragon.leagueoflegends.com/cdn/${this.ddVersion}/data/en_US/champion.json`)).json();
       const map = {};
-      for (const c of Object.values(d.data || {})) map[+c.key] = { key: c.id, name: c.name };
+      for (const c of Object.values(d.data || {})) map[+c.key] = { key: c.id, name: c.name, tags: c.tags || [], info: c.info || {} };
       this.champs = map;
     } catch (e) {
       // Fall back to the client's own list (names only).
@@ -424,9 +424,62 @@ class League {
       names: Object.fromEntries([...a.starter, ...a.boots, ...a.core, ...a.later].map(i => [i, nm[i] || ''])),
       champ, pos: m.pos, mode: m.mode, level: m.level, owned: m.items,
       starter: a.starter, boots: a.boots, core: a.core, later: a.later, skills: a.skills, maxOrder: a.maxOrder,
+      situational: this.situational(m, [...a.core, ...a.later, ...a.boots]),
       runes: a.runes && { keystone: a.runes.keystone, keystoneId: a.runes.keystoneId, primaryName: a.runes.primaryName, secondaryName: a.runes.secondaryName, secondary: a.runes.secondary },
       winRate: a.winRate, tier: a.tier,
     };
+  }
+
+  // Situational items against the enemy team: anti-heal vs healers, magic resist vs mostly magic
+  // damage, armor vs mostly physical, penetration vs tanks, safety vs assassins; picked for your
+  // kind of champion and checked against Riot's item list.
+  situational(m, inBuild) {
+    if (!this.game || !this.champs || !this.itemData) { this.loadItemData(); return []; }
+    const meP = (this.game.players || []).find(p => p.me);
+    if (!meP) return [];
+    const byKey = {};
+    for (const [id, c] of Object.entries(this.champs)) byKey[c.key] = { ...c, id: +id };
+    const enemies = this.game.players.filter(p => p.team !== meP.team).map(p => byKey[p.champKey]).filter(Boolean);
+    if (!enemies.length) return [];
+    const me = this.champs[m.champId] || {};
+    const tags = me.tags || [], info = me.info || {};
+    const cls = tags.includes('Marksman') ? 'adc'
+      : tags[0] === 'Tank' || (tags.includes('Tank') && tags.includes('Support')) ? 'tank'
+      : (info.magic || 0) > (info.attack || 0) ? 'ap'
+      : tags[0] === 'Assassin' ? 'assassin' : tags[0] === 'Support' ? 'ap' : 'fighter';
+    const ap = enemies.filter(e => (e.tags || []).includes('Mage') || (e.info && e.info.magic > e.info.attack));
+    const ad = enemies.filter(e => !ap.includes(e));
+    const tanks = enemies.filter(e => (e.tags || [])[0] === 'Tank' || ((e.tags || []).includes('Tank') && (e.info || {}).defense >= 7));
+    const assassins = enemies.filter(e => (e.tags || [])[0] === 'Assassin');
+    const HEAL = new Set(['Aatrox', 'Soraka', 'Yuumi', 'Sona', 'Nami', 'DrMundo', 'Vladimir', 'Sylas', 'Swain', 'Warwick', 'Fiddlesticks', 'Briar', 'Olaf', 'Volibear', 'Illaoi', 'Trundle', 'Zac', 'Milio', 'Gwen', 'Nasus', 'Belveth', 'Viego', 'Senna', 'Seraphine', 'Renata', 'Taric', 'Maokai', 'Kayn', 'Irelia', 'Udyr', 'Samira', 'Yorick', 'Mordekaiser', 'Fizz']);
+    const healers = enemies.filter(e => HEAL.has(e.key));
+    const names = list => list.slice(0, 3).map(e => e.name).join(', ');
+    const pick = { // per kind of champion: [anti-heal, vs magic, vs physical, vs tanks, vs assassins]
+      adc: [3033, 3091, 3026, 3036, 3026], fighter: [6609, 3065, 6333, 3071, 6053], assassin: [6609, 3156, 6333, 6694, 3026],
+      ap: [3165, 3102, 3157, 3135, 3157], tank: [3075, 4401, 3143, null, null],
+    }[cls];
+    const out = [];
+    const add = (id, why, tag) => {
+      if (!id || out.some(o => o.id === id)) return;
+      const it = this.itemData[id];
+      if (!it || (it.gold && it.gold.purchasable === false) || (it.maps && it.maps[m.mode === 'aram' ? '12' : '11'] === false)) return;
+      out.push({ id, why, tag, inBuild: inBuild.includes(id) });
+    };
+    if (healers.length >= (cls === 'tank' ? 2 : 1)) add(pick[0], `Anti-heal · ${names(healers)}`, 'Anti-heal');
+    if (ap.length >= 3) add(pick[1], `${ap.length} magic damage · ${names(ap)}`, 'Magic resist');
+    if (ad.length >= 4) add(pick[2], `${ad.length} physical damage`, 'Armor');
+    if (tanks.length >= 2 && pick[3]) add(pick[3], `Tanks · ${names(tanks)}`, 'Vs tanks');
+    if (assassins.length >= 2 && pick[4]) add(pick[4], `Assassins · ${names(assassins)}`, 'Safety');
+    if (cls !== 'adc' && cls !== 'ap') add(ap.length >= 3 ? 3111 : ad.length >= 4 ? 3047 : null, ap.length >= 3 ? 'Boots vs magic and crowd control' : 'Boots vs physical damage', 'Boots');
+    const icons = out.map(o => 'item:' + o.id).filter(k => !this.icons.has(k));
+    if (icons.length) this.loadIcons(icons);
+    return out.slice(0, 4).map(o => ({ ...o, name: (this.itemData[o.id] || {}).name || '' }));
+  }
+  loadItemData() {
+    if (this.itemData || this.itemDataLoading || !this.ddVersion) return;
+    this.itemDataLoading = true;
+    this.ddJson('item.json').then(d => { this.itemData = (d && d.data) || {}; this.itemNames = Object.fromEntries(Object.entries(this.itemData).map(([k, v]) => [k, v.name])); this.emit(); })
+      .catch(() => { this.itemDataLoading = false; });
   }
 
   laneWinRate(id, position) {

@@ -21,6 +21,7 @@ window.notch.on('overlay', p => {
     ${next ? `<div class="next">${img(next) || '<span class="ph"></span>'}<div class="nl"><small>Buy next</small><b>${esc(names[next] || 'Item ' + next)}</b></div></div>`
       : '<div class="next done"><div class="nl"><small>Build</small><b>Full build done ✓</b></div></div>'}
     <div class="path">${path.map((id, i) => `${i === b.boots.length && b.boots.length ? '<span class="sep">›</span>' : ''}${i === b.boots.length + b.core.length && b.later.length ? '<span class="sep">›</span>' : ''}<span class="it ${got.has(id) ? 'own' : ''} ${id === next ? 'nx' : ''}" title="${esc(names[id] || '')}">${img(id)}</span>`).join('')}</div>
+    ${(b.situational || []).length ? `<div class="sit"><small class="sl">Vs their team</small>${b.situational.map(x => `<span class="sc"><span class="it sitit ${(b.owned || []).includes(x.id) ? 'own' : ''}" title="${esc(x.name)} · ${esc(x.why)}">${img(x.id)}</span><span class="st">${esc(x.tag || '')}</span></span>`).join('')}</div>` : ''}
     <span class="grip" title="Drag to move"><i></i></span>
 `;
 });

@@ -492,6 +492,7 @@ function gameBuild(b) {
   return `<div class="gbuild">
     ${title}
     <span class="gitems"><span class="glabel">Start</span>${b.starter.map(id => `<span class="gitem start">${imgIcon('item:' + id, 'Start')}</span>`).join('')}<span class="oarrow">›</span>${b.boots.map(id => item(id, 'Boots')).join('')}${b.core.map(id => item(id, 'Core')).join('')}${b.later.length ? `<span class="oarrow">›</span>${b.later.map(id => item(id, 'Later')).join('')}` : ''}</span>
+    ${(b.situational || []).length ? `<span class="gsit"><span class="glabel">Vs their team</span>${b.situational.map(x => `<span class="gitem sit ${(b.owned || []).includes(x.id) ? 'own' : ''}" title="${esc(x.name)} · ${esc(x.why)}">${imgIcon('item:' + x.id, '')}${(b.owned || []).includes(x.id) ? `<i>${I.check}</i>` : ''}<small>${esc(x.tag || '')}</small></span>`).join('')}</span>` : ''}
     ${b.runes ? `<span class="grunes">${imgIcon('rune:' + b.runes.keystoneId, b.runes.keystone)}<b>${esc(b.runes.keystone)}</b>${imgIcon('rune:' + b.runes.secondary, b.runes.secondaryName)}</span>` : ''}
   </div>`;
 }
@@ -885,7 +886,7 @@ api.on('league', L => {
   D.league = L;
   const layoutChanged = clientBefore !== !!(L && L.client) || wideBefore !== leagueWide();
   // Champ select opens the notch by itself so the helper is right there.
-  if (L && L.cs && state !== 'open' && !csShownOnce) { csShownOnce = true; pinned = true; csPinned = true; setState('open'); }
+  // Champ select no longer opens the notch by itself: hover it to see the draft, like any other time.
   // Champ select is over: let go of the pin it set, so the notch closes again (and updates can install).
   if (!(L && L.cs)) {
     csShownOnce = false;

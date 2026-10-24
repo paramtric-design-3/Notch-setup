@@ -731,3 +731,10 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league.ugg .ubody > .ucols { flex: 1; }
 .league.ugg .ubody > .uload { flex: 1; }
 .league.ugg .uload > .rpage { flex: 1; }
+/* situational items */
+.league .gsit { display: inline-flex; align-items: flex-start; gap: 6px; }
+.league .gsit .glabel { align-self: center; }
+.league .gitem.sit { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.league .gitem.sit .lit { box-shadow: 0 0 0 1.5px #2196b8; }
+.league .gitem.sit small { font-size: 8.5px; color: var(--text-2); white-space: nowrap; }
+.league .gitem.sit i { bottom: 12px; }

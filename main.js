@@ -268,7 +268,7 @@ let overlayData = null;
 let gameWin = null;              // the League game window (from the helper), or 'min' while minimized
 let overlayWhy = '';
 function overlayLog(why) { if (why !== overlayWhy) { overlayWhy = why; helperLog('overlay: ' + why); } }
-const OVERLAY_W = 300, OVERLAY_H = 150;
+const OVERLAY_W = 300, OVERLAY_H = 200;
 function overlayBounds() {
   // On top of the game window when we know where it is (any monitor, windowed or borderless),
   // else the main screen.
@@ -356,7 +356,7 @@ function overlayPayload() {
   const b = overlayData && overlayData.game && overlayData.game.build;
   if (!b || !league) return null;
   const pics = {};
-  for (const id of [...b.boots, ...b.core, ...b.later]) { const v = league.icons.get('item:' + id); if (v) pics['item:' + id] = v; }
+  for (const id of [...b.boots, ...b.core, ...b.later, ...(b.situational || []).map(x => x.id)]) { const v = league.icons.get('item:' + id); if (v) pics['item:' + id] = v; }
   if (b.champ && b.champ.key && league.icons.get(b.champ.key)) pics[b.champ.key] = league.icons.get(b.champ.key);
   return { build: b, pics, theme: settings.theme, place: (settings.overlay && settings.overlay.place) || 'minimap' };
 }
