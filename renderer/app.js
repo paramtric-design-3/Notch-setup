@@ -8,6 +8,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 const island = $('#island');
 const tilesView = $('#tiles');
+// Volume row in the music tile (in place of the lyric line while it's open).
+function volRow() {
+  const v = D.volume || { level: 0, muted: false };
+  return `<div class="volrow"><button class="ibtn volmute" data-volmute title="${v.muted ? 'Unmute' : 'Mute'}">${v.muted || v.level === 0 ? I.mute : I.volume}</button><input type="range" min="0" max="100" step="1" value="${v.level}" data-volslider aria-label="Volume"><span class="volval" data-volval>${v.muted ? 'Muted' : v.level + '%'}</span></div>`;
+}
 const peekView = $('#peek');
 const compactL = $('.compact-l');
 const compactR = $('.compact-r');
@@ -201,7 +206,7 @@ const TILE = {
       meta.innerHTML = `
         <div class="title ellipsis">${esc(m.title)}</div>
         <div class="artist ellipsis">${esc(m.artist || m.album || '')}</div>
-        <div class="lyric ellipsis" data-lyric></div>
+        ${D.volOpen ? volRow() : '<div class="lyric ellipsis" data-lyric></div>'}
         <div class="bar"><i data-bar></i></div>
         <div class="row">
           <span class="time" data-pos>0:00</span>
@@ -214,9 +219,14 @@ const TILE = {
         </div>`;
     }
     t.append(meta);
-    if (D.outputs.length > 1) {
+    const two = D.outputs.length > 1;
+    if (two) {
       const cur = D.outputs.find(o => o.default);
       t.insertAdjacentHTML('beforeend', `<button class="ibtn outbtn" data-out title="Sound output: ${esc(cur ? cur.name : '')}">${outputIcon(cur)}</button>`);
+    }
+    if (m && size > 1) {
+      const v = D.volume;
+      t.insertAdjacentHTML('beforeend', `<button class="ibtn volbtn ${two ? '' : 'solo'} ${D.volOpen ? 'on' : ''}" data-volopen title="Volume${v ? ' ' + v.level + '%' : ''} · scroll to change">${v && (v.muted || v.level === 0) ? I.mute : I.volume}</button>`);
     }
     return t;
   },
@@ -436,6 +446,8 @@ tilesView.addEventListener('click', async e => {
     else if (res.replaced) peek({ icon: I.trophy, title: 'Runes imported', sub: `All pages were in use, so "${res.replaced}" was replaced`, ms: 5000 });
     return;
   }
+  if (b.dataset.volopen !== undefined) { D.volOpen = !D.volOpen; rerenderTile('music'); return; }
+  if (b.dataset.volmute !== undefined) { api.send('helper', { c: 'vol', mute: true }); return; }
   if (b.dataset.out !== undefined) { D.outPicker = true; api.send('helper', { c: 'outputs' }); rerenderTile('music'); return; }
   if (b.dataset.outclose !== undefined) { D.outPicker = false; rerenderTile('music'); return; }
   if (b.dataset.outid) {
@@ -498,6 +510,20 @@ document.addEventListener('drop', async e => {
   renderTiles();
 });
 
+// volume slider in the music tile
+tilesView.addEventListener('input', e => {
+  if (!e.target.matches('[data-volslider]')) return;
+  const v = +e.target.value;
+  D.volume = { ...(D.volume || {}), level: v, muted: false };
+  const val = tilesView.querySelector('[data-volval]'); if (val) val.textContent = v + '%';
+  api.send('helper', { c: 'vol', set: v });
+});
+tilesView.addEventListener('wheel', e => {
+  const t = e.target.closest('[data-volopen], .volrow');
+  if (!t) return;
+  e.preventDefault();
+  api.send('helper', { c: 'vol', delta: e.deltaY < 0 ? 4 : -4 });
+}, { passive: false });
 tilesView.addEventListener('wheel', e => {
   const b = e.target.closest('[data-q="vol"], [data-q="bright"]');
   if (!b) return;
@@ -936,7 +962,15 @@ api.on('media', m => {
 api.on('art', a => { D.art = a; rerenderTile('music'); if (state === 'compact') renderCompact(); });
 api.on('lyrics', l => { D.lyrics = l; });
 api.on('radios', r => { D.radios = r; rerenderTile('controls'); });
-api.on('volume', v => { D.volume = v; rerenderTile('controls'); });
+api.on('volume', v => {
+  D.volume = v; rerenderTile('controls');
+  // keep the music tile's volume row in step, without disturbing the slider while you drag it
+  const sl = tilesView.querySelector('[data-volslider]');
+  if (sl && document.activeElement !== sl) sl.value = v.level;
+  const val = tilesView.querySelector('[data-volval]'); if (val) val.textContent = v.muted ? 'Muted' : v.level + '%';
+  const mb = tilesView.querySelector('[data-volmute]'); if (mb) mb.innerHTML = v.muted || v.level === 0 ? I.mute : I.volume;
+  const vb = tilesView.querySelector('[data-volopen]'); if (vb) vb.innerHTML = v.muted || v.level === 0 ? I.mute : I.volume;
+});
 api.on('brightness', b => { D.brightness = b; rerenderTile('controls'); });
 api.on('dark', d => { D.dark = d; rerenderTile('controls'); });
 api.on('weather', w => { D.weather = w; rerenderTile('weather'); });

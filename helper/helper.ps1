@@ -470,6 +470,7 @@ function Handle-Command($line) {
         'radio' { Toggle-Radio $c.kind; $script:lastRadios = ''; $script:due['radios'] = 0 }
         'vol' {
             if ($null -ne $c.mute) { [NotchAudio]::SetMute(-not [NotchAudio]::GetMute()) }
+            if ($null -ne $c.set) { [NotchAudio]::SetLevel([math]::Min(1, [math]::Max(0, [double]$c.set / 100))); if ([NotchAudio]::GetMute()) { [NotchAudio]::SetMute($false) } }
             if ($null -ne $c.delta) { [NotchAudio]::SetLevel([NotchAudio]::GetLevel() + ([double]$c.delta / 100)); if ([NotchAudio]::GetMute()) { [NotchAudio]::SetMute($false) } }
             $script:due['volume'] = 0
         }

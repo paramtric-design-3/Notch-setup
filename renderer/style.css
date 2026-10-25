@@ -825,3 +825,18 @@ body.dropping #tiles { outline: none; }
 .league .ucicons > span { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .league .ucicons .lch.sm { width: 22px; height: 22px; border-radius: 6px; }
 .league .ucicons i { font-size: 9.5px; line-height: 1; }
+/* volume in the music tile */
+.music .volbtn { position: absolute; top: 8px; right: 38px; width: 26px; height: 26px; color: var(--text-2); }
+.music .volbtn.solo { right: 8px; }
+.music .volbtn svg { width: 15px; height: 15px; }
+.music .volbtn.on { color: var(--accent); }
+html[data-theme="dark"] .music.has-art .volbtn:not(.on) { color: rgba(242,244,248,.75); }
+.music .volrow { display: flex; align-items: center; gap: 6px; height: 18px; margin: 1px 0 2px; }
+.music .volrow .volmute { width: 20px; height: 20px; flex: none; color: var(--text-2); }
+.music .volrow .volmute svg { width: 14px; height: 14px; }
+.music .volrow input[type=range] { flex: 1; min-width: 0; height: 4px; accent-color: var(--accent); cursor: pointer; }
+.music .volval { font-size: 10.5px; color: var(--text-2); width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.music:has(.outbtn) .meta .title { padding-right: 58px; }
+.music:has(.volbtn.solo) .meta .title { padding-right: 30px; }
+.music .volbtn { right: 36px; }
+.music .volbtn.solo { right: 8px; }
