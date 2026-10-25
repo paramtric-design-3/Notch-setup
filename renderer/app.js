@@ -549,7 +549,7 @@ function leagueGame(g) {
 // and the skill order with the next level-up highlighted.
 function gameBuild(b) {
   if (!b) return '';
-  const title = `<span class="gbtitle">${chIcon(b.champ, 'lch')}<b>Your build</b><span class="muted">${esc((b.champ && b.champ.name) || '')}${b.mode === 'aram' ? ' · ARAM' : b.mode === 'urf' ? ' · URF' : b.pos ? ' · ' + esc(ROLE[b.pos] || '') : ''} · OP.GG</span></span>`;
+  const title = `<span class="gbtitle">${chIcon(b.champ, 'lch')}<b>Your build</b><span class="muted">${esc((b.champ && b.champ.name) || '')}${b.mode === 'aram' ? ' · ARAM' : b.mode === 'urf' ? ' · URF' : b.pos ? ' · ' + esc(ROLE[b.pos] || '') : ''}</span></span>`;
   if (b.unsupported) return '';
   if (b.loading || b.failed) return `<div class="gbuild">${title}<span class="muted">${b.failed ? 'OP.GG has no build for this champion here' : 'Loading the build…'}</span></div>`;
   const owned = (b.owned || []).slice();
@@ -566,7 +566,7 @@ function gameBuild(b) {
   return `<div class="gbuild">
     ${title}
     <span class="gitems"><span class="glabel">Start</span>${b.starter.map(id => `<span class="gitem start">${imgIcon('item:' + id, 'Start')}</span>`).join('')}<span class="oarrow">›</span>${b.boots.map(id => item(id, 'Boots')).join('')}${b.core.map(id => item(id, 'Core')).join('')}${b.later.length ? `<span class="oarrow">›</span>${b.later.map(id => item(id, 'Later')).join('')}` : ''}</span>
-    ${(b.situational || []).length ? `<span class="gsit"><span class="glabel">Vs their team</span>${b.situational.map(x => `<span class="gitem sit ${(b.owned || []).includes(x.id) ? 'own' : ''}" title="${esc(x.name)} · ${esc(x.why)}">${imgIcon('item:' + x.id, '')}${(b.owned || []).includes(x.id) ? `<i>${I.check}</i>` : ''}<small>${esc(x.tag || '')}</small></span>`).join('')}</span>` : ''}
+    ${(b.situational || []).length ? `<span class="gsit"><span class="glabel">Vs their team</span>${b.situational.map(x => `<span class="gitem sit ${(b.owned || []).includes(x.id) ? 'own' : ''}" title="${esc(x.name)} · ${esc(x.why)}">${imgIcon('item:' + x.id, '')}${(b.owned || []).includes(x.id) ? `<i>${I.check}</i>` : ''}</span>`).join('')}</span>` : ''}
     ${b.runes ? `<span class="grunes">${imgIcon('rune:' + b.runes.keystoneId, b.runes.keystone)}<b>${esc(b.runes.keystone)}</b>${imgIcon('rune:' + b.runes.secondary, b.runes.secondaryName)}</span>` : ''}
   </div>`;
 }
