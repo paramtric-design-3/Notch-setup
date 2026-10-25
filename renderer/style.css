@@ -840,3 +840,4 @@ html[data-theme="dark"] .music.has-art .volbtn:not(.on) { color: rgba(242,244,24
 .music:has(.volbtn.solo) .meta .title { padding-right: 30px; }
 .music .volbtn { right: 36px; }
 .music .volbtn.solo { right: 8px; }
+.league .lp { grid-template-columns: 24px minmax(0, 1fr) auto; }
