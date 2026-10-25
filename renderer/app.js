@@ -566,7 +566,7 @@ function leagueGame(g) {
   t.innerHTML = `
     <div class="lhead"><span class="cstatus">${I.trophy}${esc(g.queue || 'In game')}</span><span></span></div>
     ${gameBuild(g.build)}
-    <div class="lteams"><div class="lteam blue">${side('blue')}</div><div class="lteam red">${side('red')}</div></div>`;
+    ${g.aram ? '' : `<div class="lteams"><div class="lteam blue">${side('blue')}</div><div class="lteam red">${side('red')}</div></div>`}`;
   return t;
 }
 

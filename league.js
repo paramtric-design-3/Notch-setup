@@ -918,7 +918,8 @@ class League {
     // Look players up a few at a time; each finished lookup shows up right away.
     const todo = this.game.players.filter(p => !p.bot && !this.players.has(`${p.name}#${p.tag}`));
     for (const p of todo) this.players.set(`${p.name}#${p.tag}`, { loading: true });
-    this.lookupAll(todo, queue);
+    // ARAM: no rank lookups (the scoreboard isn't shown there)
+    if (!(this.game.mine && this.game.mine.mode === 'aram')) this.lookupAll(todo, queue);
     this.loadIcons(this.game.players.map(p => p.champKey));
   }
 
@@ -1082,7 +1083,7 @@ class League {
         enemies: this.cs.enemies.map(e => ({ ...e, icon: this.icons.get(e.key) || null, counters: e.guess ? this.countersOf(e.id, e.guess) : [] })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
       recent: this.history ? this.history.slice().sort((a, b) => b.at - a.at).slice(0, 6).map(g => ({ ...this.champ(g.champ), icon: this.icons.get((this.champ(g.champ) || {}).key) || null, win: g.win, remake: g.remake, k: g.k, d: g.d, a: g.a, lane: g.lane, queue: QUEUES[g.queue] || 'Custom', at: g.at, dur: g.dur })) : [],
-      game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players, build: this.gameBuild() },
+      game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players, build: this.gameBuild(), aram: !!(this.game.mine && this.game.mine.mode === 'aram') },
       meta: this.meta ? Object.fromEntries(Object.keys(this.meta).map(l => [l, this.metaFor(l, 10).map(({ icon, ...c }) => c)])) : null,
       mainLane: this.mainLane(),
     };
