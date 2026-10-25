@@ -379,7 +379,8 @@ function layoutWidth(shown) {
 }
 function renderTiles() {
   if (!D.settings) return;
-  let shown = D.settings.tiles.filter(x => x.show && (x.id !== 'league' || (D.league && D.league.client)));
+  let shown = D.settings.tiles.filter(x => x.show && (x.id !== 'league' || (D.league && D.league.client))
+    && (x.id !== 'shelf' || D.dragging || (D.shelf || []).length));   // the shelf shows while you drag files, or while it holds some
   if (leagueWide()) shown = shown.filter(x => x.id === 'league');   // the League panel takes the whole notch
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
@@ -419,8 +420,8 @@ tilesView.addEventListener('click', async e => {
   }
   if (b.dataset.url) { api.send('open-url', b.dataset.url); return; }
   if (b.dataset.cstab) { D.csTab = b.dataset.cstab; rerenderTile('league'); return; }
-  if (b.dataset.shelfx) { D.shelf = await api.invoke('shelf-remove', b.dataset.shelfx); rerenderTile('shelf'); return; }
-  if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); rerenderTile('shelf'); return; }
+  if (b.dataset.shelfx) { D.shelf = await api.invoke('shelf-remove', b.dataset.shelfx); renderTiles(); return; }
+  if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); renderTiles(); return; }
   if (b.dataset.tierlane) { D.tierLane = b.dataset.tierlane; rerenderTile('league'); return; }
   if (b.dataset.import !== undefined) {
     b.disabled = true; b.textContent = 'Importing…';
@@ -474,6 +475,7 @@ document.addEventListener('dragenter', e => {
   if (!hasFiles(e) || !shelfOn()) return;
   dropDepth++;
   document.body.classList.add('dropping');
+  if (!D.dragging) { D.dragging = true; renderTiles(); }
   hovering = true; clearTimeout(leaveTimer);
   if (state !== 'open') setState('open');
 });
@@ -481,14 +483,15 @@ document.addEventListener('dragover', e => { if (hasFiles(e) && shelfOn()) { e.p
 document.addEventListener('dragleave', e => {
   if (!hasFiles(e)) return;
   dropDepth = Math.max(0, dropDepth - 1);
-  if (!dropDepth) { document.body.classList.remove('dropping'); pointerLeave(); }
+  if (!dropDepth) { document.body.classList.remove('dropping'); D.dragging = false; renderTiles(); pointerLeave(); }
 });
 document.addEventListener('drop', async e => {
   if (!hasFiles(e) || !shelfOn()) return;
   e.preventDefault();
-  dropDepth = 0; document.body.classList.remove('dropping');
+  dropDepth = 0; document.body.classList.remove('dropping'); D.dragging = false;
   const paths = [...e.dataTransfer.files].map(f => api.pathFor ? api.pathFor(f) : '').filter(Boolean);
-  if (paths.length) { D.shelf = await api.invoke('shelf-add', paths).catch(() => D.shelf); rerenderTile('shelf'); }
+  if (paths.length) D.shelf = await api.invoke('shelf-add', paths).catch(() => D.shelf);
+  renderTiles();
 });
 
 tilesView.addEventListener('wheel', e => {
@@ -945,7 +948,7 @@ api.on('peek', p => {
   else peek(p);
 });
 
-api.on('shelf', list => { D.shelf = list || []; rerenderTile('shelf'); });
+api.on('shelf', list => { const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
 api.on('league', L => {
   const wideBefore = leagueWide();
