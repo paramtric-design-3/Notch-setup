@@ -611,7 +611,7 @@ function runePage(r) {
   if (!r.tree) return `<div class="rpage"><div class="rhead"><span class="olabel">Rune page</span><span class="muted">Loading…</span></div></div>`;
   const shardRow = (opts, i) => `<div class="rrow shards">${opts.map(id => `<span class="rshard ${shards[i] === id ? 'on' : ''}" title="${esc(SHARDS[id] || '')}">${LICON['shard:' + id] ? `<img src="${LICON['shard:' + id]}" alt="">` : ''}</span>`).join('')}</div>`;
   return `<div class="rpage">
-    <div class="rhead"><span class="olabel">Rune page</span><span class="muted">OP.GG's most played${r.winRate ? ' · ' + pct0(r.winRate) + ' win' : ''} · <b>${esc(r.keystone)}</b></span></div>
+    <div class="rhead"><span class="olabel">Rune page</span></div>
     <div class="rtrees">
       <div class="rtree">${head(r.primary, r.primaryName)}${row(r.tree.primary[0] || [], true)}<i class="rline"></i>${r.tree.primary.slice(1).map(x => row(x)).join('')}</div>
       <div class="rtree">${head(r.secondary, r.secondaryName)}${r.tree.secondary.map(x => row(x)).join('')}<i class="rline"></i>${(r.shardRows || []).map(shardRow).join('')}</div>
