@@ -329,7 +329,7 @@ function updateOverlay(d) {
 // Dragging: the grip in the overlay takes the mouse while you hover it; dragging moves the window
 // with the pointer and the spot is saved relative to the game window.
 let overlayDrag = null;
-ipcMain.on('overlay-mouse', (_e, over) => { if (overlay && !overlay.isDestroyed() && !overlayDrag) overlay.setIgnoreMouseEvents(!over, { forward: true }); });
+ipcMain.on('overlay-mouse', (_e, over) => { if (overlay && !overlay.isDestroyed() && !overlayDrag && !tabDown) overlay.setIgnoreMouseEvents(!over, { forward: true }); });
 ipcMain.on('overlay-drag', (_e, on) => {
   if (!overlay || overlay.isDestroyed()) return;
   if (on) {
@@ -343,7 +343,7 @@ ipcMain.on('overlay-drag', (_e, on) => {
     const b = overlay.getBounds();
     const base = gameWin && gameWin !== 'min' && gameWin.width > 200 ? gameWin : screen.getPrimaryDisplay().bounds;
     applySettings({ overlay: { ...(settings.overlay || {}), place: 'custom', custom: { x: b.x, y: b.y, bx: base.x, by: base.y, bw: base.width, bh: base.height, fx: (b.x - base.x) / base.width, fy: (b.y - base.y) / base.height } } });
-    overlay.setIgnoreMouseEvents(true, { forward: true });
+    overlay.setIgnoreMouseEvents(!tabDown, { forward: true });
   }
 });
 
@@ -511,7 +511,13 @@ async function onHelperMessage(m) {
       for (const a of (m.data.closed || []).slice(0, 2)) peekApp(a, 'closed');
       break;
     }
-    case 'tab': tabDown = !!m.data; updateOverlay(); break;
+    case 'tab':
+      tabDown = !!m.data;
+      updateOverlay();
+      // While you hold Tab the overlay takes the mouse, so you can grab and drag it (over the game the
+      // pointer-over check isn't reliable); otherwise clicks go through to the game.
+      if (overlay && !overlay.isDestroyed() && !overlayDrag) overlay.setIgnoreMouseEvents(!tabDown, { forward: true });
+      break;
     case 'lolwin': {
       const g = m.data || {};
       if (g.none) gameWin = g.minimized ? 'min' : null;
