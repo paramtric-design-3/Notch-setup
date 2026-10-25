@@ -624,7 +624,7 @@ function opggBlock(o, me) {
   const items = (ids, label) => ids.length ? `<span class="obuild">${ids.map(i => imgIcon('item:' + i, label)).join('')}</span>` : '';
   const r = o.runes;
   return `<div class="opgg">
-    <div class="orow">${tierPill(o.tier)}<span><b>${pct(o.winRate)}</b> win · ${pct(o.pickRate)} pick · ${pct(o.banRate)} ban</span><span class="muted osrc">OP.GG · ranked</span></div>
+    <div class="orow">${tierPill(o.tier)}<span class="muted osrc">OP.GG · ranked</span></div>
     <div class="orow"><span class="olabel">Build</span>${o.spells.map(i => imgIcon('spell:' + i, 'Summoner spell')).join('')}<span class="osep"></span>${items(o.starter, 'Start')}<span class="oarrow">›</span>${items(o.boots, 'Boots')}<span class="oarrow">›</span>${items(o.core, 'Core')}</div>
   </div>`;
 }
