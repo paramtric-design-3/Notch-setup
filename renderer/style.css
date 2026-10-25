@@ -819,3 +819,9 @@ body.dropping #tiles { outline: none; }
 .league .rrow.shards { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; justify-items: center; padding: 0 22%; }
 .league .rtree > .rrow.shards + .rrow.shards { margin-top: -2px; }
 .league .lp { grid-template-columns: 24px minmax(0, 1fr) 104px 84px; }
+/* enemy row counters: pictures with the win rate under each, centred in the row */
+.league .ucount { align-self: center; justify-self: end; }
+.league .ucicons { display: flex; gap: 6px; align-items: flex-start; }
+.league .ucicons > span { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.league .ucicons .lch.sm { width: 22px; height: 22px; border-radius: 6px; }
+.league .ucicons i { font-size: 9.5px; line-height: 1; }

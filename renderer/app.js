@@ -692,7 +692,7 @@ function leagueChampSelect(cs) {
       ${chIcon(e, 'uch')}
       <span class="uname"><b class="ellipsis">${e ? esc(e.name) : 'Enemy ' + r.n}</b><span class="ustat">${e && e.guess ? `<span class="upred">${roleIcon(e.guess)}${esc(ROLE[e.guess])}${e.sure ? '' : '?'}</span>${isOpp ? ' your lane' : ' predicted'}` : esc(r.status)}</span></span>
       <span class="uwr">${e && e.winRate ? `<b>${pct0(e.winRate)}</b><span class="muted">${esc(ROLE[e.guess] || '')} WR</span>` : ''}</span>
-      <span class="ucount">${e && e.counters && e.counters.length ? `<span class="muted">Counters</span><span class="ucicons">${e.counters.map(c => `<span title="${esc(c.name)} wins ${pct0(c.winRate)} vs ${esc(e.name)}">${chIcon(c, 'lch sm')}<i>${Math.round(c.winRate * 100)}%</i></span>`).join('')}</span>` : ''}</span>
+      <span class="ucount">${e && e.counters && e.counters.length ? `<span class="ucicons" title="Picks for your role that beat ${esc(e.name)}">${e.counters.map(c => `<span title="${esc(c.name)} wins ${pct0(c.winRate)} vs ${esc(e.name)}">${chIcon(c, 'lch sm')}<i>${Math.round(c.winRate * 100)}%</i></span>`).join('')}</span>` : ''}</span>
     </div>`;
   }).join('');
 
