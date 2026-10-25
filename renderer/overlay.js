@@ -17,13 +17,11 @@ window.notch.on('overlay', p => {
   const nextSkill = (b.skills || [])[lvl];
   const names = b.names || {};
   box.className = 'show' + (p.place === 'left' ? ' left' : '');
+  const champ = k => pics['champ:' + k] ? `<img src="${pics['champ:' + k]}" alt="">` : `<span class="cph">${esc(String(k).slice(0, 2))}</span>`;
   box.innerHTML = `
-    ${next ? `<div class="next">${img(next) || '<span class="ph"></span>'}<div class="nl"><small>Buy next</small><b>${esc(names[next] || 'Item ' + next)}</b></div></div>`
-      : '<div class="next done"><div class="nl"><small>Build</small><b>Full build done ✓</b></div></div>'}
     <div class="path">${path.map((id, i) => `${i === b.boots.length && b.boots.length ? '<span class="sep">›</span>' : ''}${i === b.boots.length + b.core.length && b.later.length ? '<span class="sep">›</span>' : ''}<span class="it ${got.has(id) ? 'own' : ''} ${id === next ? 'nx' : ''}" title="${esc(names[id] || '')}">${img(id)}</span>`).join('')}</div>
-    ${(b.situational || []).length ? `<div class="sit"><small class="sl">Vs their team</small>${b.situational.map(x => `<span class="sc"><span class="it sitit ${(b.owned || []).includes(x.id) ? 'own' : ''}" title="${esc(x.name)} · ${esc(x.why)}">${img(x.id)}</span><span class="st">${esc(x.tag || '')}</span></span>`).join('')}</div>` : ''}
-    <span class="grip" title="Drag to move"><i></i></span>
-`;
+    ${(b.situational || []).length ? `<div class="sit">${b.situational.map(x => `<span class="sc" title="${esc(x.name)} · ${esc(x.why)}"><span class="it sitit ${(b.owned || []).includes(x.id) ? 'own' : ''}">${img(x.id)}</span><span class="vs">${(x.vs || []).slice(0, 3).map(champ).join('')}</span></span>`).join('')}</div>` : ''}
+    <span class="grip" title="Drag to move"><i></i></span>`;
 });
 
 // Hovering the tile makes the overlay take the mouse (the rest of the window stays click-through),

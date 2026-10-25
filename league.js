@@ -459,18 +459,18 @@ class League {
       ap: [3165, 3102, 3157, 3135, 3157], tank: [3075, 4401, 3143, null, null],
     }[cls];
     const out = [];
-    const add = (id, why, tag) => {
+    const add = (id, why, tag, vs) => {
       if (!id || out.some(o => o.id === id)) return;
       const it = this.itemData[id];
       if (!it || (it.gold && it.gold.purchasable === false) || (it.maps && it.maps[m.mode === 'aram' ? '12' : '11'] === false)) return;
-      out.push({ id, why, tag, inBuild: inBuild.includes(id) });
+      out.push({ id, why, tag, vs: (vs || []).map(e => e.key), inBuild: inBuild.includes(id) });
     };
-    if (healers.length >= (cls === 'tank' ? 2 : 1)) add(pick[0], `Anti-heal · ${names(healers)}`, 'Anti-heal');
-    if (ap.length >= 3) add(pick[1], `${ap.length} magic damage · ${names(ap)}`, 'Magic resist');
-    if (ad.length >= 4) add(pick[2], `${ad.length} physical damage`, 'Armor');
-    if (tanks.length >= 2 && pick[3]) add(pick[3], `Tanks · ${names(tanks)}`, 'Vs tanks');
-    if (assassins.length >= 2 && pick[4]) add(pick[4], `Assassins · ${names(assassins)}`, 'Safety');
-    if (cls !== 'adc' && cls !== 'ap') add(ap.length >= 3 ? 3111 : ad.length >= 4 ? 3047 : null, ap.length >= 3 ? 'Boots vs magic and crowd control' : 'Boots vs physical damage', 'Boots');
+    if (healers.length >= (cls === 'tank' ? 2 : 1)) add(pick[0], `Anti-heal · ${names(healers)}`, 'Anti-heal', healers);
+    if (ap.length >= 3) add(pick[1], `${ap.length} magic damage · ${names(ap)}`, 'Magic resist', ap);
+    if (ad.length >= 4) add(pick[2], `${ad.length} physical damage`, 'Armor', ad);
+    if (tanks.length >= 2 && pick[3]) add(pick[3], `Tanks · ${names(tanks)}`, 'Vs tanks', tanks);
+    if (assassins.length >= 2 && pick[4]) add(pick[4], `Assassins · ${names(assassins)}`, 'Safety', assassins);
+    if (cls !== 'adc' && cls !== 'ap') add(ap.length >= 3 ? 3111 : ad.length >= 4 ? 3047 : null, ap.length >= 3 ? 'Boots vs magic and crowd control' : 'Boots vs physical damage', 'Boots', ap.length >= 3 ? ap : ad);
     const icons = out.map(o => 'item:' + o.id).filter(k => !this.icons.has(k));
     if (icons.length) this.loadIcons(icons);
     return out.slice(0, 4).map(o => ({ ...o, name: (this.itemData[o.id] || {}).name || '' }));
