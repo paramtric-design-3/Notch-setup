@@ -37,7 +37,7 @@ const DEFAULT_SETTINGS = {
   messageApps: 'WhatsApp, Telegram, Signal, Teams, Discord, Messenger, Slack, Instagram, Phone Link, YourPhone, Mail, Outlook',
   messageAllApps: false,
   peeks: { apps: false, power: true },
-  overlay: { show: true, place: 'minimap' },   // in-game item overlay: 'minimap' | 'top' | 'left'
+  overlay: { show: true, place: 'minimap', onTab: true },   // in-game item overlay: 'minimap' | 'top' | 'left'; onTab: only while Tab is held
   schema: 2,
   tiles: [
     { id: 'music', show: true, size: 3 },
@@ -267,6 +267,7 @@ function toIsland(channel, data) {
 let overlay = null;
 let overlayData = null;
 let gameWin = null;              // the League game window (from the helper), or 'min' while minimized
+let tabDown = false;             // Tab held in game (the overlay can show only then)
 let overlayWhy = '';
 function overlayLog(why) { if (why !== overlayWhy) { overlayWhy = why; helperLog('overlay: ' + why); } }
 const OVERLAY_W = 300, OVERLAY_H = 200;
@@ -299,6 +300,8 @@ function updateOverlay(d) {
     : b.loading ? 'in game, loading the OP.GG build'
     : b.failed ? 'in game, OP.GG has no build for this champion'
     : gameWin === 'min' ? 'game minimized' : '';
+  const waitTab = !why && settings.overlay.onTab !== false && !tabDown && !overlayDrag;
+  if (waitTab) { if (overlay && !overlay.isDestroyed() && overlay.isVisible()) overlay.hide(); return; }   // shows while you hold Tab
   if (why) { overlayLog('hidden: ' + why); if (overlay && !overlay.isDestroyed() && overlay.isVisible()) overlay.hide(); return; }
   const bb = overlayBounds();
   overlayLog(`shown at ${bb.x},${bb.y} (${gameWin && gameWin !== 'min' ? `game window ${gameWin.width}x${gameWin.height} at ${gameWin.x},${gameWin.y}` : 'main screen, game window not found'})`);
@@ -506,6 +509,7 @@ async function onHelperMessage(m) {
       for (const a of (m.data.closed || []).slice(0, 2)) peekApp(a, 'closed');
       break;
     }
+    case 'tab': tabDown = !!m.data; updateOverlay(); break;
     case 'lolwin': {
       const g = m.data || {};
       if (g.none) gameWin = g.minimized ? 'min' : null;

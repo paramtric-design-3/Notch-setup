@@ -53,6 +53,15 @@ public static class NotchNative {
         RECT r; if (!GetWindowRect(h, out r)) return "";
         return r.Left + "," + r.Top + "," + (r.Right - r.Left) + "," + (r.Bottom - r.Top);
     }
+    [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vk);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    // Tab held down while the League game window is in front (the scoreboard key). Only reads the
+    // key state; the game still gets the key as normal.
+    public static bool TabInGame() {
+        IntPtr g = FindWindow("RiotWindowClass", null);
+        if (g == IntPtr.Zero || GetForegroundWindow() != g) return false;
+        return (GetAsyncKeyState(0x09) & 0x8000) != 0;
+    }
     public static void BroadcastTheme() {
         UIntPtr r;
         SendMessageTimeout((IntPtr)0xffff, 0x1A, UIntPtr.Zero, "ImmersiveColorSet", 2, 200, out r);
@@ -509,5 +518,15 @@ while (-not [NotchPump]::Closed) {
         Every 'outputs' 30000 { Poll-Outputs }
         Every 'league' 8000 { Poll-League }
     }
-    Start-Sleep -Milliseconds 200
+    # While a League game is up, watch the Tab key (for the item overlay) a few times a second.
+    $inGame = $script:lastGameWin -and $script:lastGameWin -ne 'min'
+    if ($inGame) {
+        $tab = $false
+        try { $tab = [NotchNative]::TabInGame() } catch { }
+        if ($tab -ne $script:lastTab) { $script:lastTab = $tab; Emit 'tab' $tab }
+        Start-Sleep -Milliseconds 60
+    } else {
+        if ($script:lastTab) { $script:lastTab = $false; Emit 'tab' $false }
+        Start-Sleep -Milliseconds 200
+    }
 }
