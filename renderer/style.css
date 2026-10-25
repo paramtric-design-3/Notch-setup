@@ -841,3 +841,11 @@ html[data-theme="dark"] .music.has-art .volbtn:not(.on) { color: rgba(242,244,24
 .music .volbtn { right: 36px; }
 .music .volbtn.solo { right: 8px; }
 .league .lp { grid-template-columns: 24px minmax(0, 1fr) auto; }
+/* the wide League views sit straight in the notch: no outer tile box, just the panels inside */
+.tile.league.game { background: transparent; border: 0; padding: 0; box-shadow: none; overflow: visible; }
+.tile.league.game > .lhead { padding: 0 4px; }
+/* without the outer box, the parts inside get their own tile */
+.tile.league.game .lteam { background: var(--btn); border-radius: 12px; padding: 6px 8px 6px 10px; }
+.tile.league.game .lteams { gap: 8px; }
+.tile.league.game .ltl, .tile.league.game .lsplit > .lcol { background: var(--btn); border-radius: 12px; padding: 10px; }
+.tile.league.game .lsplit.three { gap: 8px; }
