@@ -931,7 +931,7 @@ async function loadShelf() {
   try {
     const list = JSON.parse(fs.readFileSync(shelfFile(), 'utf8'));
     shelf = [];
-    for (const x of list) if (x && x.path && fs.existsSync(x.path)) shelf.push({ ...x, icon: await shelfIcon(x.path) });
+    for (const x of list) if (x && x.path && fs.existsSync(x.path)) shelf.push({ ...x, icon: x.dir ? '' : await shelfIcon(x.path) });
   } catch { shelf = []; }
   sendShelf();
 }
@@ -939,7 +939,8 @@ ipcMain.handle('shelf-add', async (_e, paths) => {
   for (const p of (Array.isArray(paths) ? paths : []).slice(0, 50)) {
     if (typeof p !== 'string' || !p || shelf.some(x => x.path === p)) continue;
     let st; try { st = fs.statSync(p); } catch { continue; }
-    shelf.push({ id: crypto.randomUUID(), path: p, name: path.basename(p) || p, dir: st.isDirectory(), size: st.isDirectory() ? 0 : st.size, icon: await shelfIcon(p) });
+    // folders get WALL-E's own folder picture (Windows hands out a drive icon for them here)
+    shelf.push({ id: crypto.randomUUID(), path: p, name: path.basename(p) || p, dir: st.isDirectory(), size: st.isDirectory() ? 0 : st.size, icon: st.isDirectory() ? '' : await shelfIcon(p) });
   }
   saveShelf(); sendShelf();
   return shelf;

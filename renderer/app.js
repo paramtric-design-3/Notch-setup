@@ -168,6 +168,9 @@ function weatherIcon(code, isDay) {
 }
 
 // ------------------------------------------------------------------ tiles
+// A yellow folder, like the ones in Explorer, for folders on the shelf.
+const FOLDER_PIC = `<svg class="shfolder" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h6.2l2.6 2.7h12.2A2.5 2.5 0 0 1 29 11.2V24a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24z" fill="#E0A526"/><path d="M3 12.6A2.5 2.5 0 0 1 5.5 10.1h21A2.5 2.5 0 0 1 29 12.6V24a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24z" fill="#F7C948"/></svg>`;
+
 // The shelf's outline, drawn like the folder icon: a tab on the left that slopes down into the body.
 function folderOutline(size) {
   const W = size * CELL + (size - 1) * GAP, H = 112, tw = Math.round(W * (size === 1 ? 0.42 : 0.34)), th = 11, r = 16, tr = 9, dx = 9;
@@ -235,7 +238,7 @@ const TILE = {
     const outline = folderOutline(size);
     if (!list.length) { t.innerHTML = `${outline}<div class="empty"><div class="ico">${I.folder}</div>${size > 1 ? 'Drop files or folders here to hold them' : 'Drop here'}</div>`; return t; }
     if (size === 1) {
-      t.innerHTML = `${outline}<div class="shfile solo" draggable="true" data-shelfall title="Drag out all ${list.length}">${list[0].icon ? `<img src="${list[0].icon}" alt="">` : I.download}${list.length > 1 ? `<span class="badge">${list.length}</span>` : ''}</div>`;
+      t.innerHTML = `${outline}<div class="shfile solo" draggable="true" data-shelfall title="Drag out all ${list.length}">${list[0].dir ? FOLDER_PIC : list[0].icon ? `<img src="${list[0].icon}" alt="">` : I.file}${list.length > 1 ? `<span class="badge">${list.length}</span>` : ''}</div>`;
       return t;
     }
     const shown = list.slice().reverse();   // newest first, one row you can scroll
@@ -244,7 +247,7 @@ const TILE = {
         <span class="shact">${list.length > 1 ? `<span class="shall" draggable="true" data-shelfall title="Drag all ${list.length} out">All ${list.length}</span>` : ''}<button class="shclear" data-shelfclear title="Clear the shelf">Clear</button></span></div>
       <div class="shlist">${shown.map(x => `
         <div class="shfile" draggable="true" data-shelfid="${esc(x.id)}" title="${esc(x.path)}&#10;Drag out to copy or move · double-click to show in its folder">
-          ${x.icon ? `<img src="${x.icon}" alt="">` : `<span class="shph">${x.dir ? 'DIR' : 'FILE'}</span>`}
+          ${x.dir ? FOLDER_PIC : x.icon ? `<img src="${x.icon}" alt="">` : `<span class="shph">${I.file}</span>`}
           <span class="shname ellipsis">${esc(x.name)}</span>
           <button class="shx" data-shelfx="${esc(x.id)}" title="Remove from the shelf">×</button>
         </div>`).join('')}</div>`;
