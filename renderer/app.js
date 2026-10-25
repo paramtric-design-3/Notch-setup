@@ -536,11 +536,10 @@ function leagueGame(g) {
       <span class="lname ellipsis" title="${esc(p.name)}#${esc(p.tag)} · ${esc(p.champ)}">${esc(p.name)}</span>
       <span class="lrank">${p.bot ? '<span class="lpill none">Bot</span>' : p.loading ? '<span class="lpill none">…</span>' : rankPill(r)}</span>
       <span class="lwr">${r ? wr(r) : ''}</span>
-      <span class="lform">${form}</span>
     </div>`;
   }).join('');
   t.innerHTML = `
-    <div class="lhead"><span class="cstatus">${I.trophy}${esc(g.queue || 'In game')}</span><span class="muted">Win rate and form: this season · last 10 games</span></div>
+    <div class="lhead"><span class="cstatus">${I.trophy}${esc(g.queue || 'In game')}</span><span class="muted">Win rate: this season</span></div>
     ${gameBuild(g.build)}
     <div class="lteams"><div class="lteam blue">${side('blue')}</div><div class="lteam red">${side('red')}</div></div>`;
   return t;

@@ -818,3 +818,4 @@ body.dropping #tiles { outline: none; }
 .league .rline { margin: 4px 10%; }
 .league .rrow.shards { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; justify-items: center; padding: 0 22%; }
 .league .rtree > .rrow.shards + .rrow.shards { margin-top: -2px; }
+.league .lp { grid-template-columns: 24px minmax(0, 1fr) 104px 84px; }
