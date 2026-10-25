@@ -627,8 +627,6 @@ function opggBlock(o, me) {
   return `<div class="opgg">
     <div class="orow">${tierPill(o.tier)}<span><b>${pct(o.winRate)}</b> win · ${pct(o.pickRate)} pick · ${pct(o.banRate)} ban</span><span class="muted osrc">OP.GG · ranked</span></div>
     <div class="orow"><span class="olabel">Build</span>${o.spells.map(i => imgIcon('spell:' + i, 'Summoner spell')).join('')}<span class="osep"></span>${items(o.starter, 'Start')}<span class="oarrow">›</span>${items(o.boots, 'Boots')}<span class="oarrow">›</span>${items(o.core, 'Core')}</div>
-    ${o.counters.length ? `<div class="orow"><span class="olabel">Counters</span>${cw(o.counters, 'cold')}</div>` : ''}
-    ${o.goodVs.length ? `<div class="orow"><span class="olabel">Good vs</span>${cw(o.goodVs, 'hot')}</div>` : ''}
   </div>`;
 }
 function tierList(L) {
