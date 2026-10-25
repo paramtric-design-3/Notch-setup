@@ -41,6 +41,8 @@ function render() {
   const ov = S.overlay || { show: true, place: 'minimap' };
   $('#ovShow').checked = ov.show !== false;
   $('#ovTab').checked = ov.onTab !== false;
+  if (document.activeElement !== $('#ovOpacity')) $('#ovOpacity').value = Math.round((1 - (ov.opacity == null ? 1 : ov.opacity)) * 100);
+  $('#ovOpacityVal').textContent = $('#ovOpacity').value + '%';
   document.querySelectorAll('#ovPlace button').forEach(b => b.classList.toggle('on', b.dataset.v === (ov.place || 'minimap')));
   $('#ovCustom').hidden = ov.place !== 'custom';
   if (document.activeElement !== $('#city')) $('#city').value = S.city || '';
@@ -91,6 +93,8 @@ function bindText(id, key, savedId) {
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
   $('#ovShow').onchange = e => save({ overlay: { ...(S.overlay || {}), show: e.target.checked } });
   $('#ovTab').onchange = e => save({ overlay: { ...(S.overlay || {}), onTab: e.target.checked } });
+  // 0% is solid, higher lets the game show through (up to 80%); saved while you slide
+  $('#ovOpacity').oninput = e => { $('#ovOpacityVal').textContent = e.target.value + '%'; save({ overlay: { ...(S.overlay || {}), opacity: 1 - +e.target.value / 100 } }); };
   document.querySelectorAll('#ovPlace button').forEach(b => b.onclick = () => save({ overlay: { ...(S.overlay || {}), place: b.dataset.v } }));
   bindText('#city', 'city', '#citySaved');
   bindText('#msgApps', 'messageApps', '#appsSaved');

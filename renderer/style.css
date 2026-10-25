@@ -809,3 +809,12 @@ body.dropping .tile.shelf .shoutline path { stroke: var(--accent); stroke-width:
 .shelf .shph svg { width: 22px; height: 22px; }
 /* no dashed line around the whole notch while dragging: only the shelf's folder outline lights up */
 body.dropping #tiles { outline: none; }
+/* rune page spacing: even columns, room between rows and around the dividers */
+.league .rpage { gap: 10px; padding: 10px 14px 12px; }
+.league .rtrees { gap: 28px; }
+.league .rtree { gap: 8px; }
+.league .rstyle { margin-bottom: 4px; }
+.league .rrow { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; justify-items: center; align-items: center; gap: 0; }
+.league .rline { margin: 4px 10%; }
+.league .rrow.shards { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; justify-items: center; padding: 0 22%; }
+.league .rtree > .rrow.shards + .rrow.shards { margin-top: -2px; }

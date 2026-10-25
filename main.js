@@ -316,10 +316,12 @@ function updateOverlay(d) {
     overlay.setIgnoreMouseEvents(true, { forward: true });   // clicks go to the game, but we still see the pointer over the grip
     overlay.setMenu(null);
     overlay.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
+    overlay.setOpacity(Math.min(1, Math.max(0.2, (settings.overlay && settings.overlay.opacity) || 1)));
     overlay.webContents.on('did-finish-load', () => { overlay.webContents.send('overlay', overlayPayload()); overlay.showInactive(); keepOverlayOnTop(); });
     return;
   }
   if (!overlayDrag) overlay.setBounds(overlayBounds());   // not while you drag it
+  overlay.setOpacity(Math.min(1, Math.max(0.2, (settings.overlay && settings.overlay.opacity) || 1)));
   overlay.webContents.send('overlay', overlayPayload());
   if (!overlay.isVisible()) overlay.showInactive();
   keepOverlayOnTop();
