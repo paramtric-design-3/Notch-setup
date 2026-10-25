@@ -47,6 +47,13 @@
     select { height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 10px; font: inherit; outline: none; min-width: 0; flex: 1; }
     select:focus { border-color: var(--accent); }
     input[type=range] { width: 150px; accent-color: var(--accent); }
+    .row.stack { flex-wrap: wrap; padding: 8px 0; row-gap: 6px; }
+    .row.stack > .grow { flex-basis: 100%; }
+    .row.stack .seg { flex-wrap: wrap; }
+    .seg button { white-space: nowrap; }
+    .row > .grow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #ovOpacity { width: auto; flex: 0 1 150px; min-width: 70px; }
+    .row:has(#ovOpacity) > .grow { flex: 1 0 auto; }
   </style>
 </head>
 <body>
@@ -91,8 +98,8 @@
     <h2>League of Legends</h2>
     <div class="row"><span class="grow">Item overlay in game</span><label class="switch"><input type="checkbox" id="ovShow"><span></span></label></div>
     <div class="row"><span class="grow">Only while holding Tab</span><label class="switch"><input type="checkbox" id="ovTab"><span></span></label></div>
-    <div class="row"><span class="grow">Overlay transparency</span><input type="range" id="ovOpacity" min="0" max="80" step="5"><span class="sub" id="ovOpacityVal" style="width:38px;text-align:right"></span></div>
-    <div class="row"><span class="grow">Overlay position</span>
+    <div class="row"><span class="grow">Transparency</span><input type="range" id="ovOpacity" min="0" max="80" step="5"><span class="sub" id="ovOpacityVal" style="width:38px;text-align:right"></span></div>
+    <div class="row stack"><span class="grow">Position</span>
       <div class="seg" id="ovPlace"><button data-v="minimap">Above minimap</button><button data-v="top">Top right</button><button data-v="left">Left</button><button data-v="custom" id="ovCustom" hidden>Where you dragged it</button></div>
     </div>
     <p class="note">Shows the next item to buy and the rest of your OP.GG build on top of the game. It needs the game in Borderless or Windowed mode (League: Settings → Video → Window mode); in Full screen the game draws over it. Clicks go through it. Drag it anywhere on screen; pick a position here to put it back.</p>
