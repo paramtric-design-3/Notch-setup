@@ -168,6 +168,13 @@ function weatherIcon(code, isDay) {
 }
 
 // ------------------------------------------------------------------ tiles
+// The shelf's outline, drawn like the folder icon: a tab on the left that slopes down into the body.
+function folderOutline(size) {
+  const W = size * CELL + (size - 1) * GAP, H = 112, tw = Math.round(W * (size === 1 ? 0.42 : 0.34)), th = 11, r = 16, tr = 9, dx = 9;
+  const p = `M0.5 ${H - r} V${tr + 0.5} Q0.5 0.5 ${tr + 0.5} 0.5 H${tw} Q${tw + 3} 0.5 ${tw + 5} 3 L${tw + dx} ${th - 1} Q${tw + dx + 2} ${th + 0.5} ${tw + dx + 5} ${th + 0.5} H${W - r} Q${W - 0.5} ${th + 0.5} ${W - 0.5} ${th + r} V${H - r} Q${W - 0.5} ${H - 0.5} ${W - r} ${H - 0.5} H${r} Q0.5 ${H - 0.5} 0.5 ${H - r} Z`;
+  return `<svg class="shoutline" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><path d="${p}"/></svg>`;
+}
+
 const TILE = {
   music(size) {
     if (D.outPicker && size > 1) return outputsPicker(size);
@@ -222,17 +229,17 @@ const TILE = {
     return t;
   },
 
-  shelf(size) {
+  shelf(size) {   // eslint-disable-line
     const t = el('div', `tile shelf w${size}`);
     const list = D.shelf || [];
-    t.dataset.label = size > 1 ? `Shelf${list.length ? ' · ' + list.length : ''}` : (list.length ? String(list.length) : '');
-    if (!list.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.folder}</div>${size > 1 ? 'Drop files or folders here to hold them' : 'Drop here'}</div>`; return t; }
+    const outline = folderOutline(size);
+    if (!list.length) { t.innerHTML = `${outline}<div class="empty"><div class="ico">${I.folder}</div>${size > 1 ? 'Drop files or folders here to hold them' : 'Drop here'}</div>`; return t; }
     if (size === 1) {
-      t.innerHTML = `<div class="shfile solo" draggable="true" data-shelfall title="Drag out all ${list.length}">${list[0].icon ? `<img src="${list[0].icon}" alt="">` : I.download}${list.length > 1 ? `<span class="badge">${list.length}</span>` : ''}</div>`;
+      t.innerHTML = `${outline}<div class="shfile solo" draggable="true" data-shelfall title="Drag out all ${list.length}">${list[0].icon ? `<img src="${list[0].icon}" alt="">` : I.download}${list.length > 1 ? `<span class="badge">${list.length}</span>` : ''}</div>`;
       return t;
     }
     const shown = list.slice().reverse();   // newest first, one row you can scroll
-    t.innerHTML = `
+    t.innerHTML = `${outline}
       <div class="shhead">
         <span class="shact">${list.length > 1 ? `<span class="shall" draggable="true" data-shelfall title="Drag all ${list.length} out">All ${list.length}</span>` : ''}<button class="shclear" data-shelfclear title="Clear the shelf">Clear</button></span></div>
       <div class="shlist">${shown.map(x => `

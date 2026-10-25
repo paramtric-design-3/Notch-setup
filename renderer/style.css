@@ -788,3 +788,10 @@ body.dropping .tile.shelf::before { color: var(--accent); }
 .tile.shelf .shhead { top: 19px; }
 .tile.shelf .shall, .tile.shelf .shclear { padding: 1px 7px; font-size: 10px; }
 .tile.shelf .shlist { flex: 1; align-items: center; margin-top: 8px; }
+/* folder outline as one shape (replaces the tab + body boxes) */
+.tile.shelf::before, .tile.shelf::after { display: none; }
+.tile.shelf { padding-top: 18px; }
+.tile.shelf .shoutline { position: absolute; inset: 0; z-index: -1; overflow: visible; }
+.tile.shelf .shoutline path { fill: var(--tile); stroke: var(--line); stroke-width: 1; }
+body.dropping .tile.shelf .shoutline path { stroke: var(--accent); stroke-width: 1.5; }
+.tile.shelf .shhead { top: 17px; }
