@@ -941,13 +941,37 @@ ipcMain.handle('shelf-add', async (_e, paths) => {
 });
 ipcMain.handle('shelf-remove', (_e, id) => { shelf = shelf.filter(x => x.id !== id); saveShelf(); sendShelf(); return shelf; });
 ipcMain.handle('shelf-clear', () => { shelf = []; saveShelf(); sendShelf(); return shelf; });
+// Only things on the shelf, or inside a folder on the shelf, can be listed or dragged out.
+function onShelf(p) {
+  if (typeof p !== 'string' || !p) return false;
+  const r = path.resolve(p);
+  return shelf.some(x => { const rel = path.relative(x.path, r); return rel === '' || (x.dir && rel && !rel.startsWith('..') && !path.isAbsolute(rel)); });
+}
+// What's inside a folder on the shelf (folders first), for the tree view.
+ipcMain.handle('shelf-list', (_e, dir) => {
+  if (!onShelf(dir)) return [];
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true })
+      .filter(d => !d.name.startsWith('$') && d.name !== 'desktop.ini' && d.name !== 'Thumbs.db')
+      .map(d => {
+        const p = path.join(dir, d.name);
+        let size = 0, isDir = d.isDirectory();
+        if (!isDir) { try { size = fs.statSync(p).size; } catch { /* locked */ } }
+        return { path: p, name: d.name, dir: isDir, size };
+      })
+      .sort((a, b) => (b.dir - a.dir) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+      .slice(0, 300);
+  } catch { return []; }
+});
 // Dragging out: Windows takes over from here (Explorer copies, or moves on the same drive / with Shift).
-ipcMain.on('shelf-drag', (e, ids) => {
-  const items = shelf.filter(x => (ids || []).includes(x.id) && fs.existsSync(x.path));
-  if (!items.length) return;
+ipcMain.on('shelf-drag', (e, req) => {
+  const ids = Array.isArray(req) ? req : (req && req.ids) || [];
+  const paths = [...shelf.filter(x => ids.includes(x.id)).map(x => x.path), ...((req && req.paths) || []).filter(onShelf)].filter(p => fs.existsSync(p));
+  if (!paths.length) return;
+  const items = paths.map(p => shelf.find(x => x.path === p) || { path: p });
   let icon = items[0].icon ? nativeImage.createFromDataURL(items[0].icon) : trayImage();
   if (icon.isEmpty()) icon = trayImage();
-  e.sender.startDrag({ file: items[0].path, files: items.map(x => x.path), icon });
+  e.sender.startDrag({ file: paths[0], files: paths, icon });
 });
 ipcMain.on('shelf-open', (_e, id) => { const x = shelf.find(y => y.id === id); if (x) shell.showItemInFolder(x.path); });
 ipcMain.handle('get-displays', () => listDisplays());

@@ -225,14 +225,15 @@ const TILE = {
   shelf(size) {
     const t = el('div', `tile shelf w${size}`);
     const list = D.shelf || [];
-    if (!list.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.download}</div>${size > 1 ? 'Drop files or folders here to hold them' : 'Drop here'}</div>`; return t; }
+    t.dataset.label = size > 1 ? `Shelf${list.length ? ' · ' + list.length : ''}` : (list.length ? String(list.length) : '');
+    if (!list.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.folder}</div>${size > 1 ? 'Drop files or folders here to hold them' : 'Drop here'}</div>`; return t; }
     if (size === 1) {
       t.innerHTML = `<div class="shfile solo" draggable="true" data-shelfall title="Drag out all ${list.length}">${list[0].icon ? `<img src="${list[0].icon}" alt="">` : I.download}${list.length > 1 ? `<span class="badge">${list.length}</span>` : ''}</div>`;
       return t;
     }
     const shown = list.slice().reverse();   // newest first, one row you can scroll
     t.innerHTML = `
-      <div class="shhead"><span class="muted">${list.length} held · drag out to a folder</span>
+      <div class="shhead">
         <span class="shact">${list.length > 1 ? `<span class="shall" draggable="true" data-shelfall title="Drag all ${list.length} out">All ${list.length}</span>` : ''}<button class="shclear" data-shelfclear title="Clear the shelf">Clear</button></span></div>
       <div class="shlist">${shown.map(x => `
         <div class="shfile" draggable="true" data-shelfid="${esc(x.id)}" title="${esc(x.path)}&#10;Drag out to copy or move · double-click to show in its folder">

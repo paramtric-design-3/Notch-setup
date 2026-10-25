@@ -6,7 +6,7 @@ const ON = new Set([
   'weather', 'messages', 'calendar', 'peek', 'displays', 'update', 'pointer', 'outputs', 'league', 'overlay', 'shelf',
 ]);
 const SEND = new Set(['island-size', 'island-open', 'helper', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update', 'overlay-mouse', 'overlay-drag', 'shelf-drag', 'shelf-open']);
-const INVOKE = new Set(['get-settings', 'set-settings', 'copy-text', 'initial-state', 'get-displays', 'get-update', 'league-import-runes', 'shelf-add', 'shelf-remove', 'shelf-clear']);
+const INVOKE = new Set(['get-settings', 'set-settings', 'copy-text', 'initial-state', 'get-displays', 'get-update', 'league-import-runes', 'shelf-add', 'shelf-remove', 'shelf-clear', 'shelf-list']);
 
 contextBridge.exposeInMainWorld('notch', {
   on: (ch, cb) => { if (ON.has(ch)) ipcRenderer.on(ch, (_e, d) => cb(d)); },

@@ -765,3 +765,26 @@ body.dropping .tile.shelf { box-shadow: inset 0 0 0 2px var(--accent); }
 .shelf .shfile { flex: 0 0 72px; }
 .shelf .shlist { scrollbar-width: none; }
 .shelf .shlist::-webkit-scrollbar { display: none; }
+
+/* the shelf tile is shaped like a folder: a tab on the top left, the body below */
+.tile.shelf { background: transparent; border: 0; padding-top: 22px; overflow: visible; }
+.tile.shelf::before, .tile.shelf::after { content: ""; position: absolute; background: var(--tile); border: 1px solid var(--line); }
+.tile.shelf::after { inset: 12px 0 0 0; border-radius: 0 16px 16px 16px; z-index: -2; }
+.tile.shelf::before {
+  content: attr(data-label); top: 0; left: 0; width: 44%; min-width: 34px; height: 22px; box-sizing: border-box; z-index: -1;
+  border-bottom: 0; border-radius: 10px 14px 0 0; clip-path: polygon(0 0, 82% 0, 100% 100%, 0 100%);
+  font-size: 10.5px; font-weight: 600; color: var(--text-2); padding: 3px 0 0 12px; line-height: 14px; white-space: nowrap; overflow: hidden;
+}
+.tile.shelf.w1::before { width: 56%; padding-left: 9px; }
+.tile.shelf .empty .ico svg { width: 22px; height: 22px; }
+body.dropping .tile.shelf { box-shadow: none; }
+body.dropping .tile.shelf::after, body.dropping .tile.shelf::before { border-color: var(--accent); }
+body.dropping .tile.shelf::before { color: var(--accent); }
+.tile.shelf::before { clip-path: none; border-radius: 10px 10px 0 0; width: 40%; }
+.tile.shelf .shhead { position: absolute; top: 15px; right: 10px; z-index: 1; }
+.tile.shelf .shlist { margin-top: 2px; }
+.tile.shelf .shfile { padding: 2px 4px 0; gap: 2px; }
+.tile.shelf .shfile img, .tile.shelf .shph { width: 30px; height: 30px; }
+.tile.shelf .shhead { top: 19px; }
+.tile.shelf .shall, .tile.shelf .shclear { padding: 1px 7px; font-size: 10px; }
+.tile.shelf .shlist { flex: 1; align-items: center; margin-top: 8px; }
