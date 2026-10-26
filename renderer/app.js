@@ -218,7 +218,7 @@ const TILE = {
       meta.innerHTML = `
         <div class="title ellipsis">${esc(m.title)}</div>
         <div class="artist ellipsis">${esc(m.artist || m.album || '')}</div>
-        ${D.volOpen ? volRow() : '<div class="lyric ellipsis" data-lyric></div>'}
+        ${D.volOpen ? volRow() : ''}
         <div class="bar"><i data-bar></i></div>
         <div class="row">
           <span class="time" data-pos>0:00</span>

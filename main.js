@@ -491,11 +491,8 @@ async function onHelperMessage(m) {
       state.media = m.data;
       toIsland('media', m.data);
       const key = m.data ? `${m.data.artist}|${m.data.title}` : '';
-      if (key && key !== lastTrackKey) {
-        lastTrackKey = key;
-        const lyr = await getLyrics(m.data);
-        if (`${state.media?.artist}|${state.media?.title}` === key) toIsland('lyrics', { key, lines: lyr });
-      }
+      // lyrics are no longer shown, so they aren't looked up either
+      if (key && key !== lastTrackKey) lastTrackKey = key;
       break;
     }
     case 'art': {
