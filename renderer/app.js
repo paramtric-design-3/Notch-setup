@@ -216,10 +216,9 @@ const TILE = {
       meta.innerHTML = `<div class="title ellipsis">Nothing playing</div><div class="artist ellipsis">Play something in Spotify, your browser or any player</div>`;
     } else {
       // just the controls (and the volume slider when open); hover shows what's playing
-      t.title = [m.title, m.artist || m.album].filter(Boolean).join(' — ');
       meta.classList.add('lean');
       meta.innerHTML = `
-        ${D.volOpen ? volRow() : ''}
+        ${D.volOpen ? volRow() : `<div class="title ellipsis">${esc(m.title)}</div><div class="artist ellipsis">${esc(m.artist || m.album || '')}</div>`}
         <div class="row">
           <div class="ctl">
             <button class="ibtn" data-media="prev" title="Previous">${I.prev}</button>
