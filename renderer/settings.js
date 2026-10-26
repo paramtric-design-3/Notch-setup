@@ -105,7 +105,7 @@ function bindText(id, key, savedId) {
 // Foldable sections (remembered on this PC).
 let FOLDED = {};
 try { FOLDED = JSON.parse(localStorage.getItem('folded') || '{}'); } catch { FOLDED = {}; }
-document.querySelectorAll('section > h2').forEach(h => {
+document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   const key = h.textContent.trim();
   if (FOLDED[key]) h.parentElement.classList.add('folded');
   h.onclick = () => {
