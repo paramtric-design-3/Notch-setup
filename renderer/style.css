@@ -968,3 +968,13 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .tile.shelf .shclose { position: absolute; top: 16px; right: 8px; z-index: 2; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text-2); font: 400 16px/20px system-ui; cursor: pointer; }
 .tile.shelf .shclose:hover { background: var(--btn-hover); color: var(--text); }
 .tile.shelf.w1 .shclose { top: 14px; right: 4px; width: 16px; height: 16px; font-size: 13px; line-height: 16px; }
+/* volume slider takes the title+artist block (34px), sitting on the artist line under the top-right buttons; same width as the progress bar */
+.music .meta .volrow { height: 34px; margin: 0; align-items: flex-end; padding-bottom: 0; }
+.music .meta .volrow .volmute { margin-left: -3px; }
+.music .meta .volrow input[type=range] { margin-bottom: 3px; }
+/* controls row fits exactly under the progress bar */
+.music .meta .row { min-width: 0; }
+.music .meta .row .time { width: auto; min-width: 26px; }
+.music .meta .row .ctl { gap: 0; }
+.music .meta .row .ctl .ibtn { width: 26px; }
+.music .meta .row .ctl .ibtn.big { width: 30px; }
