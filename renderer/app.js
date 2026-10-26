@@ -1091,6 +1091,15 @@ api.on('todo', d => {
   if (tdTyping && box && d.status === 'ok') { box.innerHTML = todoRows(d.tasks || []); const c = tilesView.querySelector('.tdcount'); if (c) c.textContent = (d.tasks || []).filter(x => !x.done).length; return; }
   rerenderTile('todo');
 });
+// Shelf pictures size themselves: wide previews (photos, folder previews) get the full width,
+// square or tall file icons stay small so they don't crowd the name underneath.
+tilesView.addEventListener('load', e => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.closest('.tile.shelf')) return;
+  const r = img.naturalWidth / (img.naturalHeight || 1);
+  img.classList.toggle('wide', r > 1.15);
+  img.classList.toggle('tall', r < 0.85);
+}, true);
 api.on('shelfdrag', ids => { D.shelfDrag = ids || null; rerenderTile('shelf'); });
 api.on('shelf', list => { if (!(list || []).length) D.shelfList = false; const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
 api.on('appout', a => { D.appout = a; if (D.outPicker) rerenderTile('music'); });

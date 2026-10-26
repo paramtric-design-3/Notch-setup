@@ -24,6 +24,7 @@ function load() {
       BindToHandler: koffi.proto('int __stdcall BindToHandler(void *self, void *bc, void *bhid, void *riid, _Out_ void **out)'),
       InitializeFromWindow: koffi.proto('int __stdcall InitializeFromWindow(void *self, void *hwnd, void *pt, void *data)'),
       Release: koffi.proto('uint32_t __stdcall Release(void *self)'),
+      DwmSetWindowAttribute: koffi.load('dwmapi.dll').func('int __stdcall DwmSetWindowAttribute(intptr_t hwnd, uint32_t attr, _In_ uint32_t *value, uint32_t size)'),
     };
   } catch (e) { api = false; module.exports.error = e.message; }
   return api;
@@ -84,4 +85,19 @@ function drag(paths) {
   }
 }
 
-module.exports = { drag, available: () => !!load(), error: '' };
+// Colours a window's title bar (Windows 11): dark or light caption, background and text colour.
+function titleBar(hwndBuf, dark, bg, fg) {
+  const a = load();
+  if (!a || !hwndBuf || hwndBuf.length < 4) return false;
+  const hwnd = hwndBuf.length >= 8 ? hwndBuf.readBigInt64LE(0) : BigInt(hwndBuf.readInt32LE(0));
+  const rgb = hex => { const n = parseInt(hex.slice(1), 16); return ((n & 0xff) << 16) | (n & 0xff00) | (n >> 16); };   // COLORREF is 0x00BBGGRR
+  try {
+    const set = (attr, v) => a.DwmSetWindowAttribute(hwnd, attr, [v >>> 0], 4);
+    set(20, dark ? 1 : 0);          // DWMWA_USE_IMMERSIVE_DARK_MODE
+    set(35, rgb(bg));               // DWMWA_CAPTION_COLOR
+    set(36, rgb(fg));               // DWMWA_TEXT_COLOR
+    return true;
+  } catch { return false; }
+}
+
+module.exports = { drag, titleBar, available: () => !!load(), error: '' };

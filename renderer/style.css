@@ -956,3 +956,12 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .tile.shelf .shpill { margin-top: 2px; padding-top: 2px; padding-bottom: 2px; }
 .tile.shelf .shfile img, .tile.shelf .shfile > svg, .tile.shelf .shfile .shph { width: 46px; height: 40px; }
 .tile.shelf .shfile { flex: 0 0 80px; }
+/* adaptive shelf pictures: never over the name, icons smaller than previews */
+.tile.shelf .shstack { width: 84px; height: 48px; margin-top: -2px; }
+.tile.shelf .shcard img { width: 40px; height: 40px; }
+.tile.shelf .shcard img.wide { width: 72px; height: 46px; }
+.tile.shelf .shcard img.tall { width: 34px; height: 42px; }
+.tile.shelf .shcard > svg { width: 52px; height: 42px; }
+.tile.shelf .shpill { margin-top: 4px; }
+.tile.shelf .shfile img { width: 34px; height: 34px; }
+.tile.shelf .shfile img.wide { width: 46px; height: 34px; }

@@ -7,6 +7,7 @@ const {
   app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, powerMonitor,
   clipboard, shell, nativeTheme, safeStorage
 } = require('electron');
+const nativeDrag = require('./nativedrag');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -88,6 +89,7 @@ function applySettings(next, { fromSettingsWindow = false } = {}) {
   const prevList = settings.todo && settings.todo.listId;
   const prevDisplay = settings.display;
   settings = { ...settings, ...next };
+  if (next.theme) setTimeout(colorSettingsBar, 0);
   if (settings.display !== prevDisplay) {
     const d = screen.getAllDisplays().find(x => String(x.id) === String(settings.display));
     settings.displayLabel = d ? displayName(d, 0, true) : '';
@@ -253,10 +255,18 @@ function openSettings() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   settingsWin.setMenu(null);
+  colorSettingsBar();
   settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
   settingsWin.on('closed', () => { settingsWin = null; });
 }
 
+// The settings window's title bar follows WALL-E's theme (White = light bar, Dark = dark bar).
+function colorSettingsBar() {
+  if (!settingsWin || settingsWin.isDestroyed()) return;
+  const dark = settings.theme === 'dark';
+  try { nativeDrag.titleBar(settingsWin.getNativeWindowHandle(), dark, dark ? '#111111' : '#F7F8FA', dark ? '#ECECEC' : '#1E2129'); } catch { /* older Windows: default bar */ }
+  settingsWin.setBackgroundColor(dark ? '#111111' : '#F7F8FA');
+}
 function broadcast(channel, data) {
   for (const w of [island, settingsWin]) {
     if (w && !w.isDestroyed()) w.webContents.send(channel, data);
@@ -1011,7 +1021,7 @@ ipcMain.handle('shelf-list', (_e, dir) => {
 });
 // Dragging out: Windows takes over from here (Explorer copies, or moves on the same drive / with Shift).
 let nativeDragFails = 0;
-const nativeDrag = require('./nativedrag');
+
 ipcMain.on('shelf-drag', (e, req) => {
   const ids = Array.isArray(req) ? req : (req && req.ids) || [];
   const paths = [...shelf.filter(x => ids.includes(x.id)).map(x => x.path), ...((req && req.paths) || []).filter(onShelf)].filter(p => fs.existsSync(p));
