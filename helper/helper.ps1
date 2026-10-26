@@ -169,10 +169,26 @@ interface IDragSourceHelper { [PreserveSig] int InitializeFromBitmap(IntPtr shdi
 [ComImport, Guid("83E07D0D-0C5F-4163-BF1A-60B274051E40"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IDragSourceHelper2 { [PreserveSig] int InitializeFromBitmap(IntPtr shdi, [MarshalAs(UnmanagedType.IUnknown)] object data); [PreserveSig] int InitializeFromWindow(IntPtr hwnd, IntPtr pt, [MarshalAs(UnmanagedType.IUnknown)] object data); [PreserveSig] int SetFlags(int flags); }
 [ComImport, Guid("4657278A-411B-11D2-839A-00C04FD918D0")] class DragDropHelperCom { }
+[ComImport, Guid("00000121-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IDropSourceN { [PreserveSig] int QueryContinueDrag(int esc, int keys); [PreserveSig] int GiveFeedback(int effect); }
+// Drops when the real (physical) left button goes up, cancels on Esc. The drag runs on the helper's
+// own thread, which never saw the button go down, so the key state Windows passes in can't be trusted.
+[ComVisible(true), ClassInterface(ClassInterfaceType.None)]
+public class NotchDropSource : IDropSourceN {
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
+    public int QueryContinueDrag(int esc, int keys) {
+        if (esc != 0) return 0x00040101;                              // DRAGDROP_S_CANCEL
+        bool left = (GetAsyncKeyState(0x01) & 0x8000) != 0;
+        bool right = (GetAsyncKeyState(0x02) & 0x8000) != 0;
+        return left || right ? 0 : 0x00040100;                         // keep going / DRAGDROP_S_DROP
+    }
+    public int GiveFeedback(int effect) { return 0x00040102; }         // DRAGDROP_S_USEDEFAULTCURSORS
+}
 public static class NotchDrag {
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHParseDisplayName(string name, IntPtr bc, out IntPtr pidl, uint sfgaoIn, out uint sfgaoOut);
     [DllImport("shell32.dll")] static extern int SHCreateShellItemArrayFromIDLists(uint cidl, IntPtr[] pidls, out IShellItemArray items);
-    [DllImport("shell32.dll")] static extern int SHDoDragDrop(IntPtr hwnd, [MarshalAs(UnmanagedType.IUnknown)] object data, IntPtr dropSource, uint okEffects, out uint effect);
+    [DllImport("shell32.dll")] static extern int SHDoDragDrop(IntPtr hwnd, [MarshalAs(UnmanagedType.IUnknown)] object data, IDropSourceN dropSource, uint okEffects, out uint effect);
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
     [DllImport("ole32.dll")] static extern int OleInitialize(IntPtr reserved);
     [DllImport("ole32.dll")] static extern void CoTaskMemFree(IntPtr p);
     [StructLayout(LayoutKind.Sequential)] struct PT { public int x, y; }
@@ -183,8 +199,11 @@ public static class NotchDrag {
     [DllImport("user32.dll")] static extern bool ReleaseCapture();
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
     public static volatile string Last = "";
+    public static volatile bool Done = false, Dropped = false;
+    public static volatile int Ms = 0;
     // Starts the drag on its own thread (OLE drags need one) and returns at once.
     public static void Start(string[] paths) {
+        Ms = 0; Dropped = false;
         var t = new System.Threading.Thread(() => {
             var pidls = new System.Collections.Generic.List<IntPtr>();
             try {
@@ -207,12 +226,15 @@ public static class NotchDrag {
                 uint other = GetWindowThreadProcessId(WindowFromPoint(cp), IntPtr.Zero), me = GetCurrentThreadId();
                 bool attached = other != 0 && other != me && AttachThreadInput(me, other, true);
                 if (attached) ReleaseCapture();
-                uint eff; int hr;
-                try { hr = SHDoDragDrop(IntPtr.Zero, data, IntPtr.Zero, 1 | 2 | 4, out eff); }   // copy, move, link
+                uint eff; int hr; var t0 = DateTime.UtcNow;
+                // the button may already be up by the time this runs (a quick click): then don't drop anything
+                if ((GetAsyncKeyState(0x01) & 0x8000) == 0) { if (attached) AttachThreadInput(me, other, false); Last = "button already up"; return; }
+                try { hr = SHDoDragDrop(IntPtr.Zero, data, new NotchDropSource(), 1 | 2 | 4, out eff); }   // copy, move, link
                 finally { if (attached) AttachThreadInput(me, other, false); }
                 Last = "hr=0x" + hr.ToString("X8") + " effect=" + eff + (attached ? "" : " (not attached)");
+                Ms = (int)(DateTime.UtcNow - t0).TotalMilliseconds; Dropped = hr == 0x00040100 && eff != 0; Done = true;
             } catch (Exception e) { Last = e.Message; }
-            finally { foreach (var p in pidls) CoTaskMemFree(p); }
+            finally { foreach (var p in pidls) CoTaskMemFree(p); Done = true; }
         });
         t.SetApartmentState(System.Threading.ApartmentState.STA);
         t.IsBackground = true;
@@ -681,7 +703,7 @@ function Handle-Command($line) {
         }
         'dark' { Toggle-Dark; $script:due['dark'] = 0 }
         'outputs' { $script:lastOutputs = ''; $script:due['outputs'] = 0 }
-        'drag' { if ([NotchDrag]::Last) { Log "drag (previous): $([NotchDrag]::Last)" }; try { [NotchDrag]::Start([string[]]@($c.paths)) } catch { Log "drag: $($_.Exception.Message)" } }
+        'drag' { try { [NotchDrag]::Start([string[]]@($c.paths)) } catch { Log "drag: $($_.Exception.Message)" } }
         'appout' { Set-AppOutput ([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0 }
         'setoutput' { [NotchAudio]::SetDefaultOutput([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0; $script:lastVol = ''; $script:due['volume'] = 0 }
         'start' { [NotchNative]::PressWin() }
@@ -703,6 +725,7 @@ while (-not [NotchPump]::Closed) {
     while ([NotchPump]::Queue.TryDequeue([ref]$line)) {
         try { Handle-Command $line } catch { Log "command: $($_.Exception.Message)" }
     }
+    if ([NotchDrag]::Done) { [NotchDrag]::Done = $false; Emit 'dragdone' ([ordered]@{ result = [NotchDrag]::Last; ms = [NotchDrag]::Ms; dropped = [NotchDrag]::Dropped }) }
     if ($script:open) {
         Every 'media' 1000 { Poll-Media }
         Every 'volume' 1000 { Poll-Volume }

@@ -541,6 +541,14 @@ async function onHelperMessage(m) {
     }
     case 'lcu': league && league.setClient(m.data && m.data.port ? { port: m.data.port, token: m.data.token } : null); break;
     case 'log': helperLog(m.data); break;
+    case 'dragdone': {
+      const d = m.data || {};
+      helperLog(`shelf drag: ${d.result} in ${d.ms}ms`);
+      // ended at once without dropping: Windows' own drag doesn't work on this PC, use WALL-E's drag from now on
+      if (!d.dropped && d.ms < 400) { nativeDragFails++; if (nativeDragFails >= 1) helperLog('shelf drag: switching to the built-in drag'); }
+      else nativeDragFails = 0;
+      break;
+    }
   }
 }
 
@@ -988,13 +996,14 @@ ipcMain.handle('shelf-list', (_e, dir) => {
   } catch { return []; }
 });
 // Dragging out: Windows takes over from here (Explorer copies, or moves on the same drive / with Shift).
+let nativeDragFails = 0;
 ipcMain.on('shelf-drag', (e, req) => {
   const ids = Array.isArray(req) ? req : (req && req.ids) || [];
   const paths = [...shelf.filter(x => ids.includes(x.id)).map(x => x.path), ...((req && req.paths) || []).filter(onShelf)].filter(p => fs.existsSync(p));
   if (!paths.length) return;
   const items = paths.map(p => shelf.find(x => x.path === p) || { path: p });
   // On Windows, Windows itself runs the drag (thumbnail + "Move"/"Copy" like Explorer, no file path)
-  if (process.platform === 'win32' && helper && helper.stdin.writable) { sendHelper({ c: 'drag', paths }); return; }
+  if (process.platform === 'win32' && helper && helper.stdin.writable && !nativeDragFails) { sendHelper({ c: 'drag', paths }); return; }
   let icon = items[0].icon ? nativeImage.createFromDataURL(items[0].icon) : trayImage();
   if (icon.isEmpty()) icon = trayImage();
   e.sender.startDrag({ file: paths[0], files: paths, icon });
