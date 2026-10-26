@@ -854,6 +854,7 @@ class League {
     let live;
     try { live = await request(LIVE_PORT, '/liveclientdata/allgamedata', null, 2500); } catch { live = null; }
     if (!live || !Array.isArray(live.allPlayers) || !live.allPlayers.length) return;   // still loading
+    await this.loadChampions();
     const key = live.allPlayers.map(p => (p.riotId || p.summonerName) + p.championName).join('|');
     let queue = null;
     if (key !== this.gameKey) {
@@ -906,7 +907,11 @@ class League {
     this.game.players = live.allPlayers.map(p => {
       const riotId = p.riotId || (p.riotIdGameName ? `${p.riotIdGameName}#${p.riotIdTagLine}` : p.summonerName) || '';
       const [name, tag] = riotId.split('#');
-      const champKey = String(p.rawChampionName || '').replace(/^game_character_displayname_/, '') || String(p.championName || '').replace(/[^A-Za-z]/g, '');
+      // Riot's own key for the picture: look the name up in the champion list (the game's raw name
+      // can differ for some champions and skins), else fall back to the raw name.
+      const rawKey = String(p.rawChampionName || '').replace(/^game_character_displayname_/, '') || String(p.championName || '').replace(/[^A-Za-z]/g, '');
+      const cidKey = this.champs ? this.champIdOf(rawKey) || this.champIdOf(p.championName) : 0;
+      const champKey = (cidKey && this.champs[cidKey] && this.champs[cidKey].key) || rawKey;
       const info = this.players.get(riotId);
       return {
         team: p.team === 'CHAOS' ? 'red' : 'blue', champ: p.championName || champKey, champKey,
