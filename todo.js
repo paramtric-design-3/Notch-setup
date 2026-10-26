@@ -11,6 +11,16 @@ const LOGIN = process.env.NOTCH_MS_LOGIN || 'https://login.microsoftonline.com/c
 const GRAPH = process.env.NOTCH_MS_GRAPH || 'https://graph.microsoft.com/v1.0';
 const SCOPE = 'Tasks.ReadWrite offline_access';
 
+// Microsoft's sign-in errors, in plain words (with what to change in Azure).
+function explain(d) {
+  const m = String((d && (d.error_description || d.error)) || '');
+  if (/AADSTS70002|must be marked as 'mobile'|public client/i.test(m)) return 'In Azure, open Authentication and set "Allow public client flows" to Yes, save, then sign in again';
+  if (/AADSTS700016|not found in the directory|does not exist/i.test(m)) return "Microsoft doesn't know this client ID: check you copied the Application (client) ID";
+  if (/AADSTS50059|AADSTS90072|consumers|personal Microsoft account|AADSTS700046|unauthorized_client/i.test(m)) return 'In Azure, set Supported account types to include personal Microsoft accounts, then sign in again';
+  if (/AADSTS50011|redirect/i.test(m)) return 'In Azure, open Authentication and set "Allow public client flows" to Yes';
+  return m ? m.split(/\r?\n/)[0].replace(/^AADSTS\d+:\s*/, '').slice(0, 160) : 'Microsoft refused the sign-in (check the client ID)';
+}
+
 class Todo {
   constructor({ dir, safeStorage, send, log, getSettings, fetchImpl }) {
     this.file = path.join(dir, 'todo-signin.bin');
@@ -50,7 +60,7 @@ class Todo {
     if (!id) return { ok: false, error: 'Add your client ID first (see the steps below)' };
     const res = await this.fetch(`${LOGIN}/devicecode`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: id, scope: SCOPE }) });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok || !d.device_code) return { ok: false, error: d.error_description ? String(d.error_description).split('\n')[0] : 'Microsoft refused the sign-in (check the client ID)' };
+    if (!res.ok || !d.device_code) return { ok: false, error: explain(d) };
     this.emit({ status: 'pending', code: d.user_code, url: d.verification_uri || 'https://microsoft.com/devicelogin' });
     this.poll(id, d.device_code, (d.interval || 5) * 1000, Date.now() + (d.expires_in || 900) * 1000);
     return { ok: true, code: d.user_code, url: d.verification_uri || 'https://microsoft.com/devicelogin' };
@@ -65,7 +75,7 @@ class Todo {
         if (d.access_token) { this.keep(d); this.emit({ status: 'loading', code: null, error: null }); this.sync(); this.start(); return; }
         if (d.error === 'authorization_pending') return this.poll(id, deviceCode, every, until);
         if (d.error === 'slow_down') return this.poll(id, deviceCode, every + 5000, until);
-        this.emit({ status: 'signedout', code: null, error: d.error === 'expired_token' ? 'The code expired, try again' : d.error === 'authorization_declined' ? 'Sign-in was cancelled' : 'Sign-in failed' });
+        this.emit({ status: 'signedout', code: null, error: d.error === 'expired_token' ? 'The code expired, try again' : d.error === 'authorization_declined' ? 'Sign-in was cancelled' : explain(d) });
       } catch (e) { this.poll(id, deviceCode, every, until); }
     }, every);
   }
