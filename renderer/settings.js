@@ -1,7 +1,7 @@
 'use strict';
 const api = window.notch;
 const $ = s => document.querySelector(s);
-const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf' };
+const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do' };
 let S = null;
 
 const save = async patch => { S = await api.invoke('set-settings', patch); render(); };
@@ -48,6 +48,12 @@ function render() {
   if (document.activeElement !== $('#city')) $('#city').value = S.city || '';
   if (document.activeElement !== $('#msgApps')) $('#msgApps').value = S.messageApps || '';
 
+  // a feature's settings only show while its tile is on
+  document.querySelectorAll('section[data-tile]').forEach(sec => {
+    const tile = S.tiles.find(x => x.id === sec.dataset.tile);
+    sec.hidden = !(tile && tile.show);
+  });
+
   const box = $('#tiles');
   box.innerHTML = '';
   S.tiles.forEach((t, i) => {
@@ -78,6 +84,19 @@ function bindText(id, key, savedId) {
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { commit(); input.blur(); } });
 }
 
+// Foldable sections (remembered on this PC).
+let FOLDED = {};
+try { FOLDED = JSON.parse(localStorage.getItem('folded') || '{}'); } catch { FOLDED = {}; }
+document.querySelectorAll('section > h2').forEach(h => {
+  const key = h.textContent.trim();
+  if (FOLDED[key]) h.parentElement.classList.add('folded');
+  h.onclick = () => {
+    const f = h.parentElement.classList.toggle('folded');
+    FOLDED[key] = f;
+    try { localStorage.setItem('folded', JSON.stringify(FOLDED)); } catch { /* fine */ }
+  };
+});
+
 (async () => {
   S = await api.invoke('get-settings');
   DISPLAYS = await api.invoke('get-displays');
@@ -99,4 +118,40 @@ function bindText(id, key, savedId) {
   bindText('#city', 'city', '#citySaved');
   bindText('#msgApps', 'messageApps', '#appsSaved');
   api.on('settings', s => { S = s; render(); });
+  // Microsoft To Do
+  let TD = await api.invoke('todo-state').catch(() => null);
+  const tdLists = async () => {
+    const lists = await api.invoke('todo-lists').catch(() => []);
+    const sel = $('#tdList');
+    $('#tdListRow').hidden = !lists.length;
+    if (!lists.length) return;
+    const cur = (S.todo && S.todo.listId) || (lists.find(l => l.isDefault) || lists[0]).id;
+    sel.innerHTML = lists.map(l => `<option value="${l.id}">${l.name.replace(/[<>&]/g, '')}</option>`).join('');
+    sel.value = cur;
+  };
+  const tdRender = () => {
+    const st = (TD && TD.status) || 'signedout';
+    const btn = $('#tdSign');
+    $('#tdClient').value = document.activeElement === $('#tdClient') ? $('#tdClient').value : ((S.todo && S.todo.clientId) || '');
+    if (st === 'signedout') { $('#tdStatus').textContent = (TD && TD.error) || 'Not connected'; btn.textContent = 'Sign in'; btn.className = 'btn primary'; btn.disabled = false; $('#tdListRow').hidden = true; }
+    else if (st === 'pending') { $('#tdStatus').textContent = `Paste code ${TD.code} on Microsoft's page (it's on your clipboard)`; btn.textContent = 'Cancel'; btn.className = 'btn'; }
+    else { $('#tdStatus').textContent = st === 'error' ? (TD.error || 'Could not reach To Do') : `Connected${TD.list ? ' · ' + TD.list.name : ''} · ${(TD.tasks || []).filter(t => !t.done).length} open`; btn.textContent = 'Sign out'; btn.className = 'btn'; }
+  };
+  api.on('todo', d => { const was = TD && TD.status; TD = d; tdRender(); if (d.status === 'ok' && was !== 'ok') tdLists(); });
+  $('#tdSign').onclick = async () => {
+    const st = (TD && TD.status) || 'signedout';
+    if (st === 'signedout') {
+      $('#tdSign').disabled = true;
+      const r = await api.invoke('todo-signin');
+      $('#tdSign').disabled = false;
+      if (!r.ok) { $('#tdStatus').textContent = r.error; if (/client ID/i.test(r.error)) $('#tdSteps').open = true; }
+    } else await api.invoke('todo-signout');
+  };
+  const commitClient = () => { const v = $('#tdClient').value.trim(); if (v !== ((S.todo && S.todo.clientId) || '')) { save({ todo: { ...(S.todo || {}), clientId: v } }); flash('#tdSaved'); } };
+  $('#tdClient').addEventListener('change', commitClient);
+  $('#tdClient').addEventListener('keydown', e => { if (e.key === 'Enter') { commitClient(); e.target.blur(); } });
+  $('#tdList').onchange = e => save({ todo: { ...(S.todo || {}), listId: e.target.value } });
+  document.querySelectorAll('a[data-ext]').forEach(a => a.onclick = e => { e.preventDefault(); api.send('open-url', a.href); });
+  tdRender();
+  if (TD && TD.status === 'ok') tdLists();
 })();

@@ -124,7 +124,7 @@ api.on('pointer', p => {
 });
 
 island.addEventListener('click', e => {
-  if (e.target.closest('button, pre, a')) return;
+  if (e.target.closest('button, pre, a, input')) return;
   if (state === 'open' && e.target.closest('.tile.league.clickable')) return;   // handled by the tile
   if (state === 'open') { csPinned = false; pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
   else { pinned = true; setState('open'); }
@@ -173,6 +173,18 @@ function weatherIcon(code, isDay) {
 }
 
 // ------------------------------------------------------------------ tiles
+// To Do rows: tick to complete, star for important.
+function todoRows(tasks) {
+  if (!tasks.length) return '<div class="muted tdnone">Nothing to do 🎉</div>';
+  const today = new Date().toISOString().slice(0, 10);
+  return tasks.map(x => `<div class="tdrow ${x.done ? 'done' : ''} ${x.pending ? 'pending' : ''}">
+    <button class="tdchk" data-tddone="${esc(x.id)}" data-v="${x.done ? 0 : 1}" title="${x.done ? 'Mark as not done' : 'Complete'}">${x.done ? I.check : ''}</button>
+    <span class="tdtitle ellipsis" title="${esc(x.title)}">${esc(x.title)}</span>
+    ${x.due ? `<span class="tddue ${x.due < today ? 'late' : x.due === today ? 'today' : ''}">${x.due === today ? 'Today' : new Date(x.due + 'T12:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>` : ''}
+    <button class="tdstar ${x.important ? 'on' : ''}" data-tdstar="${esc(x.id)}" data-v="${x.important ? 0 : 1}" title="${x.important ? 'Not important' : 'Important'}">${x.important ? '★' : '☆'}</button>
+  </div>`).join('');
+}
+
 // A yellow folder, like the ones in Explorer, for folders on the shelf.
 const FOLDER_PIC = `<svg class="shfolder" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h6.2l2.6 2.7h12.2A2.5 2.5 0 0 1 29 11.2V24a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24z" fill="#E0A526"/><path d="M3 12.6A2.5 2.5 0 0 1 5.5 10.1h21A2.5 2.5 0 0 1 29 12.6V24a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 3 24z" fill="#F7C948"/></svg>`;
 
@@ -239,6 +251,26 @@ const TILE = {
     t.innerHTML = `
       <div class="top"><div class="temp">${w.temp}°</div><div class="wicon">${weatherIcon(w.code, w.isDay)}</div></div>
       <div><div class="city ellipsis">${esc(w.city)}</div><div class="hl">H ${w.hi}°&nbsp;&nbsp;L ${w.lo}°</div></div>`;
+    return t;
+  },
+
+  todo(size) {
+    const t = el('div', `tile todo w${size}`);
+    const d = D.todo || { status: 'signedout' };
+    const tasks = (d.tasks || []);
+    const open = tasks.filter(x => !x.done);
+    if (d.status === 'signedout') {
+      t.innerHTML = `<div class="empty"><div class="ico">${I.check}</div>${size > 1 ? `${d.error ? esc(d.error) + '<br>' : ''}<button class="tdlink" data-opensettings>Connect Microsoft To Do in Settings</button>` : 'To Do'}</div>`;
+      return t;
+    }
+    if (d.status === 'pending') { t.innerHTML = `<div class="empty"><div class="ico">${I.check}</div>${size > 1 ? `Finish signing in on Microsoft's page<br><b class="tdcode">${esc(d.code || '')}</b>` : esc(d.code || '')}</div>`; return t; }
+    if (d.status === 'loading' && !tasks.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.check}</div>Loading your tasks…</div>`; return t; }
+    if (d.status === 'error' && !tasks.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.check}</div>${esc(d.error || 'Could not reach Microsoft To Do')}</div>`; return t; }
+    if (size === 1) { t.innerHTML = `<div class="big-ico">${I.check}</div><span class="badge">${open.length}</span>`; return t; }
+    t.innerHTML = `
+      <div class="tdhead"><span class="tdlist-name ellipsis">${esc((d.list && d.list.name) || 'Tasks')}</span><span class="muted tdcount">${open.length}</span>
+        <input class="tdadd" data-tdadd type="text" placeholder="+ Add a task" maxlength="255" spellcheck="false"></div>
+      <div class="tdlist">${todoRows(tasks)}</div>`;
     return t;
   },
 
@@ -446,6 +478,9 @@ tilesView.addEventListener('click', async e => {
     else if (res.replaced) peek({ icon: I.trophy, title: 'Runes imported', sub: `All pages were in use, so "${res.replaced}" was replaced`, ms: 5000 });
     return;
   }
+  if (b.dataset.opensettings !== undefined) { api.send('open-settings'); return; }
+  if (b.dataset.tddone) { api.send('todo-done', { id: b.dataset.tddone, done: b.dataset.v === '1' }); return; }
+  if (b.dataset.tdstar) { api.send('todo-important', { id: b.dataset.tdstar, important: b.dataset.v === '1' }); return; }
   if (b.dataset.volopen !== undefined) { D.volOpen = !D.volOpen; rerenderTile('music'); return; }
   if (b.dataset.volmute !== undefined) { api.send('helper', { c: 'vol', mute: true }); return; }
   if (b.dataset.out !== undefined) { D.outPicker = true; api.send('helper', { c: 'outputs' }); rerenderTile('music'); return; }
@@ -982,6 +1017,28 @@ api.on('peek', p => {
   else peek(p);
 });
 
+// To Do: typing a new task. The window takes the keyboard only while you type in the box.
+let tdTyping = false;
+tilesView.addEventListener('mousedown', e => {
+  if (e.target.matches('[data-tdadd]') && !tdTyping) { tdTyping = true; pinned = true; island.classList.add('pinned'); api.send('island-focus', true); setTimeout(() => e.target.focus(), 30); }
+});
+tilesView.addEventListener('keydown', e => {
+  if (!e.target.matches('[data-tdadd]')) return;
+  if (e.key === 'Enter' && e.target.value.trim()) { api.send('todo-add', e.target.value.trim()); e.target.value = ''; }
+  if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); }
+});
+tilesView.addEventListener('focusout', e => {
+  if (!e.target.matches('[data-tdadd]') || !tdTyping) return;
+  tdTyping = false; api.send('island-focus', false);
+  pinned = false; island.classList.remove('pinned'); if (!hovering) settle();
+});
+api.on('todo', d => {
+  D.todo = d;
+  const box = tilesView.querySelector('.tile.todo .tdlist');
+  // while you type, only refresh the rows (keeps what you're typing)
+  if (tdTyping && box && d.status === 'ok') { box.innerHTML = todoRows(d.tasks || []); const c = tilesView.querySelector('.tdcount'); if (c) c.textContent = (d.tasks || []).filter(x => !x.done).length; return; }
+  rerenderTile('todo');
+});
 api.on('shelf', list => { const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
 api.on('league', L => {
@@ -1007,7 +1064,7 @@ api.on('league', L => {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();

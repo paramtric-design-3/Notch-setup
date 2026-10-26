@@ -47,6 +47,18 @@
     select { height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 10px; font: inherit; outline: none; min-width: 0; flex: 1; }
     select:focus { border-color: var(--accent); }
     input[type=range] { width: 150px; accent-color: var(--accent); }
+    /* foldable sections: click the title */
+    section > h2 { cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+    section > h2::after { content: ""; width: 7px; height: 7px; border-right: 1.5px solid var(--text-2); border-bottom: 1.5px solid var(--text-2); transform: rotate(45deg); margin: -3px 4px 0 0; transition: transform .15s; }
+    section.folded > h2 { margin-bottom: 0; }
+    section.folded > h2::after { transform: rotate(-45deg); margin-top: 0; }
+    section.folded > :not(h2) { display: none !important; }
+    .privacy { font-size: 10.5px; line-height: 1.5; color: var(--text-2); opacity: .75; text-align: center; max-width: 440px; margin: 18px auto 0; }
+    details.steps { margin-top: 8px; font-size: 12.5px; color: var(--text-2); }
+    details.steps summary { cursor: pointer; color: var(--text); font-weight: 600; font-size: 12.5px; padding: 4px 0; }
+    details.steps ol { margin: 6px 0 4px; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
+    details.steps b { color: var(--text); font-weight: 600; }
+    a { color: var(--accent); }
     .row.stack { flex-wrap: wrap; padding: 8px 0; row-gap: 6px; }
     .row.stack > .grow { flex-basis: 100%; }
     .row.stack .seg { flex-wrap: wrap; }
@@ -81,20 +93,38 @@
     <p class="note">Size is in cells: 1 is a small square, 3 is the widest.</p>
   </section>
 
-  <section>
+  <section data-tile="weather">
     <h2>Weather</h2>
     <div class="row"><input type="text" id="city" placeholder="City, e.g. Amsterdam"><span class="saved" id="citySaved">Saved</span></div>
     <p class="note">From Open-Meteo. Only the city name and its coordinates are sent.</p>
   </section>
 
-  <section>
+  <section data-tile="messages">
     <h2>Messages</h2>
     <div class="row"><span class="grow">Show notifications from every app</span><label class="switch"><input type="checkbox" id="msgAll"><span></span></label></div>
     <div class="row"><input type="text" id="msgApps" placeholder="WhatsApp, Telegram, Teams…"><span class="saved" id="appsSaved">Saved</span></div>
     <p class="note">Reads the notifications Windows is still holding for these apps, on this PC only. Clear them in the notification center and they disappear here too.</p>
   </section>
 
-  <section>
+  <section data-tile="todo">
+    <h2>Microsoft To Do</h2>
+    <div class="row"><span class="grow" id="tdStatus">Not connected</span><button class="btn primary" id="tdSign">Sign in</button></div>
+    <div class="row" id="tdListRow" hidden><span class="grow">List</span><select id="tdList" style="flex:0 1 220px"></select></div>
+    <div class="row"><input type="text" id="tdClient" placeholder="Application (client) ID" spellcheck="false"><span class="saved" id="tdSaved">Saved</span></div>
+    <details class="steps" id="tdSteps">
+      <summary>How to get a client ID (once, about 3 minutes)</summary>
+      <ol>
+        <li>Open <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" data-ext>App registrations in the Azure portal</a> and sign in with your Microsoft account (the one you use for To Do).</li>
+        <li>Click <b>New registration</b>. Name: <code>WALL-E</code>. Supported account types: <b>Personal Microsoft accounts only</b>. Leave Redirect URI empty and click <b>Register</b>.</li>
+        <li>Copy the <b>Application (client) ID</b> and paste it in the box above.</li>
+        <li>In the menu on the left open <b>Authentication</b>, set <b>Allow public client flows</b> to <b>Yes</b> and click <b>Save</b>.</li>
+        <li>Back here, click <b>Sign in</b>. Your browser opens Microsoft's sign-in page and the code is already on your clipboard: paste it, sign in and allow access to your tasks.</li>
+      </ol>
+      <p class="note">If Azure asks you to create a directory or a free Azure account first, that's Microsoft's requirement for registering an app; the registration itself is free. WALL-E only asks for access to your tasks, never sees your password and keeps the sign-in encrypted on this PC.</p>
+    </details>
+  </section>
+
+  <section data-tile="league">
     <h2>League of Legends</h2>
     <div class="row"><span class="grow">Item overlay in game</span><label class="switch"><input type="checkbox" id="ovShow"><span></span></label></div>
     <div class="row"><span class="grow">Only while holding Tab</span><label class="switch"><input type="checkbox" id="ovTab"><span></span></label></div>
@@ -111,10 +141,7 @@
     <p class="note">WALL-E checks for a new version every 5 minutes and whenever your PC wakes up. It downloads updates in the background and installs them by itself straight away while WALL-E is closed (it restarts in a few seconds).</p>
   </section>
 
-  <section>
-    <h2>Privacy</h2>
-    <p class="note">Nothing leaves this PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), album covers when the player doesn't provide one (iTunes Search), League champion pictures (Riot Data Dragon), OP.GG's open champion data (tier lists, counters and builds) and update checks (GitHub). No accounts, no analytics.</p>
-  </section>
+  <p class="privacy">Nothing leaves this PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), album covers when the player doesn't provide one (iTunes Search), League pictures (Riot Data Dragon), OP.GG's open champion data, your To Do tasks if you connect Microsoft To Do, and update checks (GitHub). No accounts, no analytics.</p>
 </main>
 <script src="settings.js"></script>
 </body>

@@ -5,7 +5,7 @@
 
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, powerMonitor,
-  clipboard, shell, nativeTheme
+  clipboard, shell, nativeTheme, safeStorage
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -13,6 +13,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { League } = require('./league');
+const { Todo } = require('./todo');
 
 // The window is sized to the island itself (the renderer reports its size), so it
 // catches clicks normally and never covers the apps around it.
@@ -36,6 +37,7 @@ const DEFAULT_SETTINGS = {
   calendarUrl: '',              // ICS link (Outlook: Settings > Calendar > Shared calendars > Publish)
   messageApps: 'WhatsApp, Telegram, Signal, Teams, Discord, Messenger, Slack, Instagram, Phone Link, YourPhone, Mail, Outlook',
   messageAllApps: false,
+  todo: { clientId: '', listId: '' },   // Microsoft To Do: your app registration's client ID, and which list to show
   peeks: { apps: false, power: true },
   overlay: { show: true, place: 'minimap', onTab: true },   // in-game item overlay: 'minimap' | 'top' | 'left'; onTab: only while Tab is held
   schema: 2,
@@ -47,6 +49,7 @@ const DEFAULT_SETTINGS = {
     { id: 'timer', show: false, size: 2 },
     { id: 'league', show: true, size: 3 },
     { id: 'shelf', show: true, size: 2 },
+    { id: 'todo', show: true, size: 3 },
   ],
 };
 
@@ -57,7 +60,7 @@ function loadSettings() {
   settingsPath = path.join(app.getPath('userData'), 'settings.json');
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) } };
+    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) } };
     // keep any tile added in a newer version
     const ids = new Set(settings.tiles.map(t => t.id));
     for (const t of DEFAULT_SETTINGS.tiles) if (!ids.has(t.id)) settings.tiles.push({ ...t });
@@ -82,6 +85,7 @@ function saveSettings() {
 function applySettings(next, { fromSettingsWindow = false } = {}) {
   const prevCity = settings.city;
   const prevCal = settings.calendarUrl;
+  const prevList = settings.todo && settings.todo.listId;
   const prevDisplay = settings.display;
   settings = { ...settings, ...next };
   if (settings.display !== prevDisplay) {
@@ -94,6 +98,7 @@ function applySettings(next, { fromSettingsWindow = false } = {}) {
   broadcast('settings', settings);
   if (settings.city !== prevCity) refreshWeather(true);
   if (settings.calendarUrl !== prevCal) refreshCalendar(true);
+  if (todo && settings.todo && settings.todo.listId !== prevList) todo.listChanged();
   refreshMessages();
   buildTrayMenu();
   updateOverlay();
@@ -375,7 +380,7 @@ function trayImage() {
 
 const TILE_NAMES = {
   league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages',
-  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf',
+  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do',
 };
 
 function buildTrayMenu() {
@@ -994,7 +999,29 @@ ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), pack
 ipcMain.on('check-updates', () => checkForUpdates(true));
 ipcMain.on('install-update', () => installUpdate());
 ipcMain.on('identify-screens', () => identifyScreens());
-ipcMain.on('refresh-all', () => { refreshWeather(); refreshMessages(); refreshCalendar(); });
+ipcMain.on('refresh-all', () => { refreshWeather(); refreshMessages(); refreshCalendar(); if (todo) todo.sync(); });
+
+// ---------------------------------------------------------------- Microsoft To Do
+let todo = null;
+ipcMain.handle('todo-signin', async () => {
+  if (!todo) return { ok: false, error: 'Not ready yet' };
+  const r = await todo.signIn().catch(e => ({ ok: false, error: e.message }));
+  if (r.ok) { clipboard.writeText(r.code); shell.openExternal(r.url); }   // the code is on your clipboard: paste it on Microsoft's page
+  return r;
+});
+ipcMain.handle('todo-signout', () => { if (todo) todo.signOut(); return true; });
+ipcMain.handle('todo-lists', async () => { try { return todo && todo.token ? await todo.lists() : []; } catch { return []; } });
+ipcMain.handle('todo-state', () => todo ? todo.state : null);
+ipcMain.on('todo-done', (_e, d) => todo && d && todo.setDone(d.id, !!d.done));
+ipcMain.on('todo-important', (_e, d) => todo && d && todo.setImportant(d.id, !!d.important));
+ipcMain.on('todo-add', (_e, title) => todo && todo.add(title));
+ipcMain.on('todo-sync', () => todo && todo.sync());
+// Typing in WALL-E (the To Do "Add a task" line): the window takes the keyboard only while you type.
+ipcMain.on('island-focus', (_e, on) => {
+  if (!island || island.isDestroyed()) return;
+  if (on) { island.setFocusable(true); island.focus(); }
+  else { island.blur(); island.setFocusable(false); }
+});
 
 // ---------------------------------------------------------------- lifecycle
 let quitting = false;
@@ -1033,6 +1060,13 @@ app.whenReady().then(() => {
     },
   });
   league.start();
+  todo = new Todo({
+    dir: app.getPath('userData'), safeStorage, log: helperLog,
+    getSettings: () => settings.todo,
+    send: s => { state.todo = s; broadcast('todo', s); },
+  });
+  state.todo = todo.state;
+  if (todo.token) { todo.sync(); todo.start(); }
   if (process.env.NOTCH_LCU) { const [port, token] = process.env.NOTCH_LCU.split(':'); league.setClient({ port: +port, token }); }
   island.webContents.once('did-finish-load', () => {
     toIsland('settings', settings);

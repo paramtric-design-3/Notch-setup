@@ -849,3 +849,37 @@ html[data-theme="dark"] .music.has-art .volbtn:not(.on) { color: rgba(242,244,24
 .tile.league.game .lteams { gap: 8px; }
 .tile.league.game .ltl, .tile.league.game .lsplit > .lcol { background: var(--btn); border-radius: 12px; padding: 10px; }
 .tile.league.game .lsplit.three { gap: 8px; }
+
+/* To Do */
+.tile.todo { gap: 4px; }
+.todo .tdhead { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.todo .tdlist-name { font-size: 13px; font-weight: 600; max-width: 40%; }
+.todo .tdcount { font-size: 11px; }
+.todo .tdadd { margin-left: auto; flex: 1; min-width: 60px; max-width: 170px; height: 24px; border-radius: 8px; border: 1px solid var(--line); background: var(--btn); color: var(--text); font: inherit; font-size: 12px; padding: 0 9px; outline: none; }
+.todo .tdadd:focus { border-color: var(--accent); background: var(--tile); }
+.todo .tdadd::placeholder { color: var(--text-2); }
+.todo .tdlist { flex: 1; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 1px; margin-top: 2px; }
+.todo .tdlist::-webkit-scrollbar { display: none; }
+.todo .tdrow { display: flex; align-items: center; gap: 7px; min-height: 23px; padding: 0 2px; border-radius: 6px; }
+.todo .tdrow:hover { background: var(--btn); }
+.todo .tdchk { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 1.5px solid var(--text-2); background: none; padding: 0; display: grid; place-items: center; cursor: pointer; color: #fff; }
+.todo .tdchk:hover { border-color: var(--accent); }
+.todo .tdchk svg { width: 11px; height: 11px; stroke-width: 3; }
+.todo .tdrow.done .tdchk { background: var(--accent); border-color: var(--accent); }
+.todo .tdtitle { flex: 1; min-width: 0; font-size: 12.5px; }
+.todo .tdrow.done .tdtitle { text-decoration: line-through; color: var(--text-2); }
+.todo .tdrow.pending { opacity: .6; }
+.todo .tddue { font-size: 10.5px; color: var(--text-2); flex: none; }
+.todo .tddue.today { color: var(--accent); }
+.todo .tddue.late { color: #e0705f; }
+.todo .tdstar { flex: none; border: 0; background: none; color: var(--text-2); font-size: 13px; padding: 0 2px; cursor: pointer; opacity: 0; }
+.todo .tdrow:hover .tdstar, .todo .tdstar.on { opacity: 1; }
+.todo .tdstar.on { color: var(--accent); }
+.todo .tdnone { font-size: 12px; padding: 6px 2px; }
+.todo .tdlink { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 0; }
+.todo .tdcode { font-size: 15px; letter-spacing: 2px; color: var(--accent); }
+.todo .tdrow { min-height: 19px; }
+.todo .tdtitle { font-size: 12px; }
+.todo .tdchk { width: 15px; height: 15px; }
+.todo .tdadd { height: 22px; }
+.todo .tdlist { margin-top: 3px; gap: 0; }

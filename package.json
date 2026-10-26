@@ -1,6 +1,6 @@
 {
   "name": "fjbc-notch",
-  "version": "1.49.1",
+  "version": "1.50.0",
   "description": "A Dynamic Island for Windows",
   "main": "main.js",
   "scripts": {
@@ -31,6 +31,7 @@
       "main.js",
       "league.js",
       "opgg.js",
+      "todo.js",
       "preload.js",
       "renderer/**",
       "helper/**",
