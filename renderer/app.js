@@ -468,11 +468,12 @@ tilesView.addEventListener('click', async e => {
   if (b.dataset.cstab) { D.csTab = b.dataset.cstab; rerenderTile('league'); return; }
   if (b.dataset.shelfx) { D.shelf = await api.invoke('shelf-remove', b.dataset.shelfx); renderTiles(); return; }
   if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); renderTiles(); return; }
+  if (b.dataset.buildsrc) { D.buildSrc = b.dataset.buildsrc; rerenderTile('league'); return; }
   if (b.dataset.tierlane) { D.tierLane = b.dataset.tierlane; rerenderTile('league'); return; }
   if (b.dataset.import !== undefined) {
     b.disabled = true; b.textContent = 'Importing…';
-    const res = await api.invoke('league-import-runes').catch(() => ({ ok: false, error: 'Could not reach League' }));
-    b.textContent = res.ok ? `${res.source || ''} runes imported ✓` : 'Import runes';
+    const res = await api.invoke('league-import-runes', D.buildSrc === 'riot' ? 'riot' : 'opgg').catch(() => ({ ok: false, error: 'Could not reach League' }));
+    b.textContent = res.ok ? (res.spells ? 'Runes & spells imported ✓' : 'Runes imported ✓') : 'Import runes & spells';
     b.disabled = !!res.ok;
     if (!res.ok) peek({ icon: I.trophy, title: 'Runes not imported', sub: res.error || '', ms: 4000 });
     else if (res.replaced) peek({ icon: I.trophy, title: 'Runes imported', sub: `All pages were in use, so "${res.replaced}" was replaced`, ms: 5000 });
@@ -660,7 +661,7 @@ function opggUrl(champ, lane) {
 const SHARDS = { 5001: 'Health scaling', 5002: 'Armor', 5003: 'Magic resist', 5005: 'Attack speed', 5007: 'Ability haste', 5008: 'Adaptive force', 5010: 'Move speed', 5011: 'Health', 5013: 'Tenacity & slow resist' };
 // The full rune page OP.GG suggests (the one Import runes creates), drawn like the client:
 // every choice in each row, the picked ones lit, the rest greyed out.
-function runePage(r) {
+function runePage(r, spells) {
   if (!r || !r.perkIds || r.perkIds.length < 6) return '';
   const picked = new Set(r.perkIds.slice(0, 6));
   const shards = r.perkIds.slice(6, 9);
@@ -672,7 +673,8 @@ function runePage(r) {
   if (!r.tree) return `<div class="rpage"><div class="rhead"><span class="olabel">Rune page</span><span class="muted">Loading…</span></div></div>`;
   const shardRow = (opts, i) => `<div class="rrow shards">${opts.map(id => `<span class="rshard ${shards[i] === id ? 'on' : ''}" title="${esc(SHARDS[id] || '')}">${LICON['shard:' + id] ? `<img src="${LICON['shard:' + id]}" alt="">` : ''}</span>`).join('')}</div>`;
   return `<div class="rpage">
-    <div class="rhead"><span class="olabel">Rune page</span></div>
+    <div class="rhead"><span class="olabel">Rune page</span>
+      <span class="rimp">${(spells || []).map(x => imgIcon('spell:' + x, 'Summoner spell')).join('')}<button class="pbtn allow" data-import>Import runes &amp; spells</button></span></div>
     <div class="rtrees">
       <div class="rtree">${head(r.primary, r.primaryName)}${row(r.tree.primary[0] || [], true)}<i class="rline"></i>${r.tree.primary.slice(1).map(x => row(x)).join('')}</div>
       <div class="rtree">${head(r.secondary, r.secondaryName)}${r.tree.secondary.map(x => row(x)).join('')}<i class="rline"></i>${(r.shardRows || []).map(shardRow).join('')}</div>
@@ -784,23 +786,28 @@ function leagueChampSelect(cs) {
         : `<div class="uhead">Strongest ${esc(pos || '')} picks<span class="muted">Win rate</span></div>${ulist((cs.laneTop || []).slice(0, 8).map(c => ({ ...c, lane })), c => c.winRate - 0.45, c => pct0(c.winRate) + ' WR', () => 'good', 'Loading the tier list…')}`}</div>
     </div>`;
   } else {
-    const r = (o && o.runes) || cs.runes;
+    // which recommendation to show and import: OP.GG or the League client's own
+    const src = D.buildSrc === 'riot' && cs.runes ? 'riot' : (o && o.runes ? 'opgg' : (cs.runes ? 'riot' : 'opgg'));
+    const r = src === 'riot' ? cs.runes : (o && o.runes);
+    const spells = src === 'riot' ? ((cs.runes && cs.runes.spells && cs.runes.spells.length) ? cs.runes.spells : (o && o.spells) || []) : ((o && o.spells) || []);
     body = me ? `<div class="uload">
       <div class="csme">
         ${chIcon(me, 'csbig')}
         <div class="csinfo">
           <div class="csname">${esc(me.name)} <span class="muted">${me.locked ? 'locked in' : 'hovering'}</span></div>
           <div class="csstat">Your games: ${statLine(me.stats)}</div>
-          <div class="csrunes">${r ? `${o && o.runes ? imgIcon('rune:' + o.runes.keystoneId, r.keystone) : I.trophy}<b>${esc(r.keystone || r.primaryName)}</b>&nbsp;· ${esc(r.primaryName)} + ${esc(r.secondaryName)}${o && o.runes ? '<span class="muted">&nbsp;(OP.GG)</span>' : ''}` : '<span class="muted">Loading recommended runes…</span>'}</div>
+          <div class="csrunes">${r ? `${r.keystoneId ? imgIcon('rune:' + r.keystoneId, r.keystone) : I.trophy}<b>${esc(r.keystone || r.primaryName)}</b>&nbsp;· ${esc(r.primaryName)} + ${esc(r.secondaryName)}` : '<span class="muted">Loading recommended runes…</span>'}</div>
         </div>
       </div>
       <div class="csbtns">
-          <button class="pbtn allow" data-import ${r && r.perkIds && r.perkIds.length >= 6 ? '' : 'disabled'}>Import ${o && o.runes ? 'OP.GG ' : ''}runes</button>
-          <button class="pbtn" data-url="${esc(opggUrl(me, o && o.lane))}">OP.GG ↗</button>
-          <button class="pbtn" data-url="${esc(uggUrl(me, cs.position, 'build'))}">u.gg ↗</button>
+          <span class="srcseg" title="Whose recommended runes and spells to show and import">
+            <button class="${src === 'opgg' ? 'on' : ''}" data-buildsrc="opgg" ${o && o.runes ? '' : 'disabled'}>OP.GG</button>
+            <button class="${src === 'riot' ? 'on' : ''}" data-buildsrc="riot" ${cs.runes ? '' : 'disabled'}>League client</button>
+          </span>
+          <span class="srclinks"><button class="lnk" data-url="${esc(opggUrl(me, o && o.lane))}">OP.GG ↗</button><button class="lnk" data-url="${esc(uggUrl(me, cs.position, 'build'))}">u.gg ↗</button></span>
       </div>
       ${opggBlock(o, me)}
-      ${runePage(o && o.runes)}
+      ${runePage(r, spells)}
     </div>` : '<div class="muted uempty">Hover a champion to see its build, skills and runes</div>';
   }
   const bs = cs.banSides || { mine: [], theirs: [] };

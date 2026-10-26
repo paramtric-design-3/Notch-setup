@@ -541,18 +541,28 @@ class League {
       this.csRunes = {
         primary: p.primaryPerkStyleId, secondary: p.secondaryPerkStyleId,
         primaryName: styleName(p.primaryPerkStyleId), secondaryName: styleName(p.secondaryPerkStyleId),
-        keystone: keystone.name || '', perkIds: perks.map(x => x.id).filter(Boolean),
+        keystone: keystone.name || '', keystoneId: keystone.id || (perks[0] || {}).id || 0, perkIds: perks.map(x => x.id).filter(Boolean),
         names: perks.map(x => x.name).filter(Boolean),
+        spells: (p.summonerSpellIds || []).filter(x => x > 0),
       };
-      if (this.cs) { this.cs.runes = this.csRunes; this.emit(); }
+      const r = this.csRunes;
+      if (this.cs) { this.cs.runes = r; this.emit(); }
+      // the full trees and pictures, like for OP.GG's page
+      this.loadIcons(['rune:' + r.primary, 'rune:' + r.secondary, ...r.perkIds.slice(0, 6).map(x => 'rune:' + x), ...r.spells.map(x => 'spell:' + x)]);
+      this.attachRuneTree(r).then(() => { if (this.cs && this.csRunes === r) { this.cs.runes = { ...r }; this.emit(); } });
     } catch (e) { this.log('league runes: ' + e.message); }
   }
 
   // Create (or update) a rune page named "WALL-E: <champion>" and make it current.
   // OP.GG's most played page (all 9 choices) is used when it's there, else Riot's recommendation.
-  async importRunes() {
+  // Import runes (and summoner spells) from the source you picked: 'opgg' or 'riot' (the League client's own).
+  async importRunes(source) {
     const o = this.csOpgg && this.csOpgg.runes;
-    const r = o && o.perkIds.length === 9 ? o : this.csRunes;
+    const useOpgg = source !== 'riot' && o && o.perkIds.length === 9;
+    const r = useOpgg ? o : (this.csRunes || (o && o.perkIds.length === 9 ? o : null));
+    const riotSpells = (this.csRunes && this.csRunes.spells) || [];
+    const spells = useOpgg ? (this.csOpgg.spells || []) : (riotSpells.length === 2 ? riotSpells : ((this.csOpgg && this.csOpgg.spells) || []));
+    const spellsDone = await this.importSpells(spells);
     const me = this.cs && this.cs.me;
     if (!r || !me || r.perkIds.length < 6) return { ok: false, error: 'No recommended runes yet' };
     const body = { name: `WALL-E: ${me.name}`, primaryStyleId: r.primary, subStyleId: r.secondary, selectedPerkIds: r.perkIds, current: true };
@@ -567,13 +577,27 @@ class League {
         if (!cur) throw e;
         await this.lcuSend('DELETE', `/lol-perks/v1/pages/${cur.id}`);
         await this.lcuSend('POST', '/lol-perks/v1/pages', body);
-        return { ok: true, source: r === o ? 'OP.GG' : 'Riot', replaced: cur.name || '' };
+        return { ok: true, source: r === o ? 'OP.GG' : 'League client', replaced: cur.name || '', spells: spellsDone };
       }
-      return { ok: true, source: r === o ? 'OP.GG' : 'Riot' };
+      return { ok: true, source: r === o ? 'OP.GG' : 'League client', spells: spellsDone };
     } catch (e) {
       this.log('league import runes: ' + e.message);
       return { ok: false, error: /400|limit|max/i.test(e.message) ? 'All rune pages are in use: delete one in the client first' : 'Could not create the rune page' };
     }
+  }
+
+  // Pick the two summoner spells in champ select. Flash stays on the key you already have it on.
+  async importSpells(ids) {
+    ids = (ids || []).filter(x => x > 0).slice(0, 2);
+    if (ids.length !== 2) return false;
+    try {
+      const s = await this.lcuGet('/lol-champ-select/v1/session').catch(() => null);
+      const me = s && (s.myTeam || []).find(p => p.cellId === s.localPlayerCellId);
+      let [a, b] = ids;
+      if (me && (me.spell1Id === b || me.spell2Id === a)) [a, b] = [b, a];   // keep each spell on the key it's on now
+      await this.lcuSend('PATCH', '/lol-champ-select/v1/session/my-selection', { spell1Id: a, spell2Id: b });
+      return true;
+    } catch (e) { this.log('league import spells: ' + e.message); return false; }
   }
 
   lcuSend(method, p, body) {

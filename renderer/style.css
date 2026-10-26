@@ -896,3 +896,16 @@ html[data-theme="white"] .league .rdot.big.on img { filter: drop-shadow(0 0 4px 
 html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data-theme="white"] .todo .tdplus:hover { color: #fff; }
 /* whose turn: same blue as your team (not a different cyan) */
 .league .uteam.blue .uplayer.turn { border-left-color: #4a7bd0; background: linear-gradient(90deg, rgba(74, 123, 208, .24), transparent 70%); }
+/* Loadout: recommendation source switch, import on the rune page */
+.league .uload .csbtns { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.league .srcseg { display: inline-flex; background: var(--btn); border-radius: 10px; padding: 3px; gap: 2px; }
+.league .srcseg button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12px; padding: 5px 12px; border-radius: 8px; cursor: pointer; }
+.league .srcseg button.on { background: var(--btn-on); color: var(--accent); font-weight: 600; }
+.league .srcseg button:disabled { opacity: .4; cursor: default; }
+.league .srclinks { display: inline-flex; gap: 10px; }
+.league .lnk { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 11.5px; cursor: pointer; padding: 2px 0; }
+.league .lnk:hover { color: var(--accent); }
+.league .rhead { display: flex; align-items: center; justify-content: space-between; }
+.league .rimp { display: inline-flex; align-items: center; gap: 4px; }
+.league .rimp .lit { width: 20px; height: 20px; border-radius: 5px; }
+.league .rimp .pbtn { height: 26px; padding: 0 12px; font-size: 11.5px; margin-left: 4px; }

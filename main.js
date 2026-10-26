@@ -998,7 +998,7 @@ ipcMain.on('shelf-drag', (e, req) => {
 });
 ipcMain.on('shelf-open', (_e, id) => { const x = shelf.find(y => y.id === id); if (x) shell.showItemInFolder(x.path); });
 ipcMain.handle('get-displays', () => listDisplays());
-ipcMain.handle('league-import-runes', () => league ? league.importRunes() : { ok: false, error: 'League is not open' });
+ipcMain.handle('league-import-runes', (_e, source) => league ? league.importRunes(source) : { ok: false, error: 'League is not open' });
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));
 ipcMain.on('install-update', () => installUpdate());
