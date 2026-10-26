@@ -3,6 +3,7 @@ const api = window.notch;
 const $ = s => document.querySelector(s);
 const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do' };
 let S = null;
+let DRAG = null;   // index of the tile row being dragged
 
 const save = async patch => { S = await api.invoke('set-settings', patch); render(); };
 const flash = id => { const e = $(id); e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1200); };
@@ -58,19 +59,36 @@ function render() {
   box.innerHTML = '';
   S.tiles.forEach((t, i) => {
     const row = document.createElement('div');
-    row.className = 'row';
+    row.className = 'row tilerow';
+    row.draggable = true;
+    row.dataset.i = i;
     row.innerHTML = `
+      <span class="grip" title="Drag to reorder">⋮⋮</span>
       <label class="switch"><input type="checkbox" ${t.show ? 'checked' : ''}><span></span></label>
-      <span class="grow">${NAMES[t.id]}</span>
-      <div class="seg">${[1, 2, 3].map(n => `<button data-size="${n}" class="${t.size === n ? 'on' : ''}">${n}</button>`).join('')}</div>
-      <button class="arrow" data-move="-1" ${i === 0 ? 'disabled' : ''} title="Move left">↑</button>
-      <button class="arrow" data-move="1" ${i === S.tiles.length - 1 ? 'disabled' : ''} title="Move right">↓</button>`;
+      <span class="grow">${NAMES[t.id] || t.id}</span>
+      <div class="seg">${[[1, 'Small'], [2, 'Medium'], [3, 'Big']].map(([n, l]) => `<button data-size="${n}" class="${t.size === n ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     row.querySelector('input').onchange = e => save({ tiles: S.tiles.map((x, j) => j === i ? { ...x, show: e.target.checked } : x) });
     row.querySelectorAll('[data-size]').forEach(b => b.onclick = () => save({ tiles: S.tiles.map((x, j) => j === i ? { ...x, size: +b.dataset.size } : x) }));
-    row.querySelectorAll('[data-move]').forEach(b => b.onclick = () => {
-      const k = i + +b.dataset.move;
+    // drag a row to reorder the tiles
+    row.addEventListener('dragstart', e => { DRAG = i; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); });
+    row.addEventListener('dragend', () => { DRAG = null; box.querySelectorAll('.tilerow').forEach(r => r.classList.remove('dragging', 'over-top', 'over-bottom')); });
+    row.addEventListener('dragover', e => {
+      if (DRAG === null) return;
+      e.preventDefault();
+      const r = row.getBoundingClientRect(), top = e.clientY < r.top + r.height / 2;
+      box.querySelectorAll('.tilerow').forEach(x => x.classList.remove('over-top', 'over-bottom'));
+      if (DRAG !== i) row.classList.add(top ? 'over-top' : 'over-bottom');
+    });
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      if (DRAG === null || DRAG === i) return;
+      const r = row.getBoundingClientRect(), top = e.clientY < r.top + r.height / 2;
       const arr = S.tiles.slice();
-      [arr[i], arr[k]] = [arr[k], arr[i]];
+      const [moved] = arr.splice(DRAG, 1);
+      let to = i + (top ? 0 : 1);
+      if (DRAG < to) to--;
+      arr.splice(to, 0, moved);
+      DRAG = null;
       save({ tiles: arr });
     });
     box.append(row);
