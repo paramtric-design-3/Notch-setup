@@ -834,7 +834,11 @@ html[data-theme="dark"] .music.has-art .volbtn:not(.on) { color: rgba(242,244,24
 .music .volrow { display: flex; align-items: center; gap: 6px; height: 18px; margin: 1px 0 2px; }
 .music .volrow .volmute { width: 20px; height: 20px; flex: none; color: var(--text-2); }
 .music .volrow .volmute svg { width: 14px; height: 14px; }
-.music .volrow input[type=range] { flex: 1; min-width: 0; height: 4px; accent-color: var(--accent); cursor: pointer; }
+.music .volrow input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 14px; margin: 0; background: none; cursor: pointer; outline: none; }
+.music .volrow input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; border: 0; background: linear-gradient(to right, var(--text) var(--p, 50%), var(--track) var(--p, 50%)); }
+.music .volrow input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; margin-top: -3px; border-radius: 50%; border: 0; box-shadow: none; background: var(--text); opacity: 0; transition: opacity .15s; }
+.music .volrow:hover input[type=range]::-webkit-slider-thumb, .music .volrow input[type=range]:active::-webkit-slider-thumb { opacity: 1; }
+.music .volrow input[type=range]:focus-visible { outline: none; }
 .music .volval { font-size: 10.5px; color: var(--text-2); width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
 .music:has(.outbtn) .meta .title { padding-right: 58px; }
 .music:has(.volbtn.solo) .meta .title { padding-right: 30px; }

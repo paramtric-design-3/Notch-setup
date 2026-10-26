@@ -11,7 +11,7 @@ const tilesView = $('#tiles');
 // Volume row in the music tile (in place of the lyric line while it's open).
 function volRow() {
   const v = D.volume || { level: 0, muted: false };
-  return `<div class="volrow"><button class="ibtn volmute" data-volmute title="${v.muted ? 'Unmute' : 'Mute'}">${v.muted || v.level === 0 ? I.mute : I.volume}</button><input type="range" min="0" max="100" step="1" value="${v.level}" data-volslider aria-label="Volume"></div>`;
+  return `<div class="volrow"><button class="ibtn volmute" data-volmute title="${v.muted ? 'Unmute' : 'Mute'}">${v.muted || v.level === 0 ? I.mute : I.volume}</button><input type="range" min="0" max="100" step="1" value="${v.level}" style="--p:${v.level}%" data-volslider aria-label="Volume"></div>`;
 }
 const peekView = $('#peek');
 const compactL = $('.compact-l');
@@ -556,6 +556,7 @@ tilesView.addEventListener('input', e => {
   if (!e.target.matches('[data-volslider]')) return;
   const v = +e.target.value;
   D.volume = { ...(D.volume || {}), level: v, muted: false };
+  e.target.style.setProperty('--p', v + '%');
   const val = tilesView.querySelector('[data-volval]'); if (val) val.textContent = v + '%';
   api.send('helper', { c: 'vol', set: v });
 });
@@ -1030,7 +1031,7 @@ api.on('volume', v => {
   D.volume = v; rerenderTile('controls');
   // keep the music tile's volume row in step, without disturbing the slider while you drag it
   const sl = tilesView.querySelector('[data-volslider]');
-  if (sl && document.activeElement !== sl) sl.value = v.level;
+  if (sl && document.activeElement !== sl) { sl.value = v.level; sl.style.setProperty('--p', v.level + '%'); }
   const val = tilesView.querySelector('[data-volval]'); if (val) val.textContent = v.muted ? 'Muted' : v.level + '%';
   const mb = tilesView.querySelector('[data-volmute]'); if (mb) mb.innerHTML = v.muted || v.level === 0 ? I.mute : I.volume;
   const vb = tilesView.querySelector('[data-volopen]'); if (vb) vb.innerHTML = v.muted || v.level === 0 ? I.mute : I.volume;
