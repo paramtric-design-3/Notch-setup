@@ -949,3 +949,10 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .tile.shelf .shpill { margin-top: 6px; }
 .tile.shelf .shcard { display: flex; align-items: center; justify-content: center; }
 .tile.shelf .shcard img { width: 56px; height: 46px; max-width: none; max-height: none; object-fit: contain; }
+/* bigger files on the shelf */
+.tile.shelf .shstack { width: 84px; height: 58px; margin-top: -8px; }
+.tile.shelf .shcard img { width: 72px; height: 58px; }
+.tile.shelf .shcard > svg { width: 70px; height: 56px; }
+.tile.shelf .shpill { margin-top: 2px; padding-top: 2px; padding-bottom: 2px; }
+.tile.shelf .shfile img, .tile.shelf .shfile > svg, .tile.shelf .shfile .shph { width: 46px; height: 40px; }
+.tile.shelf .shfile { flex: 0 0 80px; }
