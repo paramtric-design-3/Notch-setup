@@ -894,3 +894,5 @@ html[data-theme="white"] .compact .ico { color: #2196B8; }
 html[data-theme="white"] .eq i, html[data-theme="white"] .workgrid i, html[data-theme="white"] .dots i { background: #2196B8; }
 html[data-theme="white"] .league .rdot.big.on img { filter: drop-shadow(0 0 4px rgba(33, 150, 184, .5)); }
 html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data-theme="white"] .todo .tdplus:hover { color: #fff; }
+/* whose turn: same blue as your team (not a different cyan) */
+.league .uteam.blue .uplayer.turn { border-left-color: #4a7bd0; background: linear-gradient(90deg, rgba(74, 123, 208, .24), transparent 70%); }
