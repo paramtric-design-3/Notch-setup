@@ -285,6 +285,7 @@ const TILE = {
       const top = list.slice(-3).reverse();
       const label = list.length === 1 ? list[0].name : `${list.length} items`;
       t.innerHTML = `${outline}
+        <button class="shclose" data-shelfclear title="Clear the shelf (the files stay where they are)">×</button>
         <div class="shstack n${top.length}" draggable="true" data-shelfall title="${esc(list.map(x => x.name).join('\n'))}&#10;Drag out to move or copy${list.length === 1 ? ' · double-click to show in its folder' : ''}"${list.length === 1 ? ` data-shelfid="${esc(list[0].id)}"` : ''}>
           ${top.map((x, i) => `<span class="shcard c${i}">${pic(x)}</span>`).reverse().join('')}
         </div>

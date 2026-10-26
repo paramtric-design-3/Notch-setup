@@ -965,3 +965,6 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .tile.shelf .shpill { margin-top: 4px; }
 .tile.shelf .shfile img { width: 34px; height: 34px; }
 .tile.shelf .shfile img.wide { width: 46px; height: 34px; }
+.tile.shelf .shclose { position: absolute; top: 16px; right: 8px; z-index: 2; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text-2); font: 400 16px/20px system-ui; cursor: pointer; }
+.tile.shelf .shclose:hover { background: var(--btn-hover); color: var(--text); }
+.tile.shelf.w1 .shclose { top: 14px; right: 4px; width: 16px; height: 16px; font-size: 13px; line-height: 16px; }
