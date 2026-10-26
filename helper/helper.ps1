@@ -128,6 +128,38 @@ interface IAudioPolicyConfigOld {
     [PreserveSig] int GetPersistedDefaultAudioEndpoint(uint processId, int flow, int role, out IntPtr deviceId);
     [PreserveSig] int ClearAllPersistedApplicationDefaultEndpoints();
 }
+// Audio sessions: which processes are actually playing sound (only those accept a per-app output).
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceAny { int Activate(ref Guid id, int clsCtx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object o); }
+[Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioSessionManager2 { int _c1(); int _c2(); int GetSessionEnumerator(out IAudioSessionEnumerator e); }
+[Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioSessionEnumerator { int GetCount(out int n); int GetSession(int i, out IAudioSessionControl2 s); }
+[Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioSessionControl2 {
+    int _s1(); int _s2(); int _s3(); int _s4(); int _s5(); int _s6(); int _s7(); int _s8(); int _s9(); int _s10(); int _s11();
+    int GetProcessId(out uint pid);
+}
+public static class NotchSessions {
+    public static uint[] Pids() {
+        var list = new System.Collections.Generic.List<uint>();
+        var e = (IMMDeviceEnumerator)(new MMDeviceEnumeratorCom());
+        IMMDeviceCollection col;
+        if (e.EnumAudioEndpoints(0, 1, out col) != 0) return list.ToArray();
+        uint n; col.GetCount(out n);
+        var iid = typeof(IAudioSessionManager2).GUID;
+        for (uint i = 0; i < n; i++) {
+            try {
+                IMMDevice d; if (col.Item(i, out d) != 0) continue;
+                object o; if (((IMMDeviceAny)(object)d).Activate(ref iid, 23, IntPtr.Zero, out o) != 0) continue;
+                IAudioSessionEnumerator se; if (((IAudioSessionManager2)o).GetSessionEnumerator(out se) != 0) continue;
+                int c; se.GetCount(out c);
+                for (int k = 0; k < c; k++) { IAudioSessionControl2 sc; if (se.GetSession(k, out sc) != 0) continue; uint pid; if (sc.GetProcessId(out pid) == 0 && pid != 0 && !list.Contains(pid)) list.Add(pid); }
+            } catch { }
+        }
+        return list.ToArray();
+    }
+}
 public static class NotchAppAudio {
     [DllImport("combase.dll", PreserveSig = false)] static extern void RoGetActivationFactory(IntPtr classId, [In] ref Guid iid, [MarshalAs(UnmanagedType.IInspectable)] out object factory);
     [DllImport("combase.dll", PreserveSig = false)] static extern void WindowsCreateString([MarshalAs(UnmanagedType.LPWStr)] string s, int len, out IntPtr hstr);
@@ -151,10 +183,12 @@ public static class NotchAppAudio {
         IntPtr h = IntPtr.Zero;
         if (!string.IsNullOrEmpty(deviceId)) { string full = @"\\?\SWD#MMDEVAPI#" + deviceId + RENDER; WindowsCreateString(full, full.Length, out h); }
         try {
+            int bad = 0;
             for (int role = 0; role < 2; role++) {   // console and multimedia
                 int hr = f is IAudioPolicyConfigNew ? ((IAudioPolicyConfigNew)f).SetPersistedDefaultAudioEndpoint(pid, 0, role, h) : ((IAudioPolicyConfigOld)f).SetPersistedDefaultAudioEndpoint(pid, 0, role, h);
-                Marshal.ThrowExceptionForHR(hr);
+                if (hr != 0) bad = hr;
             }
+            if (bad != 0) throw new InvalidOperationException("0x" + bad.ToString("X8"));
         } finally { if (h != IntPtr.Zero) WindowsDeleteString(h); }
     }
     public static string Get(uint pid) {
@@ -458,10 +492,26 @@ function Get-MusicPids {
     }
     return @($ids | Select-Object -Unique)
 }
+# Only the music app's processes that have a sound session accept a per-app output (Spotify and
+# browsers run many processes; the others answer "invalid argument").
+function Get-MusicAudioPids {
+    $ids = @(Get-MusicPids)
+    if (-not $ids) { return @() }
+    $sess = @()
+    try { $sess = @([NotchSessions]::Pids()) } catch { Log "appout sessions: $($_.Exception.Message)" }
+    $hit = @($ids | Where-Object { $sess -contains [uint32]$_ })
+    if ($hit) { return $hit }
+    return $ids
+}
+$script:appOutErr = ''
 function Set-AppOutput($deviceId) {
-    $ids = Get-MusicPids
-    if (-not $ids) { Log "appout: no process for '$script:mediaApp'"; return }
-    foreach ($p in $ids) { try { [NotchAppAudio]::Set([uint32]$p, $deviceId) } catch { Log "appout: $($_.Exception.Message)"; return } }
+    $script:appOutErr = ''
+    $ids = @(Get-MusicAudioPids)
+    if (-not $ids) { Log "appout: no process for '$script:mediaApp'"; $script:appOutErr = 'Start the music first'; return }
+    $ok = 0; $last = ''
+    foreach ($p in $ids) { try { [NotchAppAudio]::Set([uint32]$p, $deviceId); $ok++ } catch { $last = $_.Exception.InnerException.Message; if (-not $last) { $last = $_.Exception.Message } } }
+    if (-not $ok) { Log "appout: Windows refused for $($ids.Count) process(es): $last"; $script:appOutErr = 'Windows didn''t accept it, play some music first and try again' }
+    else { $script:appOutWant = $deviceId }
 }
 
 function Poll-Outputs {
@@ -475,10 +525,11 @@ function Poll-Outputs {
     $ids = Get-MusicPids
     if ($ids) {
         $app = "$script:mediaApp"
-        try { foreach ($p in $ids) { $o = [NotchAppAudio]::Get([uint32]$p); if ($o) { $appOut = $o; break } } } catch { $appOk = $false }
+        try { foreach ($p in @(Get-MusicAudioPids)) { $o = [NotchAppAudio]::Get([uint32]$p); if ($o) { $appOut = $o; break } } } catch { $appOk = $false }
     }
-    $sig = (($devs | ForEach-Object { "$($_.id)|$($_.default)" }) -join ';') + "|$app|$appOut|$appOk"
-    if ($sig -ne $script:lastOutputs) { $script:lastOutputs = $sig; Emit 'outputs' ([ordered]@{ devices = $devs; app = $app; appOut = $appOut; appOk = $appOk }) }
+    $err = "$script:appOutErr"
+    $sig = (($devs | ForEach-Object { "$($_.id)|$($_.default)" }) -join ';') + "|$app|$appOut|$appOk|$err"
+    if ($sig -ne $script:lastOutputs) { $script:lastOutputs = $sig; Emit 'outputs' ([ordered]@{ devices = $devs; app = $app; appOut = $appOut; appOk = $appOk; appErr = $err }) }
 }
 
 # ------------------------------------------------------------------ League of Legends client (its local API port and key)

@@ -11,7 +11,7 @@ const tilesView = $('#tiles');
 // Volume row in the music tile (in place of the lyric line while it's open).
 function volRow() {
   const v = D.volume || { level: 0, muted: false };
-  return `<div class="volrow"><button class="ibtn volmute" data-volmute title="${v.muted ? 'Unmute' : 'Mute'}">${v.muted || v.level === 0 ? I.mute : I.volume}</button><input type="range" min="0" max="100" step="1" value="${v.level}" data-volslider aria-label="Volume"><span class="volval" data-volval>${v.muted ? 'Muted' : v.level + '%'}</span></div>`;
+  return `<div class="volrow"><button class="ibtn volmute" data-volmute title="${v.muted ? 'Unmute' : 'Mute'}">${v.muted || v.level === 0 ? I.mute : I.volume}</button><input type="range" min="0" max="100" step="1" value="${v.level}" data-volslider aria-label="Volume"></div>`;
 }
 const peekView = $('#peek');
 const compactL = $('.compact-l');
@@ -215,25 +215,24 @@ const TILE = {
     if (!m) {
       meta.innerHTML = `<div class="title ellipsis">Nothing playing</div><div class="artist ellipsis">Play something in Spotify, your browser or any player</div>`;
     } else {
+      // just the controls (and the volume slider when open); hover shows what's playing
+      t.title = [m.title, m.artist || m.album].filter(Boolean).join(' — ');
+      meta.classList.add('lean');
       meta.innerHTML = `
-        <div class="title ellipsis">${esc(m.title)}</div>
-        <div class="artist ellipsis">${esc(m.artist || m.album || '')}</div>
         ${D.volOpen ? volRow() : ''}
-        <div class="bar"><i data-bar></i></div>
         <div class="row">
-          <span class="time" data-pos>0:00</span>
           <div class="ctl">
             <button class="ibtn" data-media="prev" title="Previous">${I.prev}</button>
             <button class="ibtn big" data-media="toggle" title="Play/Pause">${m.playing ? I.pause : I.play}</button>
             <button class="ibtn" data-media="next" title="Next">${I.next}</button>
           </div>
-          <span class="time r">${fmtTime(m.durMs)}</span>
         </div>`;
     }
     t.append(meta);
     const two = D.outputs.length > 1;
     if (two) {
-      const cur = D.outputs.find(o => o.default);
+      const ao = D.appout || {};
+      const cur = (ao.out && D.outputs.find(o => o.id === ao.out)) || D.outputs.find(o => o.default);
       t.insertAdjacentHTML('beforeend', `<button class="ibtn outbtn" data-out title="Sound output: ${esc(cur ? cur.name : '')}">${outputIcon(cur)}</button>`);
     }
     if (m && size > 1) {
@@ -489,8 +488,8 @@ tilesView.addEventListener('click', async e => {
   if (b.dataset.outscope) { D.outScope = b.dataset.outscope; rerenderTile('music'); return; }
   if (b.dataset.appout !== undefined) {
     api.send('helper', { c: 'appout', id: b.dataset.appout });
-    D.appout = { ...(D.appout || {}), out: b.dataset.appout };   // show it right away
-    D.outPicker = false; rerenderTile('music'); return;
+    D.appout = { ...(D.appout || {}), out: b.dataset.appout, err: '' };   // show it right away
+    rerenderTile('music'); return;   // stay open so a refusal from Windows shows up here
   }
   if (b.dataset.outclose !== undefined) { D.outPicker = false; rerenderTile('music'); return; }
   if (b.dataset.outid) {
@@ -870,15 +869,13 @@ function appLabel(id) {
   for (const [re, n] of known) if (re.test(a)) return n;
   return (a.split('!').pop().replace(/\.exe$/i, '').split(/[\\/]/).pop() || 'Music app');
 }
-// Sound output: for just the music app (the rest of the PC keeps its output), or for the whole PC.
+// Sound output for just the music app (the rest of the PC keeps its own output).
 function outputsPicker(size) {
   const t = el('div', `tile music picker w${size}`);
-  const ao = D.appout || {};
-  const canApp = !!(ao.app && ao.ok !== false);
-  const scope = canApp && D.outScope !== 'pc' ? 'app' : 'pc';
-  const head = canApp
-    ? `<span class="pseg"><button class="${scope === 'app' ? 'on' : ''}" data-outscope="app">${esc(appLabel(ao.app))} only</button><button class="${scope === 'pc' ? 'on' : ''}" data-outscope="pc">Whole PC</button></span>`
-    : `<span>Sound output</span>`;
+  const ao = { ...(D.appout || {}) };
+  const scope = 'app';   // only the music moves; the PC's own output is left alone
+  const head = `<span>${ao.app ? esc(appLabel(ao.app)) + ' plays on' : 'Music plays on'}</span>`;
+  if (!ao.app && !ao.err) ao.err = 'Play some music first';
   const rows = scope === 'app'
     ? [{ id: '', name: 'Same as PC', same: true }, ...D.outputs].map(o => {
         const on = o.same ? !ao.out : ao.out === o.id;
@@ -890,7 +887,7 @@ function outputsPicker(size) {
       </button>`).join('');
   t.innerHTML = `
     <div class="phead">${head}<button class="ibtn" data-outclose title="Back">${I.chevron}</button></div>
-    <div class="plist">${rows}</div>`;
+    <div class="plist">${rows}</div>${scope === 'app' && ao.err ? `<div class="perr">${esc(ao.err)}</div>` : ''}`;
   return t;
 }
 

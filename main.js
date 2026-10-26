@@ -511,7 +511,7 @@ async function onHelperMessage(m) {
     case 'dark': state.dark = m.data; toIsland('dark', m.data); break;
     case 'outputs':
       state.outputs = (m.data && m.data.devices) || [];
-      state.appout = { app: (m.data && m.data.app) || '', out: (m.data && m.data.appOut) || '', ok: !(m.data && m.data.appOk === false) };
+      state.appout = { app: (m.data && m.data.app) || '', out: (m.data && m.data.appOut) || '', ok: !(m.data && m.data.appOk === false), err: (m.data && m.data.appErr) || '' };
       toIsland('outputs', state.outputs); toIsland('appout', state.appout); buildTrayMenu();
       break;
     case 'apps': {
