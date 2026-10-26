@@ -246,7 +246,7 @@ function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
   settingsWin = new BrowserWindow({
     width: 520, height: 720, minWidth: 460, minHeight: 520,
-    title: 'WALL-E settings',
+    title: appName() + ' settings',
     backgroundColor: settings.theme === 'dark' ? '#111111' : '#F7F8FA',
     autoHideMenuBar: true,
     icon: trayImage(),
@@ -374,6 +374,9 @@ function overlayPayload() {
 }
 
 // ---------------------------------------------------------------- tray
+// White Matte is EVE, Dark Matte is WALL-E.
+function appName() { return settings && settings.theme === 'white' ? 'EVE' : 'WALL-E'; }
+
 function trayImage() {
   return nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
 }
@@ -385,8 +388,9 @@ const TILE_NAMES = {
 
 function buildTrayMenu() {
   if (!tray) return;
+  tray.setToolTip(appName());
   const menu = Menu.buildFromTemplate([
-    { label: `WALL-E ${app.getVersion()}`, enabled: false },
+    { label: `${appName()} ${app.getVersion()}`, enabled: false },
     { type: 'separator' },
     {
       label: 'Tiles', submenu: settings.tiles.map(t => ({
@@ -431,7 +435,7 @@ function buildTrayMenu() {
 
 function createTray() {
   tray = new Tray(trayImage());
-  tray.setToolTip('WALL-E');
+  tray.setToolTip(appName());
   tray.on('click', openSettings);
   buildTrayMenu();
 }
@@ -858,7 +862,7 @@ function setupUpdater() {
     if (pct !== update.percent) setUpdate({ percent: pct });
   });
   autoUpdater.on('update-not-available', () => {
-    if (update.manual) toIsland('peek', { kind: 'update', title: 'WALL-E is up to date', sub: `Version ${app.getVersion()}` });
+    if (update.manual) toIsland('peek', { kind: 'update', title: `${appName()} is up to date`, sub: `Version ${app.getVersion()}` });
     setUpdate({ state: 'idle', manual: false });
   });
   autoUpdater.on('update-downloaded', info => {
@@ -1037,9 +1041,9 @@ app.whenReady().then(() => {
   // League of Legends: the helper reports the client; tests can pass NOTCH_LCU=port:token.
   league = new League({
     send: d => {
-      if (d.type === 'game-start') toIsland('peek', { kind: 'league', title: 'Game loading', sub: d.queue ? `${d.queue} · ranks in WALL-E` : 'Ranks in WALL-E', ms: 4000 });
-      else if (d.type === 'cs-start') toIsland('peek', { kind: 'league', title: 'Champ select', sub: 'Runes, your stats and the draft are in WALL-E', ms: 4000 });
-      else if (d.type === 'cs-counter') toIsland('peek', { kind: 'league', title: `Counter picks vs ${d.name}`, sub: `${d.role ? d.role + ' · ' : ''}head-to-head win rates in WALL-E`, ms: 4000 });
+      if (d.type === 'game-start') toIsland('peek', { kind: 'league', title: 'Game loading', sub: d.queue ? `${d.queue} · ranks in ${appName()}` : `Ranks in ${appName()}`, ms: 4000 });
+      else if (d.type === 'cs-start') toIsland('peek', { kind: 'league', title: 'Champ select', sub: `Runes, your stats and the draft are in ${appName()}`, ms: 4000 });
+      else if (d.type === 'cs-counter') toIsland('peek', { kind: 'league', title: `Counter picks vs ${d.name}`, sub: `${d.role ? d.role + ' · ' : ''}head-to-head win rates in ${appName()}`, ms: 4000 });
       else { updateOverlay(d); state.league = { ...d, icons: { ...((state.league && state.league.icons) || {}), ...(d.icons || {}) } }; toIsland('league', d); }
     },
     log: helperLog,

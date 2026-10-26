@@ -4,6 +4,7 @@ const box = document.getElementById('o');
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 window.notch.on('overlay', p => {
   const b = p && p.build;
+  document.documentElement.dataset.theme = (p && p.theme) === 'white' ? 'white' : 'dark';
   if (!b || b.unsupported || b.loading || b.failed) { box.className = ''; return; }
   const pics = p.pics || {};
   const img = id => pics['item:' + id] ? `<img src="${pics['item:' + id]}" alt="">` : '';

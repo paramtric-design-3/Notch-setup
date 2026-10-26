@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
   <title>WALL-E settings</title>
   <style>
-    html[data-theme="white"] { --bg:#F7F8FA; --tile:#FBFBFC; --text:#1E2129; --text-2:#545A69; --accent:#D97A2B; --line:rgba(30,33,41,.09); --btn:rgba(30,33,41,.05); --btn-h:rgba(30,33,41,.09); --on:rgba(217,122,43,.14); --mono:#F1F3F6; }
+    html[data-theme="white"] { --bg:#F7F8FA; --tile:#FBFBFC; --text:#1E2129; --text-2:#545A69; --accent:#2196B8; --line:rgba(30,33,41,.09); --btn:rgba(30,33,41,.05); --btn-h:rgba(30,33,41,.09); --on:rgba(33,150,184,.14); --mono:#F1F3F6; }
     html[data-theme="dark"]  { --bg:#111111; --tile:#151515; --text:#ECECEC; --text-2:#9A9A9A; --accent:#F29A4A; --line:#292929; --btn:rgba(255,255,255,.055); --btn-h:rgba(255,255,255,.1); --on:rgba(242,154,74,.16); --mono:#0C0C0C; }
     * { box-sizing: border-box; }
     body { margin:0; background:var(--bg); color:var(--text); font:13.5px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
@@ -94,8 +94,8 @@
 </head>
 <body>
 <main>
-  <h1>WALL-E</h1>
-  <p class="lead">Hover WALL-E at the top of your screen to open it. Click it to keep it open. Right-click it to come back here.</p>
+  <h1 class="appname">WALL-E</h1>
+  <p class="lead">Hover <span class="appname">WALL-E</span> at the top of your screen to open it. Click it to keep it open. Right-click it to come back here.</p>
 
   <section class="nofold">
     <h2>Updates</h2>
@@ -113,7 +113,7 @@
   <section>
     <h2>Screen</h2>
     <div class="row"><select id="display"></select><button class="btn" id="identify">Identify</button></div>
-    <p class="note">"Screen with the mouse" moves WALL-E to whichever screen your pointer is on. Identify shows each screen's number for a moment.</p>
+    <p class="note">"Screen with the mouse" moves <span class="appname">WALL-E</span> to whichever screen your pointer is on. Identify shows each screen's number for a moment.</p>
   </section>
 
   <section>
@@ -148,7 +148,7 @@
         <li>In the menu on the left open <b>Authentication</b>, set <b>Allow public client flows</b> to <b>Yes</b> and click <b>Save</b>.</li>
         <li>Back here, click <b>Sign in</b>. Your browser opens Microsoft's sign-in page and the code is already on your clipboard: paste it, sign in and allow access to your tasks.</li>
       </ol>
-      <p class="note">If Azure asks you to create a directory or a free Azure account first, that's Microsoft's requirement for registering an app; the registration itself is free. WALL-E only asks for access to your tasks, never sees your password and keeps the sign-in encrypted on this PC.</p>
+      <p class="note">If Azure asks you to create a directory or a free Azure account first, that's Microsoft's requirement for registering an app; the registration itself is free. <span class="appname">WALL-E</span> only asks for access to your tasks, never sees your password and keeps the sign-in encrypted on this PC.</p>
     </details>
   </section>
 

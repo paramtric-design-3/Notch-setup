@@ -21,12 +21,12 @@ html[data-theme="white"] {
   --tile: #FBFBFC;
   --text: #1E2129;
   --text-2: #545A69;
-  --accent: #D97A2B;
+  --accent: #2196B8;
   --line: rgba(30, 33, 41, .07);
   --track: rgba(30, 33, 41, .14);
   --btn: rgba(30, 33, 41, .05);
   --btn-hover: rgba(30, 33, 41, .09);
-  --btn-on: rgba(217, 122, 43, .14);
+  --btn-on: rgba(33, 150, 184, .14);
   --shadow: 0 14px 34px rgba(16, 20, 30, .16), 0 2px 6px rgba(16, 20, 30, .08);
   --sun: #E8B84A;
   --cloud: #DDE2EA;
@@ -888,3 +888,9 @@ html[data-theme="dark"] .music.has-art .volbtn:not(.on) { color: rgba(242,244,24
 .todo .tdadd { max-width: none; }
 .todo .tdplus { background: none; color: var(--accent); font-size: 20px; width: 22px; }
 .todo .tdplus:hover { background: none; color: var(--accent); transform: scale(1.15); }
+
+/* White theme (EVE): the blue of the icon's eyes as the accent */
+html[data-theme="white"] .compact .ico { color: #2196B8; }
+html[data-theme="white"] .eq i, html[data-theme="white"] .workgrid i, html[data-theme="white"] .dots i { background: #2196B8; }
+html[data-theme="white"] .league .rdot.big.on img { filter: drop-shadow(0 0 4px rgba(33, 150, 184, .5)); }
+html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data-theme="white"] .todo .tdplus:hover { color: #fff; }
