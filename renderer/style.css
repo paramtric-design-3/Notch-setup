@@ -978,3 +978,6 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .music .meta .row .ctl { gap: 0; }
 .music .meta .row .ctl .ibtn { width: 26px; }
 .music .meta .row .ctl .ibtn.big { width: 30px; }
+.music .meta.volonly { justify-content: center; }
+.music .meta.volonly .volrow { height: 24px; align-items: center; }
+.music .meta.volonly .volrow input[type=range] { margin-bottom: 0; }
