@@ -1,6 +1,6 @@
 {
   "name": "fjbc-notch",
-  "version": "1.55.1",
+  "version": "1.56.0",
   "description": "A Dynamic Island for Windows",
   "main": "main.js",
   "scripts": {
@@ -17,7 +17,8 @@
   },
   "productName": "WALL-E",
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "koffi": "^2.16.3"
   },
   "repository": {
     "type": "git",
@@ -32,6 +33,9 @@
       "league.js",
       "opgg.js",
       "todo.js",
+      "nativedrag.js",
+      "!node_modules/koffi/build/koffi/!(win32_x64)/**",
+      "!node_modules/koffi/src/**",
       "preload.js",
       "renderer/**",
       "helper/**",

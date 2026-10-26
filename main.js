@@ -1011,16 +1011,29 @@ ipcMain.handle('shelf-list', (_e, dir) => {
 });
 // Dragging out: Windows takes over from here (Explorer copies, or moves on the same drive / with Shift).
 let nativeDragFails = 0;
+const nativeDrag = require('./nativedrag');
 ipcMain.on('shelf-drag', (e, req) => {
   const ids = Array.isArray(req) ? req : (req && req.ids) || [];
   const paths = [...shelf.filter(x => ids.includes(x.id)).map(x => x.path), ...((req && req.paths) || []).filter(onShelf)].filter(p => fs.existsSync(p));
   if (!paths.length) return;
   const items = paths.map(p => shelf.find(x => x.path === p) || { path: p });
   // On Windows, Windows itself runs the drag (thumbnail + "Move"/"Copy" like Explorer, no file path)
-  if (process.platform === 'win32' && helper && helper.stdin.writable && !nativeDragFails) {
-    shelfDragIds = ids.filter(id => shelf.some(x => x.id === id));
-    toIsland('shelfdrag', shelfDragIds);
-    sendHelper({ c: 'drag', paths }); return;
+  if (process.platform === 'win32' && !nativeDragFails) {
+    const dragIds = ids.filter(id => shelf.some(x => x.id === id));
+    toIsland('shelfdrag', dragIds);
+    let r = null;
+    try { r = nativeDrag.drag(paths); } catch (err) { helperLog('shelf drag: ' + err.message); }
+    toIsland('shelfdrag', null);
+    if (r) {
+      // dropped somewhere: the shelf lets go of it (an Explorer move can report "no effect", so a file
+      // that's gone from its place counts as moved); cancelled: it stays
+      const gone = paths.some(p => !fs.existsSync(p));
+      if (r.dropped && (r.effect || gone)) { shelf = shelf.filter(x => !dragIds.includes(x.id)); saveShelf(); }
+      sendShelf();
+      return;
+    }
+    helperLog('shelf drag: Windows drag not available (' + (nativeDrag.error || 'no files') + '), using the built-in drag');
+    nativeDragFails++;
   }
   let icon = items[0].icon ? nativeImage.createFromDataURL(items[0].icon) : trayImage();
   if (icon.isEmpty()) icon = trayImage();
