@@ -629,7 +629,7 @@ function gameBuild(b) {
     ${title}
     <span class="gitems"><span class="glabel">Start</span>${b.starter.map(id => `<span class="gitem start">${imgIcon('item:' + id, 'Start')}</span>`).join('')}<span class="oarrow">›</span>${b.boots.map(id => item(id, 'Boots')).join('')}${b.core.map(id => item(id, 'Core')).join('')}${b.later.length ? `<span class="oarrow">›</span>${b.later.map(id => item(id, 'Later')).join('')}` : ''}</span>
     ${(b.situational || []).length ? `<span class="gsit"><span class="glabel">Vs their team</span>${b.situational.map(x => `<span class="gitem sit ${(b.owned || []).includes(x.id) ? 'own' : ''}" title="${esc(x.name)} · ${esc(x.why)}">${imgIcon('item:' + x.id, '')}${(b.owned || []).includes(x.id) ? `<i>${I.check}</i>` : ''}</span>`).join('')}</span>` : ''}
-    ${b.runes ? `<span class="grunes">${imgIcon('rune:' + b.runes.keystoneId, b.runes.keystone)}<b>${esc(b.runes.keystone)}</b>${imgIcon('rune:' + b.runes.secondary, b.runes.secondaryName)}</span>` : ''}
+    ${b.runes && b.mode !== 'aram' ? `<span class="grunes">${imgIcon('rune:' + b.runes.keystoneId, b.runes.keystone)}<b>${esc(b.runes.keystone)}</b>${imgIcon('rune:' + b.runes.secondary, b.runes.secondaryName)}</span>` : ''}
   </div>`;
 }
 
