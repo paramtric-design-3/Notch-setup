@@ -993,6 +993,8 @@ ipcMain.on('shelf-drag', (e, req) => {
   const paths = [...shelf.filter(x => ids.includes(x.id)).map(x => x.path), ...((req && req.paths) || []).filter(onShelf)].filter(p => fs.existsSync(p));
   if (!paths.length) return;
   const items = paths.map(p => shelf.find(x => x.path === p) || { path: p });
+  // On Windows, Windows itself runs the drag (thumbnail + "Move"/"Copy" like Explorer, no file path)
+  if (process.platform === 'win32' && helper && helper.stdin.writable) { sendHelper({ c: 'drag', paths }); return; }
   let icon = items[0].icon ? nativeImage.createFromDataURL(items[0].icon) : trayImage();
   if (icon.isEmpty()) icon = trayImage();
   e.sender.startDrag({ file: paths[0], files: paths, icon });

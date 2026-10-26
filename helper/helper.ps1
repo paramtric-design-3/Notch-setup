@@ -160,6 +160,66 @@ public static class NotchSessions {
         return list.ToArray();
     }
 }
+// Dragging shelf files out the way Explorer does it: Windows draws the file's thumbnail and the
+// "Move" / "Copy" label, and does the move or copy itself.
+[ComImport, Guid("b63ea76d-1f85-456f-a19c-48159efa858b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IShellItemArray { [PreserveSig] int BindToHandler(IntPtr pbc, [In] ref Guid bhid, [In] ref Guid riid, [MarshalAs(UnmanagedType.IUnknown)] out object ppv); }
+[ComImport, Guid("DE5BF786-477A-11D2-839D-00C04FD918D0"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IDragSourceHelper { [PreserveSig] int InitializeFromBitmap(IntPtr shdi, [MarshalAs(UnmanagedType.IUnknown)] object data); [PreserveSig] int InitializeFromWindow(IntPtr hwnd, IntPtr pt, [MarshalAs(UnmanagedType.IUnknown)] object data); }
+[ComImport, Guid("83E07D0D-0C5F-4163-BF1A-60B274051E40"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IDragSourceHelper2 { [PreserveSig] int InitializeFromBitmap(IntPtr shdi, [MarshalAs(UnmanagedType.IUnknown)] object data); [PreserveSig] int InitializeFromWindow(IntPtr hwnd, IntPtr pt, [MarshalAs(UnmanagedType.IUnknown)] object data); [PreserveSig] int SetFlags(int flags); }
+[ComImport, Guid("4657278A-411B-11D2-839A-00C04FD918D0")] class DragDropHelperCom { }
+public static class NotchDrag {
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHParseDisplayName(string name, IntPtr bc, out IntPtr pidl, uint sfgaoIn, out uint sfgaoOut);
+    [DllImport("shell32.dll")] static extern int SHCreateShellItemArrayFromIDLists(uint cidl, IntPtr[] pidls, out IShellItemArray items);
+    [DllImport("shell32.dll")] static extern int SHDoDragDrop(IntPtr hwnd, [MarshalAs(UnmanagedType.IUnknown)] object data, IntPtr dropSource, uint okEffects, out uint effect);
+    [DllImport("ole32.dll")] static extern int OleInitialize(IntPtr reserved);
+    [DllImport("ole32.dll")] static extern void CoTaskMemFree(IntPtr p);
+    [StructLayout(LayoutKind.Sequential)] struct PT { public int x, y; }
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out PT p);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(PT p);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, IntPtr pid);
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);
+    [DllImport("user32.dll")] static extern bool ReleaseCapture();
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    public static volatile string Last = "";
+    // Starts the drag on its own thread (OLE drags need one) and returns at once.
+    public static void Start(string[] paths) {
+        var t = new System.Threading.Thread(() => {
+            var pidls = new System.Collections.Generic.List<IntPtr>();
+            try {
+                OleInitialize(IntPtr.Zero);
+                foreach (var p in paths) { IntPtr id; uint o; if (SHParseDisplayName(p, IntPtr.Zero, out id, 0, out o) == 0) pidls.Add(id); }
+                if (pidls.Count == 0) { Last = "no files"; return; }
+                IShellItemArray arr;
+                Marshal.ThrowExceptionForHR(SHCreateShellItemArrayFromIDLists((uint)pidls.Count, pidls.ToArray(), out arr));
+                Guid bhid = new Guid("B8C0BD9F-ED24-455c-83E6-D5390C4FE8C4"), iid = new Guid("0000010e-0000-0000-C000-000000000046");
+                object data;
+                Marshal.ThrowExceptionForHR(arr.BindToHandler(IntPtr.Zero, ref bhid, ref iid, out data));
+                try {
+                    var h = new DragDropHelperCom();
+                    var h2 = h as IDragSourceHelper2; if (h2 != null) h2.SetFlags(1);   // allow "Move to …" labels
+                    ((IDragSourceHelper)h).InitializeFromWindow(IntPtr.Zero, IntPtr.Zero, data);
+                } catch { }
+                // WALL-E's window holds the mouse (the button is still down there): share its input
+                // state and take the mouse over, so Windows' drag sees the held button.
+                PT cp; GetCursorPos(out cp);
+                uint other = GetWindowThreadProcessId(WindowFromPoint(cp), IntPtr.Zero), me = GetCurrentThreadId();
+                bool attached = other != 0 && other != me && AttachThreadInput(me, other, true);
+                if (attached) ReleaseCapture();
+                uint eff; int hr;
+                try { hr = SHDoDragDrop(IntPtr.Zero, data, IntPtr.Zero, 1 | 2 | 4, out eff); }   // copy, move, link
+                finally { if (attached) AttachThreadInput(me, other, false); }
+                Last = "hr=0x" + hr.ToString("X8") + " effect=" + eff + (attached ? "" : " (not attached)");
+            } catch (Exception e) { Last = e.Message; }
+            finally { foreach (var p in pidls) CoTaskMemFree(p); }
+        });
+        t.SetApartmentState(System.Threading.ApartmentState.STA);
+        t.IsBackground = true;
+        t.Start();
+    }
+}
+
 public static class NotchAppAudio {
     [DllImport("combase.dll", PreserveSig = false)] static extern void RoGetActivationFactory(IntPtr classId, [In] ref Guid iid, [MarshalAs(UnmanagedType.IInspectable)] out object factory);
     [DllImport("combase.dll", PreserveSig = false)] static extern void WindowsCreateString([MarshalAs(UnmanagedType.LPWStr)] string s, int len, out IntPtr hstr);
@@ -621,6 +681,7 @@ function Handle-Command($line) {
         }
         'dark' { Toggle-Dark; $script:due['dark'] = 0 }
         'outputs' { $script:lastOutputs = ''; $script:due['outputs'] = 0 }
+        'drag' { if ([NotchDrag]::Last) { Log "drag (previous): $([NotchDrag]::Last)" }; try { [NotchDrag]::Start([string[]]@($c.paths)) } catch { Log "drag: $($_.Exception.Message)" } }
         'appout' { Set-AppOutput ([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0 }
         'setoutput' { [NotchAudio]::SetDefaultOutput([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0; $script:lastVol = ''; $script:due['volume'] = 0 }
         'start' { [NotchNative]::PressWin() }
