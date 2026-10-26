@@ -150,6 +150,10 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   const tdRender = () => {
     const st = (TD && TD.status) || 'signedout';
     const btn = $('#tdSign');
+    // once connected, the client ID and the setup steps aren't needed any more
+    const connected = st !== 'signedout' && st !== 'pending';
+    $('#tdClientRow').hidden = connected;
+    $('#tdSteps').hidden = connected;
     $('#tdClient').value = document.activeElement === $('#tdClient') ? $('#tdClient').value : ((S.todo && S.todo.clientId) || '');
     if (st === 'signedout') { $('#tdStatus').textContent = (TD && TD.error) || 'Not connected'; btn.textContent = 'Sign in'; btn.className = 'btn primary'; btn.disabled = false; $('#tdListRow').hidden = true; }
     else if (st === 'pending') { $('#tdStatus').textContent = `Paste code ${TD.code} on Microsoft's page (it's on your clipboard)`; btn.textContent = 'Cancel'; btn.className = 'btn'; }
