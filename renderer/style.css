@@ -981,3 +981,8 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .music .meta.volonly { justify-content: center; }
 .music .meta.volonly .volrow { height: 24px; align-items: center; }
 .music .meta.volonly .volrow input[type=range] { margin-bottom: 0; }
+/* a new task is typed where it will appear: the first row of the list */
+.todo .tdnewrow .tdadd { flex: 1; min-width: 0; max-width: none; height: 23px; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; font-size: 12.5px; }
+.todo .tdnewrow .tdadd:focus { background: none; }
+.todo .tdnewrow .tdchk { border-style: dashed; cursor: default; }
+.todo .tdnewrow { background: var(--btn); }

@@ -271,8 +271,8 @@ const TILE = {
     if (size === 1) { t.innerHTML = `<div class="big-ico">${I.check}</div><span class="badge">${open.length}</span>`; return t; }
     t.innerHTML = `
       <div class="tdhead"><span class="tdlist-name ellipsis">${esc((d.list && d.list.name) || 'Tasks')}</span><span class="muted tdcount">${open.length}</span>
-        ${D.tdAdding ? `<input class="tdadd" data-tdadd type="text" placeholder="New task, then Enter" maxlength="255" spellcheck="false">` : `<button class="tdplus" data-tdplus title="Add a task">+</button>`}</div>
-      <div class="tdlist">${todoRows(tasks)}</div>`;
+        ${D.tdAdding ? '' : `<button class="tdplus" data-tdplus title="Add a task">+</button>`}</div>
+      <div class="tdlist">${D.tdAdding ? `<div class="tdrow tdnewrow"><span class="tdchk"></span><input class="tdadd" data-tdadd type="text" placeholder="New task, then Enter" maxlength="255" spellcheck="false"></div>${tasks.length ? todoRows(tasks) : ''}` : todoRows(tasks)}</div>`;
     return t;
   },
 
