@@ -66,7 +66,7 @@ function render() {
       <span class="grip" title="Drag to reorder">⋮⋮</span>
       <label class="switch"><input type="checkbox" ${t.show ? 'checked' : ''}><span></span></label>
       <span class="grow">${NAMES[t.id] || t.id}</span>
-      <div class="seg">${[[1, 'Small'], [2, 'Medium'], [3, 'Big']].map(([n, l]) => `<button data-size="${n}" class="${t.size === n ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+      ${t.show ? `<div class="seg">${[[1, 'Small'], [2, 'Medium'], [3, 'Big']].map(([n, l]) => `<button data-size="${n}" class="${t.size === n ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}`;
     row.querySelector('input').onchange = e => save({ tiles: S.tiles.map((x, j) => j === i ? { ...x, show: e.target.checked } : x) });
     row.querySelectorAll('[data-size]').forEach(b => b.onclick = () => save({ tiles: S.tiles.map((x, j) => j === i ? { ...x, size: +b.dataset.size } : x) }));
     // drag a row to reorder the tiles
