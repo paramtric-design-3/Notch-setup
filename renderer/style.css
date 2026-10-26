@@ -883,3 +883,8 @@ html[data-theme="dark"] .music.has-art .volbtn:not(.on) { color: rgba(242,244,24
 .todo .tdchk { width: 15px; height: 15px; }
 .todo .tdadd { height: 22px; }
 .todo .tdlist { margin-top: 3px; gap: 0; }
+.todo .tdplus { margin-left: auto; width: 24px; height: 24px; border-radius: 8px; border: 0; background: var(--btn-on); color: var(--accent); font-size: 18px; font-weight: 500; line-height: 22px; padding: 0; cursor: pointer; flex: none; }
+.todo .tdplus:hover { background: var(--accent); color: #2A1606; }
+.todo .tdadd { max-width: none; }
+.todo .tdplus { background: none; color: var(--accent); font-size: 20px; width: 22px; }
+.todo .tdplus:hover { background: none; color: var(--accent); transform: scale(1.15); }

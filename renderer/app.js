@@ -269,7 +269,7 @@ const TILE = {
     if (size === 1) { t.innerHTML = `<div class="big-ico">${I.check}</div><span class="badge">${open.length}</span>`; return t; }
     t.innerHTML = `
       <div class="tdhead"><span class="tdlist-name ellipsis">${esc((d.list && d.list.name) || 'Tasks')}</span><span class="muted tdcount">${open.length}</span>
-        <input class="tdadd" data-tdadd type="text" placeholder="+ Add a task" maxlength="255" spellcheck="false"></div>
+        ${D.tdAdding ? `<input class="tdadd" data-tdadd type="text" placeholder="New task, then Enter" maxlength="255" spellcheck="false">` : `<button class="tdplus" data-tdplus title="Add a task">+</button>`}</div>
       <div class="tdlist">${todoRows(tasks)}</div>`;
     return t;
   },
@@ -479,6 +479,7 @@ tilesView.addEventListener('click', async e => {
     return;
   }
   if (b.dataset.opensettings !== undefined) { api.send('open-settings'); return; }
+  if (b.dataset.tdplus !== undefined) { D.tdAdding = true; rerenderTile('todo'); startTyping(); return; }
   if (b.dataset.tddone) { api.send('todo-done', { id: b.dataset.tddone, done: b.dataset.v === '1' }); return; }
   if (b.dataset.tdstar) { api.send('todo-important', { id: b.dataset.tdstar, important: b.dataset.v === '1' }); return; }
   if (b.dataset.volopen !== undefined) { D.volOpen = !D.volOpen; rerenderTile('music'); return; }
@@ -1019,9 +1020,14 @@ api.on('peek', p => {
 
 // To Do: typing a new task. The window takes the keyboard only while you type in the box.
 let tdTyping = false;
-tilesView.addEventListener('mousedown', e => {
-  if (e.target.matches('[data-tdadd]') && !tdTyping) { tdTyping = true; pinned = true; island.classList.add('pinned'); api.send('island-focus', true); setTimeout(() => e.target.focus(), 30); }
-});
+function startTyping() {
+  const inp = tilesView.querySelector('[data-tdadd]');
+  if (!inp) return;
+  tdTyping = true; pinned = true; island.classList.add('pinned');
+  api.send('island-focus', true);
+  setTimeout(() => inp.focus(), 40);
+}
+tilesView.addEventListener('mousedown', e => { if (e.target.matches('[data-tdadd]') && !tdTyping) startTyping(); });
 tilesView.addEventListener('keydown', e => {
   if (!e.target.matches('[data-tdadd]')) return;
   if (e.key === 'Enter' && e.target.value.trim()) { api.send('todo-add', e.target.value.trim()); e.target.value = ''; }
@@ -1030,7 +1036,8 @@ tilesView.addEventListener('keydown', e => {
 tilesView.addEventListener('focusout', e => {
   if (!e.target.matches('[data-tdadd]') || !tdTyping) return;
   tdTyping = false; api.send('island-focus', false);
-  pinned = false; island.classList.remove('pinned'); if (!hovering) settle();
+  pinned = false; island.classList.remove('pinned');
+  setTimeout(() => { if (!tdTyping) { D.tdAdding = false; rerenderTile('todo'); if (!hovering) settle(); } }, 60);
 });
 api.on('todo', d => {
   D.todo = d;

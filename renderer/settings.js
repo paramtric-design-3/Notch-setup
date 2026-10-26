@@ -63,7 +63,7 @@ function render() {
     row.draggable = true;
     row.dataset.i = i;
     row.innerHTML = `
-      <span class="grip" title="Drag to reorder">⋮⋮</span>
+      <span class="grip" title="Drag to reorder"><svg viewBox="0 0 10 16" width="10" height="16"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></span>
       <label class="switch"><input type="checkbox" ${t.show ? 'checked' : ''}><span></span></label>
       <span class="grow">${NAMES[t.id] || t.id}</span>
       ${t.show ? `<div class="seg">${[[1, 'Small'], [2, 'Medium'], [3, 'Big']].map(([n, l]) => `<button data-size="${n}" class="${t.size === n ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}`;

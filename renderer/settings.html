@@ -57,8 +57,10 @@
     section.folded > :not(h2) { display: none !important; }
     .privacy { font-size: 10.5px; line-height: 1.5; color: var(--text-2); opacity: .75; text-align: center; max-width: 440px; margin: 18px auto 0; }
     .tilerow { cursor: default; }
-    .tilerow .grip { cursor: grab; color: var(--text-2); font-size: 13px; letter-spacing: -2px; width: 14px; text-align: center; user-select: none; opacity: .6; }
-    .tilerow:hover .grip { opacity: 1; }
+    .tilerow .grip { cursor: grab; width: 14px; display: inline-flex; justify-content: center; user-select: none; }
+    .tilerow .grip svg { fill: var(--text-2); opacity: .55; transition: opacity .12s, fill .12s; }
+    .tilerow:hover .grip svg { opacity: 1; }
+    .tilerow .grip:hover svg { fill: var(--accent); }
     .tilerow.dragging { opacity: .4; }
     .tilerow.over-top { box-shadow: inset 0 2px 0 var(--accent); }
     .tilerow.over-bottom { box-shadow: inset 0 -2px 0 var(--accent); }
@@ -110,7 +112,6 @@
   <section>
     <h2>Tiles</h2>
     <div id="tiles"></div>
-    <p class="note">Drag a tile by its grip to change the order. Small is a square, Big is the widest.</p>
   </section>
 
   <section data-tile="weather">
