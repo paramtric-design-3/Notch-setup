@@ -921,3 +921,31 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .music .meta.lean { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
 .music .meta.lean .row { justify-content: center; }
 .music .meta.lean .volrow { margin: 0; }
+/* shelf as a stack, like Dropshelf */
+.tile.shelf .shstack { position: relative; width: 70px; height: 54px; margin: 0 auto; cursor: grab; flex: none; }
+.tile.shelf.w1 .shstack { margin-top: 6px; }
+.tile.shelf .shcard { position: absolute; inset: 0; display: grid; place-items: center; transition: transform .15s; }
+.tile.shelf .shcard img, .tile.shelf .shcard svg { max-width: 100%; max-height: 100%; object-fit: contain; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+.tile.shelf .shcard .shph { width: 44px; height: 44px; }
+.tile.shelf .shstack .c1 { transform: translate(-7px, 2px) rotate(-7deg) scale(.92); }
+.tile.shelf .shstack .c2 { transform: translate(7px, 3px) rotate(7deg) scale(.88); }
+.tile.shelf .shstack:hover .c1 { transform: translate(-10px, 1px) rotate(-10deg) scale(.92); }
+.tile.shelf .shstack:hover .c2 { transform: translate(10px, 2px) rotate(10deg) scale(.88); }
+.tile.shelf .shpill { align-self: center; display: inline-flex; align-items: center; gap: 4px; max-width: 90%; margin-top: 4px; padding: 3px 6px 3px 10px; border: 0; border-radius: 8px; background: var(--btn); color: var(--text); font: inherit; font-size: 11px; cursor: pointer; }
+.tile.shelf .shpill:hover { background: var(--btn-hover); }
+.tile.shelf .shpill svg { width: 12px; height: 12px; flex: none; transform: rotate(90deg); color: var(--text-2); }
+.tile.shelf .shback { padding: 2px 4px; display: inline-grid; place-items: center; }
+.tile.shelf .shback svg { width: 11px; height: 11px; transform: rotate(-90deg); }
+.tile.shelf > .badge { position: absolute; right: 10px; bottom: 10px; }
+.tile.shelf .shfile img { object-fit: contain; }
+.tile.shelf .shcard > svg { width: 60px; height: 50px; }
+.tile.shelf .shcard img { width: 100%; height: 100%; }
+.tile.shelf .shstack { width: 64px; height: 46px; margin-top: -4px; }
+.tile.shelf .shcard > svg { width: 54px; height: 44px; }
+.tile.shelf .shstack .c1 { transform: translate(-10px, 1px) rotate(-10deg) scale(.86); }
+.tile.shelf .shstack .c2 { transform: translate(10px, 2px) rotate(10deg) scale(.82); }
+.tile.shelf .shstack:hover .c1 { transform: translate(-13px, 0) rotate(-13deg) scale(.86); }
+.tile.shelf .shstack:hover .c2 { transform: translate(13px, 1px) rotate(13deg) scale(.82); }
+.tile.shelf .shpill { margin-top: 6px; }
+.tile.shelf .shcard { display: flex; align-items: center; justify-content: center; }
+.tile.shelf .shcard img { width: 56px; height: 46px; max-width: none; max-height: none; object-fit: contain; }

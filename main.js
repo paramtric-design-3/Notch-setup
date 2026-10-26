@@ -541,8 +541,16 @@ async function onHelperMessage(m) {
     }
     case 'lcu': league && league.setClient(m.data && m.data.port ? { port: m.data.port, token: m.data.token } : null); break;
     case 'log': helperLog(m.data); break;
+    case 'thumb': {
+      const x = shelf.find(y => y.id === (m.data && m.data.id));
+      if (x && m.data.src) { x.thumb = m.data.src; toIsland('shelf', shelf); }
+      break;
+    }
     case 'dragdone': {
       const d = m.data || {};
+      // dropped somewhere: the shelf lets go of it (like Dropshelf); cancelled: it comes back
+      if (d.dropped && shelfDragIds) { shelf = shelf.filter(x => !shelfDragIds.includes(x.id)); saveShelf(); sendShelf(); }
+      shelfDragIds = null; toIsland('shelfdrag', null);
       helperLog(`shelf drag: ${d.result} in ${d.ms}ms`);
       // ended at once without dropping: Windows' own drag doesn't work on this PC, use WALL-E's drag from now on
       if (!d.dropped && d.ms < 400) { nativeDragFails++; if (nativeDragFails >= 1) helperLog('shelf drag: switching to the built-in drag'); }
@@ -950,8 +958,14 @@ ipcMain.handle('initial-state', () => ({ settings, state: { ...state, shelf } })
 // or app. Only the paths are kept (nothing is copied); the list survives restarts.
 let shelf = [];
 const shelfFile = () => path.join(app.getPath('userData'), 'shelf.json');
-function saveShelf() { try { fs.writeFileSync(shelfFile(), JSON.stringify(shelf.map(({ icon, ...x }) => x))); } catch { /* ignore */ } }
-function sendShelf() { toIsland('shelf', shelf); }
+function saveShelf() { try { fs.writeFileSync(shelfFile(), JSON.stringify(shelf.map(({ icon, thumb, ...x }) => x))); } catch { /* ignore */ } }
+function sendShelf() { toIsland('shelf', shelf); askThumbs(); }
+// Explorer's own thumbnails (folder previews, photos), made by the helper
+function askThumbs() {
+  if (process.platform !== 'win32') return;
+  for (const x of shelf) if (x.thumb === undefined) { x.thumb = null; sendHelper({ c: 'thumb', id: x.id, path: x.path }); }
+}
+let shelfDragIds = null;
 async function shelfIcon(p) { try { return (await app.getFileIcon(p, { size: 'normal' })).toDataURL(); } catch { return ''; } }
 async function loadShelf() {
   try {
@@ -1003,7 +1017,11 @@ ipcMain.on('shelf-drag', (e, req) => {
   if (!paths.length) return;
   const items = paths.map(p => shelf.find(x => x.path === p) || { path: p });
   // On Windows, Windows itself runs the drag (thumbnail + "Move"/"Copy" like Explorer, no file path)
-  if (process.platform === 'win32' && helper && helper.stdin.writable && !nativeDragFails) { sendHelper({ c: 'drag', paths }); return; }
+  if (process.platform === 'win32' && helper && helper.stdin.writable && !nativeDragFails) {
+    shelfDragIds = ids.filter(id => shelf.some(x => x.id === id));
+    toIsland('shelfdrag', shelfDragIds);
+    sendHelper({ c: 'drag', paths }); return;
+  }
   let icon = items[0].icon ? nativeImage.createFromDataURL(items[0].icon) : trayImage();
   if (icon.isEmpty()) icon = trayImage();
   e.sender.startDrag({ file: paths[0], files: paths, icon });

@@ -274,9 +274,23 @@ const TILE = {
 
   shelf(size) {   // eslint-disable-line
     const t = el('div', `tile shelf w${size}`);
-    const list = D.shelf || [];
+    const dragging = D.shelfDrag || [];
+    const list = (D.shelf || []).filter(x => !dragging.includes(x.id));   // what's being dragged out has left the shelf
     const outline = folderOutline(size);
+    if (!list.length && dragging.length) { t.innerHTML = outline; return t; }
     if (!list.length) { t.innerHTML = `${outline}<div class="empty"><div class="ico">${I.folder}</div>${size > 1 ? 'Drop files or folders here to hold them' : 'Drop here'}</div>`; return t; }
+    const pic = x => x.thumb ? `<img src="${x.thumb}" alt="">` : x.dir ? FOLDER_PIC : x.icon ? `<img src="${x.icon}" alt="">` : `<span class="shph">${I.file}</span>`;
+    // Like Dropshelf: one stack with the newest on top; drag it to take everything, ⌄ lists them one by one
+    if (!D.shelfList || size === 1) {
+      const top = list.slice(-3).reverse();
+      const label = list.length === 1 ? list[0].name : `${list.length} items`;
+      t.innerHTML = `${outline}
+        <div class="shstack n${top.length}" draggable="true" data-shelfall title="${esc(list.map(x => x.name).join('\n'))}&#10;Drag out to move or copy${list.length === 1 ? ' · double-click to show in its folder' : ''}"${list.length === 1 ? ` data-shelfid="${esc(list[0].id)}"` : ''}>
+          ${top.map((x, i) => `<span class="shcard c${i}">${pic(x)}</span>`).reverse().join('')}
+        </div>
+        ${size > 1 ? `<button class="shpill" data-shelflist title="Show them one by one"><span class="ellipsis">${esc(label)}</span>${I.chevron}</button>` : list.length > 1 ? `<span class="badge">${list.length}</span>` : ''}`;
+      return t;
+    }
     if (size === 1) {
       t.innerHTML = `${outline}<div class="shfile solo" draggable="true" data-shelfall title="Drag out all ${list.length}">${list[0].dir ? FOLDER_PIC : list[0].icon ? `<img src="${list[0].icon}" alt="">` : I.file}${list.length > 1 ? `<span class="badge">${list.length}</span>` : ''}</div>`;
       return t;
@@ -284,10 +298,10 @@ const TILE = {
     const shown = list.slice().reverse();   // newest first, one row you can scroll
     t.innerHTML = `${outline}
       <div class="shhead">
-        <span class="shact">${list.length > 1 ? `<span class="shall" draggable="true" data-shelfall title="Drag all ${list.length} out">All ${list.length}</span>` : ''}<button class="shclear" data-shelfclear title="Clear the shelf">Clear</button></span></div>
+        <span class="shact"><button class="shclear shback" data-shelflist title="Back to the stack">${I.chevron}</button>${list.length > 1 ? `<span class="shall" draggable="true" data-shelfall title="Drag all ${list.length} out">All ${list.length}</span>` : ''}<button class="shclear" data-shelfclear title="Clear the shelf">Clear</button></span></div>
       <div class="shlist">${shown.map(x => `
         <div class="shfile" draggable="true" data-shelfid="${esc(x.id)}" title="${esc(x.path)}&#10;Drag out to copy or move · double-click to show in its folder">
-          ${x.dir ? FOLDER_PIC : x.icon ? `<img src="${x.icon}" alt="">` : `<span class="shph">${I.file}</span>`}
+          ${pic(x)}
           <span class="shname ellipsis">${esc(x.name)}</span>
           <button class="shx" data-shelfx="${esc(x.id)}" title="Remove from the shelf">×</button>
         </div>`).join('')}</div>`;
@@ -465,6 +479,7 @@ tilesView.addEventListener('click', async e => {
   if (b.dataset.url) { api.send('open-url', b.dataset.url); return; }
   if (b.dataset.cstab) { D.csTab = b.dataset.cstab; rerenderTile('league'); return; }
   if (b.dataset.shelfx) { D.shelf = await api.invoke('shelf-remove', b.dataset.shelfx); renderTiles(); return; }
+  if (b.dataset.shelflist !== undefined) { D.shelfList = !D.shelfList; rerenderTile('shelf'); return; }
   if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); renderTiles(); return; }
   if (b.dataset.buildsrc) { D.buildSrc = b.dataset.buildsrc; rerenderTile('league'); return; }
   if (b.dataset.tierlane) { D.tierLane = b.dataset.tierlane; rerenderTile('league'); return; }
@@ -1076,7 +1091,8 @@ api.on('todo', d => {
   if (tdTyping && box && d.status === 'ok') { box.innerHTML = todoRows(d.tasks || []); const c = tilesView.querySelector('.tdcount'); if (c) c.textContent = (d.tasks || []).filter(x => !x.done).length; return; }
   rerenderTile('todo');
 });
-api.on('shelf', list => { const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
+api.on('shelfdrag', ids => { D.shelfDrag = ids || null; rerenderTile('shelf'); });
+api.on('shelf', list => { if (!(list || []).length) D.shelfList = false; const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
 api.on('appout', a => { D.appout = a; if (D.outPicker) rerenderTile('music'); });
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
 api.on('league', L => {

@@ -6,7 +6,7 @@ Set-StrictMode -Off
 
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 
-Add-Type -Language CSharp -TypeDefinition @'
+Add-Type -Language CSharp -ReferencedAssemblies System.Drawing -TypeDefinition @'
 using System;
 using System.IO;
 using System.Text;
@@ -239,6 +239,42 @@ public static class NotchDrag {
         t.SetApartmentState(System.Threading.ApartmentState.STA);
         t.IsBackground = true;
         t.Start();
+    }
+}
+
+// Explorer's own thumbnail for a file or folder (folder previews, photos, documents), as PNG.
+[ComImport, Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IShellItemImageFactory { [PreserveSig] int GetImage(SIZEI size, int flags, out IntPtr hbmp); }
+[StructLayout(LayoutKind.Sequential)] struct SIZEI { public int cx, cy; }
+public static class NotchThumb {
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHCreateItemFromParsingName(string path, IntPtr bc, [In] ref Guid riid, [MarshalAs(UnmanagedType.IUnknown)] out object item);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr h);
+    [DllImport("gdi32.dll")] static extern int GetObject(IntPtr h, int size, ref BITMAPI bm);
+    [DllImport("gdi32.dll")] static extern int GetDIBits(IntPtr hdc, IntPtr hbmp, uint start, uint lines, byte[] bits, ref BITMAPINFOHEADERI bi, uint usage);
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
+    [StructLayout(LayoutKind.Sequential)] struct BITMAPI { public int type, width, height, widthBytes; public ushort planes, bits; public IntPtr data; }
+    [StructLayout(LayoutKind.Sequential)] struct BITMAPINFOHEADERI { public int size, width, height; public ushort planes, bitCount; public int compression, sizeImage, xppm, yppm, clrUsed, clrImportant; }
+    public static string Get(string path, int px) {
+        object o; Guid iid = typeof(IShellItemImageFactory).GUID;
+        if (SHCreateItemFromParsingName(path, IntPtr.Zero, ref iid, out o) != 0) return "";
+        IntPtr h;
+        if (((IShellItemImageFactory)o).GetImage(new SIZEI { cx = px, cy = px }, 0, out h) != 0 || h == IntPtr.Zero) return "";
+        try {
+            var bm = new BITMAPI(); GetObject(h, Marshal.SizeOf(typeof(BITMAPI)), ref bm);
+            int w = bm.width, ht = Math.Abs(bm.height);
+            var bi = new BITMAPINFOHEADERI { size = Marshal.SizeOf(typeof(BITMAPINFOHEADERI)), width = w, height = -ht, planes = 1, bitCount = 32 };
+            var buf = new byte[w * ht * 4];
+            IntPtr dc = GetDC(IntPtr.Zero);
+            try { GetDIBits(dc, h, 0, (uint)ht, buf, ref bi, 0); } finally { ReleaseDC(IntPtr.Zero, dc); }
+            bool anyAlpha = false; for (int i = 3; i < buf.Length; i += 4) if (buf[i] != 0) { anyAlpha = true; break; }
+            if (!anyAlpha) for (int i = 3; i < buf.Length; i += 4) buf[i] = 255;   // plain photos come without alpha
+            using (var bmp = new System.Drawing.Bitmap(w, ht, System.Drawing.Imaging.PixelFormat.Format32bppPArgb)) {
+                var d = bmp.LockBits(new System.Drawing.Rectangle(0, 0, w, ht), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                Marshal.Copy(buf, 0, d.Scan0, buf.Length); bmp.UnlockBits(d);
+                using (var ms = new System.IO.MemoryStream()) { bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png); return "data:image/png;base64," + Convert.ToBase64String(ms.ToArray()); }
+            }
+        } finally { DeleteObject(h); }
     }
 }
 
@@ -703,6 +739,7 @@ function Handle-Command($line) {
         }
         'dark' { Toggle-Dark; $script:due['dark'] = 0 }
         'outputs' { $script:lastOutputs = ''; $script:due['outputs'] = 0 }
+        'thumb' { $src = ''; try { $src = [NotchThumb]::Get([string]$c.path, 128) } catch { Log "thumb: $($_.Exception.Message)" }; Emit 'thumb' ([ordered]@{ id = $c.id; src = $src }) }
         'drag' { try { [NotchDrag]::Start([string[]]@($c.paths)) } catch { Log "drag: $($_.Exception.Message)" } }
         'appout' { Set-AppOutput ([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0 }
         'setoutput' { [NotchAudio]::SetDefaultOutput([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0; $script:lastVol = ''; $script:due['volume'] = 0 }
