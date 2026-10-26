@@ -486,6 +486,12 @@ tilesView.addEventListener('click', async e => {
   if (b.dataset.volopen !== undefined) { D.volOpen = !D.volOpen; rerenderTile('music'); return; }
   if (b.dataset.volmute !== undefined) { api.send('helper', { c: 'vol', mute: true }); return; }
   if (b.dataset.out !== undefined) { D.outPicker = true; api.send('helper', { c: 'outputs' }); rerenderTile('music'); return; }
+  if (b.dataset.outscope) { D.outScope = b.dataset.outscope; rerenderTile('music'); return; }
+  if (b.dataset.appout !== undefined) {
+    api.send('helper', { c: 'appout', id: b.dataset.appout });
+    D.appout = { ...(D.appout || {}), out: b.dataset.appout };   // show it right away
+    D.outPicker = false; rerenderTile('music'); return;
+  }
   if (b.dataset.outclose !== undefined) { D.outPicker = false; rerenderTile('music'); return; }
   if (b.dataset.outid) {
     api.send('helper', { c: 'setoutput', id: b.dataset.outid });
@@ -857,14 +863,34 @@ function outputIcon(o) {
   if (/monitor|display|hdmi|nvidia|amd high definition|tv|lg |samsung|dell|msi|mag /.test(n)) return I.monitor;
   return I.speaker;
 }
+// "Spotify.exe", "SpotifyAB.SpotifyMusic_…!Spotify", "Chrome", "MSEdge" -> a readable app name
+function appLabel(id) {
+  const a = String(id || '');
+  const known = [[/spotify/i, 'Spotify'], [/msedge|edge/i, 'Edge'], [/chrome/i, 'Chrome'], [/firefox/i, 'Firefox'], [/opera/i, 'Opera'], [/brave/i, 'Brave'], [/tidal/i, 'TIDAL'], [/deezer/i, 'Deezer'], [/applemusic|itunes/i, 'Apple Music'], [/vlc/i, 'VLC'], [/zune|media\.player/i, 'Media Player']];
+  for (const [re, n] of known) if (re.test(a)) return n;
+  return (a.split('!').pop().replace(/\.exe$/i, '').split(/[\\/]/).pop() || 'Music app');
+}
+// Sound output: for just the music app (the rest of the PC keeps its output), or for the whole PC.
 function outputsPicker(size) {
   const t = el('div', `tile music picker w${size}`);
-  t.innerHTML = `
-    <div class="phead"><span>Sound output</span><button class="ibtn" data-outclose title="Back">${I.chevron}</button></div>
-    <div class="plist">${D.outputs.map(o => `
+  const ao = D.appout || {};
+  const canApp = !!(ao.app && ao.ok !== false);
+  const scope = canApp && D.outScope !== 'pc' ? 'app' : 'pc';
+  const head = canApp
+    ? `<span class="pseg"><button class="${scope === 'app' ? 'on' : ''}" data-outscope="app">${esc(appLabel(ao.app))} only</button><button class="${scope === 'pc' ? 'on' : ''}" data-outscope="pc">Whole PC</button></span>`
+    : `<span>Sound output</span>`;
+  const rows = scope === 'app'
+    ? [{ id: '', name: 'Same as PC', same: true }, ...D.outputs].map(o => {
+        const on = o.same ? !ao.out : ao.out === o.id;
+        return `<button class="pitem ${on ? 'on' : ''}" data-appout="${esc(o.id)}"><span class="pico">${o.same ? I.monitor : outputIcon(o)}</span><span class="pname ellipsis">${esc(o.name || 'Unknown device')}</span>${on ? `<span class="pcheck">${I.check}</span>` : ''}</button>`;
+      }).join('')
+    : D.outputs.map(o => `
       <button class="pitem ${o.default ? 'on' : ''}" data-outid="${esc(o.id)}">
         <span class="pico">${outputIcon(o)}</span><span class="pname ellipsis">${esc(o.name || 'Unknown device')}</span>${o.default ? `<span class="pcheck">${I.check}</span>` : ''}
-      </button>`).join('')}</div>`;
+      </button>`).join('');
+  t.innerHTML = `
+    <div class="phead">${head}<button class="ibtn" data-outclose title="Back">${I.chevron}</button></div>
+    <div class="plist">${rows}</div>`;
   return t;
 }
 
@@ -1054,6 +1080,7 @@ api.on('todo', d => {
   rerenderTile('todo');
 });
 api.on('shelf', list => { const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
+api.on('appout', a => { D.appout = a; if (D.outPicker) rerenderTile('music'); });
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
 api.on('league', L => {
   const wideBefore = leagueWide();

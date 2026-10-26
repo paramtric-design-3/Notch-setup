@@ -110,6 +110,65 @@ interface IMMDeviceEnumerator {
 }
 [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumeratorCom { }
 
+// Per-app sound output (what Settings > Sound > Volume mixer does per app). Windows exposes it through
+// an internal, undocumented interface (the same one EarTrumpet uses); its ID changed in Windows 10 21H2.
+[ComImport, Guid("ab3d4648-e242-459f-b02f-541c70306324"), InterfaceType(ComInterfaceType.InterfaceIsIInspectable)]
+interface IAudioPolicyConfigNew {
+    int _a1(); int _a2(); int _a3(); int _a4(); int _a5(); int _a6(); int _a7(); int _a8(); int _a9(); int _a10();
+    int _a11(); int _a12(); int _a13(); int _a14(); int _a15(); int _a16(); int _a17(); int _a18(); int _a19();
+    [PreserveSig] int SetPersistedDefaultAudioEndpoint(uint processId, int flow, int role, IntPtr deviceId);
+    [PreserveSig] int GetPersistedDefaultAudioEndpoint(uint processId, int flow, int role, out IntPtr deviceId);
+    [PreserveSig] int ClearAllPersistedApplicationDefaultEndpoints();
+}
+[ComImport, Guid("2a59116d-6c4f-45e0-a74f-707e3fef9258"), InterfaceType(ComInterfaceType.InterfaceIsIInspectable)]
+interface IAudioPolicyConfigOld {
+    int _a1(); int _a2(); int _a3(); int _a4(); int _a5(); int _a6(); int _a7(); int _a8(); int _a9(); int _a10();
+    int _a11(); int _a12(); int _a13(); int _a14(); int _a15(); int _a16(); int _a17(); int _a18(); int _a19();
+    [PreserveSig] int SetPersistedDefaultAudioEndpoint(uint processId, int flow, int role, IntPtr deviceId);
+    [PreserveSig] int GetPersistedDefaultAudioEndpoint(uint processId, int flow, int role, out IntPtr deviceId);
+    [PreserveSig] int ClearAllPersistedApplicationDefaultEndpoints();
+}
+public static class NotchAppAudio {
+    [DllImport("combase.dll", PreserveSig = false)] static extern void RoGetActivationFactory(IntPtr classId, [In] ref Guid iid, [MarshalAs(UnmanagedType.IInspectable)] out object factory);
+    [DllImport("combase.dll", PreserveSig = false)] static extern void WindowsCreateString([MarshalAs(UnmanagedType.LPWStr)] string s, int len, out IntPtr hstr);
+    [DllImport("combase.dll", PreserveSig = false)] static extern void WindowsDeleteString(IntPtr hstr);
+    [DllImport("combase.dll")] static extern IntPtr WindowsGetStringRawBuffer(IntPtr hstr, out uint len);
+    const string RENDER = "#{e6327cad-dcec-4949-ae8a-991e976a79d2}";
+    static object factory;
+    static object Factory() {
+        if (factory != null) return factory;
+        IntPtr cls; WindowsCreateString("Windows.Media.Internal.AudioPolicyConfig", 40, out cls);
+        try {
+            foreach (var iid in new[] { typeof(IAudioPolicyConfigNew).GUID, typeof(IAudioPolicyConfigOld).GUID }) {
+                try { var g = iid; object f; RoGetActivationFactory(cls, ref g, out f); if (f != null) { factory = f; return f; } } catch { }
+            }
+        } finally { WindowsDeleteString(cls); }
+        throw new InvalidOperationException("per-app audio is not available on this Windows");
+    }
+    // deviceId "" puts the app back on the PC's own output
+    public static void Set(uint pid, string deviceId) {
+        var f = Factory();
+        IntPtr h = IntPtr.Zero;
+        if (!string.IsNullOrEmpty(deviceId)) { string full = @"\\?\SWD#MMDEVAPI#" + deviceId + RENDER; WindowsCreateString(full, full.Length, out h); }
+        try {
+            for (int role = 0; role < 2; role++) {   // console and multimedia
+                int hr = f is IAudioPolicyConfigNew ? ((IAudioPolicyConfigNew)f).SetPersistedDefaultAudioEndpoint(pid, 0, role, h) : ((IAudioPolicyConfigOld)f).SetPersistedDefaultAudioEndpoint(pid, 0, role, h);
+                Marshal.ThrowExceptionForHR(hr);
+            }
+        } finally { if (h != IntPtr.Zero) WindowsDeleteString(h); }
+    }
+    public static string Get(uint pid) {
+        var f = Factory();
+        IntPtr h;
+        int hr = f is IAudioPolicyConfigNew ? ((IAudioPolicyConfigNew)f).GetPersistedDefaultAudioEndpoint(pid, 0, 1, out h) : ((IAudioPolicyConfigOld)f).GetPersistedDefaultAudioEndpoint(pid, 0, 1, out h);
+        if (hr != 0 || h == IntPtr.Zero) return "";
+        uint len; string s = Marshal.PtrToStringUni(WindowsGetStringRawBuffer(h, out len), (int)len);
+        WindowsDeleteString(h);
+        int a = s.IndexOf("MMDEVAPI#"), b = s.LastIndexOf("#{");
+        return a >= 0 && b > a ? s.Substring(a + 9, b - a - 9) : "";
+    }
+}
+
 public static class NotchAudio {
     [DllImport("ole32.dll")] static extern int PropVariantClear(ref PROPVARIANT pv);
     static string FriendlyName(IMMDevice d) {
@@ -213,6 +272,7 @@ function Poll-Media {
     $tl = $s.GetTimelineProperties()
     $pb = $s.GetPlaybackInfo()
     $dur = ($tl.EndTime - $tl.StartTime).TotalMilliseconds
+    if ($script:mediaApp -ne $s.SourceAppUserModelId) { $script:mediaApp = $s.SourceAppUserModelId; $script:lastOutputs = '' }
     $data = [ordered]@{
         title     = $props.Title
         artist    = $props.Artist
@@ -382,14 +442,43 @@ function Toggle-Dark {
 
 # ------------------------------------------------------------------ sound output devices
 $script:lastOutputs = ''
+# The processes of the app that's playing music (from the media session's app id).
+function Get-MusicPids {
+    $a = "$script:mediaApp"
+    if (-not $a) { return @() }
+    $names = @()
+    if ($a -match '([^\\/!]+)\.exe$') { $names += $Matches[1] }
+    $map = @{ 'chrome' = 'chrome'; 'msedge' = 'msedge'; 'firefox' = 'firefox'; 'opera' = 'opera'; 'brave' = 'brave'; 'spotify' = 'Spotify'; 'vivaldi' = 'vivaldi'; 'tidal' = 'TIDAL'; 'deezer' = 'Deezer'; 'applemusic' = 'AppleMusic'; 'itunes' = 'iTunes'; 'vlc' = 'vlc'; 'foobar' = 'foobar2000'; 'zune' = 'Microsoft.Media.Player' }
+    foreach ($k in $map.Keys) { if ($a -match $k) { $names += $map[$k] } }
+    $ids = @()
+    foreach ($n in ($names | Select-Object -Unique)) { $ids += @(Get-Process -Name $n -ErrorAction SilentlyContinue | ForEach-Object { $_.Id }) }
+    if (-not $ids -and $a -match '^([^_!]+)_') {
+        $pkg = $Matches[1]
+        $ids += @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "*$pkg*" } | ForEach-Object { $_.Id })
+    }
+    return @($ids | Select-Object -Unique)
+}
+function Set-AppOutput($deviceId) {
+    $ids = Get-MusicPids
+    if (-not $ids) { Log "appout: no process for '$script:mediaApp'"; return }
+    foreach ($p in $ids) { try { [NotchAppAudio]::Set([uint32]$p, $deviceId) } catch { Log "appout: $($_.Exception.Message)"; return } }
+}
+
 function Poll-Outputs {
     $devs = @()
     foreach ($line in [NotchAudio]::ListOutputs()) {
         $f = $line -split "`t"
         $devs += , ([ordered]@{ id = $f[0]; name = $f[1]; default = ($f[2] -eq '1') })
     }
-    $sig = ($devs | ForEach-Object { "$($_.id)|$($_.default)" }) -join ';'
-    if ($sig -ne $script:lastOutputs) { $script:lastOutputs = $sig; Emit 'outputs' ([ordered]@{ devices = $devs }) }
+    # where the music app's sound goes ('' = same as the PC)
+    $app = ''; $appOut = ''; $appOk = $true
+    $ids = Get-MusicPids
+    if ($ids) {
+        $app = "$script:mediaApp"
+        try { foreach ($p in $ids) { $o = [NotchAppAudio]::Get([uint32]$p); if ($o) { $appOut = $o; break } } } catch { $appOk = $false }
+    }
+    $sig = (($devs | ForEach-Object { "$($_.id)|$($_.default)" }) -join ';') + "|$app|$appOut|$appOk"
+    if ($sig -ne $script:lastOutputs) { $script:lastOutputs = $sig; Emit 'outputs' ([ordered]@{ devices = $devs; app = $app; appOut = $appOut; appOk = $appOk }) }
 }
 
 # ------------------------------------------------------------------ League of Legends client (its local API port and key)
@@ -481,6 +570,7 @@ function Handle-Command($line) {
         }
         'dark' { Toggle-Dark; $script:due['dark'] = 0 }
         'outputs' { $script:lastOutputs = ''; $script:due['outputs'] = 0 }
+        'appout' { Set-AppOutput ([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0 }
         'setoutput' { [NotchAudio]::SetDefaultOutput([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0; $script:lastVol = ''; $script:due['volume'] = 0 }
         'start' { [NotchNative]::PressWin() }
     }

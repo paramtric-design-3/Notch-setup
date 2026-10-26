@@ -509,7 +509,11 @@ async function onHelperMessage(m) {
     case 'volume': state.volume = m.data; toIsland('volume', m.data); break;
     case 'brightness': state.brightness = m.data; toIsland('brightness', m.data); break;
     case 'dark': state.dark = m.data; toIsland('dark', m.data); break;
-    case 'outputs': state.outputs = (m.data && m.data.devices) || []; toIsland('outputs', state.outputs); buildTrayMenu(); break;
+    case 'outputs':
+      state.outputs = (m.data && m.data.devices) || [];
+      state.appout = { app: (m.data && m.data.app) || '', out: (m.data && m.data.appOut) || '', ok: !(m.data && m.data.appOk === false) };
+      toIsland('outputs', state.outputs); toIsland('appout', state.appout); buildTrayMenu();
+      break;
     case 'apps': {
       if (!appsBaselineDone) { appsBaselineDone = true; break; }  // no peeks for apps already open
       if (!settings.peeks.apps) break;
