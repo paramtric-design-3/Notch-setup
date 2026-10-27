@@ -270,7 +270,8 @@ const TILE = {
     if (d.status === 'error' && !tasks.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.check}</div>${esc(d.error || 'Could not reach Microsoft To Do')}</div>`; return t; }
     if (size === 1) { t.innerHTML = `<div class="big-ico">${I.check}</div><span class="badge">${open.length}</span>`; return t; }
     t.innerHTML = `
-      <div class="tdhead"><span class="tdlist-name ellipsis">${esc((d.list && d.list.name) || 'Tasks')}</span><span class="muted tdcount">${open.length}</span>
+      <div class="tdhead"><button class="tdlist-name" data-tdlists title="Switch list"><span class="ellipsis">${esc((d.list && d.list.name) || 'Tasks')}</span>${I.chevron}</button>
+        ${D.tdLists ? `<div class="tdmenu">${D.tdLists.length ? D.tdLists.map(l => `<button class="${d.list && d.list.id === l.id ? 'on' : ''}" data-tdpick="${esc(l.id)}"><span class="ellipsis">${esc(l.name)}</span>${d.list && d.list.id === l.id ? I.check : ''}</button>`).join('') : '<span class="muted">Loading lists…</span>'}</div>` : ''}
         ${D.tdAdding ? '' : `<button class="tdplus" data-tdplus title="Add a task">+</button>`}</div>
       <div class="tdlist">${D.tdAdding ? `<div class="tdrow tdnewrow"><span class="tdchk"></span><input class="tdadd" data-tdadd type="text" placeholder="New task, then Enter" maxlength="255" spellcheck="false"></div>${tasks.length ? todoRows(tasks) : ''}` : todoRows(tasks)}</div>`;
     return t;
@@ -484,6 +485,17 @@ tilesView.addEventListener('click', async e => {
   if (b.dataset.url) { api.send('open-url', b.dataset.url); return; }
   if (b.dataset.cstab) { D.csTab = b.dataset.cstab; rerenderTile('league'); return; }
   if (b.dataset.shelfx) { D.shelf = await api.invoke('shelf-remove', b.dataset.shelfx); renderTiles(); return; }
+  if (b.dataset.tdlists !== undefined) {
+    if (D.tdLists) { D.tdLists = null; rerenderTile('todo'); return; }
+    D.tdLists = []; rerenderTile('todo');
+    D.tdLists = await api.invoke('todo-lists').catch(() => []); if (D.tdLists) rerenderTile('todo'); return;
+  }
+  if (b.dataset.tdpick) {
+    const listId = b.dataset.tdpick; D.tdLists = null;
+    const cur = (D.settings && D.settings.todo) || {};
+    D.settings = await api.invoke('set-settings', { todo: { ...cur, listId } }).catch(() => D.settings);
+    rerenderTile('todo'); return;
+  }
   if (b.dataset.shelflist !== undefined) { D.shelfList = !D.shelfList; rerenderTile('shelf'); return; }
   if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); renderTiles(); return; }
   if (b.dataset.buildsrc) { D.buildSrc = b.dataset.buildsrc; rerenderTile('league'); return; }
