@@ -93,13 +93,15 @@
     .tophead { display: flex; align-items: center; gap: 12px; margin: 0 4px 16px; }
     .tophead h1 { margin: 0; }
     .tophead .ver { font-size: 12.5px; color: var(--text-2, #8a8f98); margin-top: 2px; }
+    .tophead .verbtn { font: inherit; font-size: 12.5px; color: var(--accent); background: none; border: 0; padding: 0; margin-top: 3px; cursor: pointer; }
+    .tophead .verbtn:hover { text-decoration: underline; }
+    .tophead .verbtn:disabled { color: var(--text-2); cursor: default; text-decoration: none; }
   </style>
 </head>
 <body>
 <main>
   <header class="tophead">
-    <div class="grow"><h1 class="appname">WALL-E</h1><div class="ver" id="upText">Version …</div></div>
-    <button class="btn" id="upBtn">Check now</button>
+    <div class="grow"><h1 class="appname">WALL-E</h1><div class="ver" id="upText">Version …</div><button class="verbtn" id="upBtn">Check now</button></div>
   </header>
 
   <section>
