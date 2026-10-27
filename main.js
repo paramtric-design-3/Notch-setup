@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS = {
   messageAllApps: false,
   todo: { clientId: '', listId: '' },   // Microsoft To Do: your app registration's client ID, and which list to show
   peeks: { apps: false, power: true },
+  taskbar: 'off',               // see-through taskbar: 'off' | 'clear' | 'blur' | 'acrylic'
   overlay: { show: true, place: 'minimap', onTab: true },   // in-game item overlay: 'minimap' | 'top' | 'left'; onTab: only while Tab is held
   schema: 2,
   tiles: [
@@ -104,6 +105,7 @@ function applySettings(next, { fromSettingsWindow = false } = {}) {
   refreshMessages();
   buildTrayMenu();
   updateOverlay();
+  sendTaskbar();
   if (!fromSettingsWindow && settingsWin) settingsWin.webContents.send('settings', settings);
 }
 
@@ -486,7 +488,9 @@ function startHelper() {
     if (helperRestarts++ < 5) setTimeout(startHelper, 2000 * helperRestarts);
   });
   sendHelper({ c: 'mode', open: islandOpen });
+  sendTaskbar();
 }
+function sendTaskbar() { sendHelper({ c: 'taskbar', mode: settings.taskbar || 'off', dark: settings.theme === 'dark' }); }
 
 function sendHelper(cmd) {
   if (helper && helper.stdin.writable) helper.stdin.write(JSON.stringify(cmd) + '\n');
@@ -1136,7 +1140,14 @@ app.whenReady().then(() => {
 
 app.on('second-instance', openSettings);
 app.on('window-all-closed', e => e.preventDefault());
-app.on('before-quit', () => {
+app.on('before-quit', e => {
+  // give the taskbar its normal look back before the helper goes
+  if (!quitting && settings.taskbar && settings.taskbar !== 'off' && helper) {
+    e.preventDefault(); quitting = true;
+    sendHelper({ c: 'taskbar', mode: 'off' });
+    setTimeout(() => app.quit(), 400);
+    return;
+  }
   quitting = true;
   if (helper) { try { helper.kill(); } catch {} }
 });

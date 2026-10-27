@@ -40,6 +40,7 @@ function render() {
   document.querySelectorAll('.appname').forEach(e => { e.textContent = name; });
   document.title = name + ' settings';
   document.querySelectorAll('#theme button').forEach(b => b.classList.toggle('on', b.dataset.v === S.theme));
+  document.querySelectorAll('#taskbar button').forEach(b => b.classList.toggle('on', b.dataset.v === (S.taskbar || 'off')));
   $('#login').checked = !!S.launchAtLogin;
   renderDisplays();
   $('#msgAll').checked = !!S.messageAllApps;
@@ -130,6 +131,7 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   api.on('update', u => { UP = u; renderUpdate(); });
   $('#upBtn').onclick = () => api.send(UP && UP.state === 'ready' ? 'install-update' : 'check-updates');
   document.querySelectorAll('#theme button').forEach(b => b.onclick = () => save({ theme: b.dataset.v }));
+  document.querySelectorAll('#taskbar button').forEach(b => b.onclick = () => save({ taskbar: b.dataset.v }));
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
   $('#ovShow').onchange = e => save({ overlay: { ...(S.overlay || {}), show: e.target.checked } });

@@ -278,6 +278,40 @@ public static class NotchThumb {
     }
 }
 
+// See-through taskbar like TranslucentTB, without touching Explorer: the same window-composition
+// call Windows' own shell uses, reapplied because Explorer resets it (hover, Start, focus changes).
+public static class NotchTaskbar {
+    [StructLayout(LayoutKind.Sequential)] struct ACCENT { public int State, Flags, Color, Anim; }
+    [StructLayout(LayoutKind.Sequential)] struct WCAD { public int Attr; public IntPtr Data; public int Size; }
+    [DllImport("user32.dll")] static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WCAD d);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string title);
+    [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint ms, out IntPtr res);
+    static System.Collections.Generic.List<IntPtr> Bars() {
+        var l = new System.Collections.Generic.List<IntPtr>();
+        var main = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "Shell_TrayWnd", null); if (main != IntPtr.Zero) l.Add(main);
+        IntPtr h = IntPtr.Zero;
+        while ((h = FindWindowEx(IntPtr.Zero, h, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero) l.Add(h);   // other screens
+        return l;
+    }
+    // state: 0 normal, 2 clear, 3 blur, 4 acrylic; color AABBGGRR
+    public static int Apply(int state, int color) {
+        var a = new ACCENT { State = state, Flags = state == 2 ? 2 : 0, Color = color, Anim = 0 };
+        int n = 0, size = Marshal.SizeOf(typeof(ACCENT));
+        IntPtr p = Marshal.AllocHGlobal(size);
+        try {
+            Marshal.StructureToPtr(a, p, false);
+            var d = new WCAD { Attr = 19, Data = p, Size = size };   // WCA_ACCENT_POLICY
+            foreach (var h in Bars()) { if (SetWindowCompositionAttribute(h, ref d) != 0) n++; }
+        } finally { Marshal.FreeHGlobal(p); }
+        return n;
+    }
+    // back to Windows' own look
+    public static void Reset() {
+        Apply(0, 0);
+        foreach (var h in Bars()) { IntPtr r; SendMessageTimeout(h, 0x0320, IntPtr.Zero, IntPtr.Zero, 2, 200, out r); }   // WM_DWMCOLORIZATIONCOLORCHANGED: repaint
+    }
+}
+
 public static class NotchAppAudio {
     [DllImport("combase.dll", PreserveSig = false)] static extern void RoGetActivationFactory(IntPtr classId, [In] ref Guid iid, [MarshalAs(UnmanagedType.IInspectable)] out object factory);
     [DllImport("combase.dll", PreserveSig = false)] static extern void WindowsCreateString([MarshalAs(UnmanagedType.LPWStr)] string s, int len, out IntPtr hstr);
@@ -592,6 +626,19 @@ function Toggle-Dark {
     [NotchNative]::BroadcastTheme()
 }
 
+# ------------------------------------------------------------------ see-through taskbar
+$script:tbMode = ''; $script:tbDark = $true
+function Apply-Taskbar {
+    $tint = if ($script:tbDark) { 0x00101010 } else { 0x00F2F2F2 }   # BBGGRR
+    switch ($script:tbMode) {
+        'clear'   { $st = 2; $col = 0 }
+        'blur'    { $st = 3; $col = 0 }
+        'acrylic' { $st = 4; $col = (0x30 -shl 24) -bor $tint }
+        default   { return }
+    }
+    try { $null = [NotchTaskbar]::Apply($st, [int]$col) } catch { Log "taskbar: $($_.Exception.Message)"; $script:tbMode = '' }
+}
+
 # ------------------------------------------------------------------ sound output devices
 $script:lastOutputs = ''
 # The processes of the app that's playing music (from the media session's app id).
@@ -739,6 +786,11 @@ function Handle-Command($line) {
         }
         'dark' { Toggle-Dark; $script:due['dark'] = 0 }
         'outputs' { $script:lastOutputs = ''; $script:due['outputs'] = 0 }
+        'taskbar' {
+            $script:tbMode = [string]$c.mode; $script:tbDark = [bool]$c.dark
+            if ($script:tbMode -eq 'off' -or -not $script:tbMode) { try { [NotchTaskbar]::Reset() } catch { Log "taskbar: $($_.Exception.Message)" } }
+            else { $script:due['taskbar'] = 0 }
+        }
         'thumb' { $src = ''; try { $src = [NotchThumb]::Get([string]$c.path, 128) } catch { Log "thumb: $($_.Exception.Message)" }; Emit 'thumb' ([ordered]@{ id = $c.id; src = $src }) }
         'drag' { try { [NotchDrag]::Start([string[]]@($c.paths)) } catch { Log "drag: $($_.Exception.Message)" } }
         'appout' { Set-AppOutput ([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0 }
@@ -763,6 +815,7 @@ while (-not [NotchPump]::Closed) {
         try { Handle-Command $line } catch { Log "command: $($_.Exception.Message)" }
     }
     if ([NotchDrag]::Done) { [NotchDrag]::Done = $false; Emit 'dragdone' ([ordered]@{ result = [NotchDrag]::Last; ms = [NotchDrag]::Ms; dropped = [NotchDrag]::Dropped }) }
+    if ($script:tbMode -and $script:tbMode -ne 'off') { Every 'taskbar' 400 { Apply-Taskbar } }
     if ($script:open) {
         Every 'media' 1000 { Poll-Media }
         Every 'volume' 1000 { Poll-Volume }
