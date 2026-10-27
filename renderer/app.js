@@ -446,6 +446,7 @@ function renderTiles() {
     && (x.id !== 'shelf' || D.dragging || (D.shelf || []).length));   // the shelf shows while you drag files, or while it holds some
   if (D.dragging && shown.some(x => x.id === 'shelf')) shown = shown.filter(x => x.id === 'shelf');   // dragging files in: only the shelf
   else if (leagueWide()) shown = shown.filter(x => x.id === 'league');   // the League panel takes the whole notch
+  else if (D.league && D.league.client && shown.some(x => x.id === 'league')) shown = shown.filter(x => x.id === 'league' || x.id === 'music' || (x.id === 'shelf' && (D.shelf || []).length));   // playing League: just music and the League assistant
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
