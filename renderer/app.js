@@ -914,9 +914,11 @@ function outputsPicker(size) {
   const head = `<span>${ao.app ? esc(appLabel(ao.app)) + ' plays on' : 'Music plays on'}</span>`;
   if (!ao.app && !ao.err) ao.err = 'Play some music first';
   const rows = scope === 'app'
-    ? [{ id: '', name: 'Same as PC', same: true }, ...D.outputs].map(o => {
-        const on = o.same ? !ao.out : ao.out === o.id;
-        return `<button class="pitem ${on ? 'on' : ''}" data-appout="${esc(o.id)}"><span class="pico">${o.same ? I.monitor : outputIcon(o)}</span><span class="pname ellipsis">${esc(o.name || 'Unknown device')}</span>${on ? `<span class="pcheck">${I.check}</span>` : ''}</button>`;
+    ? D.outputs.map(o => {
+        // no own output yet: the music follows the PC, so the PC's device is the one ticked
+        const on = ao.out ? ao.out === o.id : o.default;
+        // picking the PC's own device lets the music follow the PC again
+        return `<button class="pitem ${on ? 'on' : ''}" data-appout="${esc(o.default ? '' : o.id)}"><span class="pico">${outputIcon(o)}</span><span class="pname ellipsis">${esc(o.name || 'Unknown device')}</span>${on ? `<span class="pcheck">${I.check}</span>` : ''}</button>`;
       }).join('')
     : D.outputs.map(o => `
       <button class="pitem ${o.default ? 'on' : ''}" data-outid="${esc(o.id)}">
