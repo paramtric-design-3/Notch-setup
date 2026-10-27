@@ -13,12 +13,12 @@ let UP = null;
 function renderUpdate() {
   if (!UP) return;
   const t = $('#upText'), b = $('#upBtn');
-  b.disabled = false; b.className = 'btn';
+  b.disabled = false; b.className = 'verbtn';
   if (!UP.packaged) { t.textContent = `Version ${UP.current} · updates only work in the installed app`; b.disabled = true; return; }
   switch (UP.state) {
     case 'checking': t.textContent = `Version ${UP.current} · checking…`; b.disabled = true; break;
     case 'downloading': t.textContent = `Downloading ${UP.version} · ${UP.percent}%`; b.disabled = true; break;
-    case 'ready': t.textContent = `Version ${UP.version} is ready to install`; b.textContent = 'Restart now'; b.className = 'btn primary'; return;
+    case 'ready': t.textContent = `Version ${UP.version} is ready to install`; b.textContent = 'Restart now'; b.className = 'verbtn ready'; return;
     default: t.textContent = `Version ${UP.current}` + (UP.error ? ' · last check failed' : ' · up to date');
   }
   b.textContent = 'Check now';
