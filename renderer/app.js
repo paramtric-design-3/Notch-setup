@@ -632,6 +632,12 @@ function leagueGame(g) {
   return t;
 }
 
+// The build style that fits the enemy team best (burn vs tanks, full AP vs squishies…).
+function planHtml(p, owned, cls = 'gplan') {
+  if (!p) return '';
+  const own = new Set(owned || []);
+  return `<span class="${cls}" title="${esc(p.style)}${p.why ? ' · ' + esc(p.why) : ''}${p.others && p.others.length ? '&#10;Other options: ' + esc(p.others.join(', ')) : ''}"><span class="glabel">Vs this comp</span><b class="pstyle">${esc(p.style)}</b>${p.items.map((id, i) => `<span class="gitem ${own.has(id) ? 'own' : ''}" title="${esc(p.names[i] || '')}">${imgIcon('item:' + id, '')}${own.has(id) ? `<i>${I.check}</i>` : ''}</span>`).join('')}</span>`;
+}
 // Your build in game: OP.GG's items with what you own ticked and the next one highlighted,
 // and the skill order with the next level-up highlighted.
 function gameBuild(b) {
@@ -653,6 +659,7 @@ function gameBuild(b) {
   return `<div class="gbuild">
     ${title}
     <span class="gitems"><span class="glabel">Start</span>${b.starter.map(id => `<span class="gitem start">${imgIcon('item:' + id, 'Start')}</span>`).join('')}<span class="oarrow">›</span>${b.boots.map(id => item(id, 'Boots')).join('')}${b.core.map(id => item(id, 'Core')).join('')}${b.later.length ? `<span class="oarrow">›</span>${b.later.map(id => item(id, 'Later')).join('')}` : ''}</span>
+    ${b.plan ? planHtml(b.plan, b.owned) : ''}
     ${(b.situational || []).length ? `<span class="gsit"><span class="glabel">Vs their team</span>${b.situational.map(x => `<span class="gitem sit ${(b.owned || []).includes(x.id) ? 'own' : ''}" title="${esc(x.name)} · ${esc(x.why)}">${imgIcon('item:' + x.id, '')}${(b.owned || []).includes(x.id) ? `<i>${I.check}</i>` : ''}</span>`).join('')}</span>` : ''}
   </div>`;
 }
@@ -828,6 +835,7 @@ function leagueChampSelect(cs) {
           </span>
           <span class="srclinks"><button class="lnk" data-url="${esc(opggUrl(me, o && o.lane))}">OP.GG ↗</button><button class="lnk" data-url="${esc(uggUrl(me, cs.position, 'build'))}">u.gg ↗</button></span>
       </div>
+      ${cs.plan ? `<div class="csplan">${planHtml(cs.plan, [], 'gplan big')}${cs.plan.why ? `<span class="muted pwhy">${esc(cs.plan.why)}</span>` : ''}</div>` : ''}
       ${opggBlock(o, me)}
       ${runePage(r, spells)}
     </div>` : '<div class="muted uempty">Hover a champion to see its build, skills and runes</div>';

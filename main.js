@@ -377,7 +377,7 @@ function overlayPayload() {
   const b = overlayData && overlayData.game && overlayData.game.build;
   if (!b || !league) return null;
   const pics = {};
-  for (const id of [...b.boots, ...b.core, ...b.later, ...(b.situational || []).map(x => x.id)]) { const v = league.icons.get('item:' + id); if (v) pics['item:' + id] = v; }
+  for (const id of [...b.boots, ...b.core, ...b.later, ...(b.situational || []).map(x => x.id), ...((b.plan && b.plan.items) || [])]) { const v = league.icons.get('item:' + id); if (v) pics['item:' + id] = v; }
   if (b.champ && b.champ.key && league.icons.get(b.champ.key)) pics[b.champ.key] = league.icons.get(b.champ.key);
   for (const k of (b.situational || []).flatMap(x => x.vs || [])) { const v = league.icons.get(k); if (v) pics['champ:' + k] = v; }
   return { build: b, pics, theme: settings.theme, place: (settings.overlay && settings.overlay.place) || 'minimap' };

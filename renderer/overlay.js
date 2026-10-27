@@ -21,6 +21,7 @@ window.notch.on('overlay', p => {
   const champ = k => pics['champ:' + k] ? `<img src="${pics['champ:' + k]}" alt="">` : `<span class="cph">${esc(String(k).slice(0, 2))}</span>`;
   box.innerHTML = `
     <div class="path">${path.map((id, i) => `${i === b.boots.length && b.boots.length ? '<span class="sep">›</span>' : ''}${i === b.boots.length + b.core.length && b.later.length ? '<span class="sep">›</span>' : ''}<span class="it ${got.has(id) ? 'own' : ''} ${id === next ? 'nx' : ''}" title="${esc(names[id] || '')}">${img(id)}</span>`).join('')}</div>
+    ${b.plan ? `<div class="plan" title="${esc(b.plan.why || '')}"><b>${esc(b.plan.style)}</b>${b.plan.items.map((id, i) => `<span class="it ${(b.owned || []).includes(id) ? 'own' : ''}" title="${esc((b.plan.names || [])[i] || '')}">${img(id)}</span>`).join('')}</div>` : ''}
     ${(b.situational || []).length ? `<div class="sit">${b.situational.map(x => `<span class="sc" title="${esc(x.name)} · ${esc(x.why)}"><span class="it sitit ${(b.owned || []).includes(x.id) ? 'own' : ''}">${img(x.id)}</span><span class="vs">${(x.vs || []).slice(0, 3).map(champ).join('')}</span></span>`).join('')}</div>` : ''}
     <span class="grip" title="Drag to move"><i></i></span>`;
 });

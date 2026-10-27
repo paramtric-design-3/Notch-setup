@@ -333,6 +333,7 @@ class League {
       at: Date.now(), me: mine.champ ? { ...mine.champ, locked: mine.locked, stats: this.statsFor(mine.champ.id) } : null,
       allies, enemies, bans: [...new Set([...banList, ...actionBans])].map(id => this.champ(id)),
       runes: this.csRunes, ideas: this.topChamps(mine.position || '', 4),
+      plan: mine.champ && enemies.length ? this.buildPlan(mine.champ.id, enemies.map(e => ({ ...(this.champs[e.id] || {}), id: e.id })), this.csOpgg && this.csOpgg.core, 'ranked') : null,
       opgg: this.opggView(this.csOpgg), meta: mine.position ? this.metaFor(mine.position, 5) : [],
       myPos, opponent: opponent && { ...opponent }, clearOpp: clearOpp && { id: clearOpp.id, name: clearOpp.name }, picks: [], banSides, stage, enemyRows, opggFailed: !!this.csOpggFailed,
     };
@@ -425,11 +426,21 @@ class League {
       champ, pos: m.pos, mode: m.mode, level: m.level, owned: m.items,
       starter: a.starter, boots: a.boots, core: a.core, later: a.later, skills: a.skills, maxOrder: a.maxOrder,
       situational: this.situational(m, [...a.core, ...a.later, ...a.boots]),
+      plan: this.gamePlan(m, a.core),
       runes: a.runes && { keystone: a.runes.keystone, keystoneId: a.runes.keystoneId, primaryName: a.runes.primaryName, secondaryName: a.runes.secondaryName, secondary: a.runes.secondary },
       winRate: a.winRate, tier: a.tier,
     };
   }
 
+  gamePlan(m, core) {
+    if (!this.game || !this.champs) return null;
+    const meP = (this.game.players || []).find(p => p.me);
+    if (!meP) return null;
+    const byKey = {};
+    for (const [id, c] of Object.entries(this.champs)) byKey[c.key] = { ...c, id: +id };
+    const enemies = this.game.players.filter(p => p.team !== meP.team).map(p => byKey[p.champKey]).filter(Boolean);
+    return this.buildPlan(m.champId, enemies, core, m.mode);
+  }
   // Situational items against the enemy team: anti-heal vs healers, magic resist vs mostly magic
   // damage, armor vs mostly physical, penetration vs tanks, safety vs assassins; picked for your
   // kind of champion and checked against Riot's item list.
@@ -475,6 +486,82 @@ class League {
     if (icons.length) this.loadIcons(icons);
     return out.slice(0, 4).map(o => ({ ...o, name: (this.itemData[o.id] || {}).name || '' }));
   }
+  // The strongest way to build against this enemy team: for your kind of champion, a few build
+  // styles (mage: burst, burn, battle mage; marksman: crit, anti-tank, safety; …), each scored on
+  // the enemy comp (tanks, squishies, divers, healers, magic vs physical damage). OP.GG's most
+  // played core counts as a head start, so the usual build wins unless the comp says otherwise.
+  // Items are picked by name from Riot's current item list, so they follow the patches.
+  buildPlan(myChampId, enemies, opggCore, mode) {
+    if (!this.itemData || !enemies.length) { this.loadItemData(); return null; }
+    const me = (this.champs || {})[myChampId] || {};
+    const tags = me.tags || [], info = me.info || {};
+    const cls = tags.includes('Marksman') ? 'adc'
+      : tags[0] === 'Tank' || (tags.includes('Tank') && tags.includes('Support')) ? 'tank'
+      : tags[0] === 'Support' && !tags.includes('Mage') ? 'enchanter'
+      : (info.magic || 0) > (info.attack || 0) ? 'mage'
+      : tags[0] === 'Assassin' ? 'assassin' : 'fighter';
+    const t = e => e.tags || [];
+    const tanks = enemies.filter(e => t(e)[0] === 'Tank' || (t(e).includes('Tank') && (e.info || {}).defense >= 7));
+    const bruisers = enemies.filter(e => t(e)[0] === 'Fighter' && !tanks.includes(e));
+    const squishy = enemies.filter(e => !tanks.includes(e) && !bruisers.includes(e) && ['Marksman', 'Mage', 'Assassin', 'Support'].includes(t(e)[0]));
+    const divers = enemies.filter(e => t(e)[0] === 'Assassin' || (t(e)[0] === 'Fighter' && t(e).includes('Assassin')));
+    const apE = enemies.filter(e => t(e).includes('Mage') || ((e.info || {}).magic > (e.info || {}).attack));
+    const adE = enemies.filter(e => !apE.includes(e));
+    const HEAL = new Set(['Aatrox', 'Soraka', 'Yuumi', 'Sona', 'Nami', 'DrMundo', 'Vladimir', 'Sylas', 'Swain', 'Warwick', 'Fiddlesticks', 'Briar', 'Olaf', 'Volibear', 'Illaoi', 'Trundle', 'Zac', 'Milio', 'Gwen', 'Nasus', 'Belveth', 'Viego', 'Senna', 'Seraphine', 'Renata', 'Taric', 'Maokai', 'Kayn', 'Irelia', 'Udyr', 'Samira', 'Yorick', 'Mordekaiser', 'Fizz']);
+    const healers = enemies.filter(e => HEAL.has(e.key));
+    const n = (list, max = 3) => list.slice(0, max).map(e => e.name).join(', ');
+    // [name, why it fits, champions it answers, score, items by name]
+    const S = {
+      mage: [
+        ['Full AP burst', `${squishy.length} squishy · ${n(squishy)}`, squishy, 1 + squishy.length * 0.8 - tanks.length * 0.9, ["Luden's Companion", 'Shadowflame', "Rabadon's Deathcap", 'Void Staff', 'Stormsurge']],
+        ['Burn', `${tanks.length + bruisers.length} tanky · ${n([...tanks, ...bruisers])}`, [...tanks, ...bruisers], 0.5 + tanks.length * 1.1 + bruisers.length * 0.5 + healers.length * 0.2, ["Liandry's Torment", 'Blackfire Torch', "Rylai's Crystal Scepter", 'Void Staff', 'Cryptbloom']],
+        ['Battle mage', `${divers.length} divers · ${n(divers)}`, divers, 0.3 + divers.length * 1.0, ['Rod of Ages', "Zhonya's Hourglass", 'Riftmaker', "Banshee's Veil", 'Cosmic Drive']],
+      ],
+      adc: [
+        ['Crit', `${squishy.length} squishy · ${n(squishy)}`, squishy, 1 + squishy.length * 0.6 - tanks.length * 0.6, ['Infinity Edge', 'Phantom Dancer', 'Navori Flickerblade', 'Bloodthirster', "Lord Dominik's Regards"]],
+        ['On-hit vs tanks', `${tanks.length + bruisers.length} tanky · ${n([...tanks, ...bruisers])}`, [...tanks, ...bruisers], 0.4 + tanks.length * 1.0 + bruisers.length * 0.4, ['Kraken Slayer', 'Blade of The Ruined King', 'Terminus', "Lord Dominik's Regards", "Guinsoo's Rageblade"]],
+        ['Safety', `${divers.length} divers · ${n(divers)}`, divers, 0.2 + divers.length * 1.0, ['Immortal Shieldbow', 'Infinity Edge', 'Bloodthirster', 'Guardian Angel', "Maw of Malmortius"]],
+      ],
+      fighter: [
+        ['Damage', `${squishy.length} squishy · ${n(squishy)}`, squishy, 1 + squishy.length * 0.5 - tanks.length * 0.3, ['Trinity Force', 'Sundered Sky', 'Eclipse', 'Black Cleaver', "Death's Dance"]],
+        ['Anti-tank', `${tanks.length} tanks · ${n(tanks)}`, tanks, 0.3 + tanks.length * 1.0 + bruisers.length * 0.3, ['Black Cleaver', 'Blade of The Ruined King', "Serylda's Grudge", 'Terminus', "Sterak's Gage"]],
+        ['Tanky', `${divers.length + apE.length >= 3 ? 'lots of burst' : divers.length + ' divers'} · ${n([...divers, ...apE.filter(e => !divers.includes(e))])}`, [...divers, ...apE.filter(e => !divers.includes(e))], 0.3 + divers.length * 0.6 + (apE.length >= 3 ? 0.6 : 0), ["Sterak's Gage", "Death's Dance", 'Spirit Visage', "Maw of Malmortius", 'Jak\'Sho, The Protean']],
+      ],
+      tank: [
+        ['Armor', `${adE.length} physical damage · ${n(adE)}`, adE, adE.length * 0.5, ['Sunfire Aegis', 'Thornmail', "Randuin's Omen", 'Frozen Heart', "Dead Man's Plate"]],
+        ['Magic resist', `${apE.length} magic damage · ${n(apE)}`, apE, apE.length * 0.5, ['Hollow Radiance', 'Kaenic Rookern', 'Force of Nature', 'Spirit Visage', 'Abyssal Mask']],
+        ['Mixed', 'balanced damage', [], 1.4 - Math.abs(adE.length - apE.length) * 0.35, ['Heartsteel', 'Jak\'Sho, The Protean', 'Sunfire Aegis', 'Kaenic Rookern', 'Thornmail']],
+      ],
+      assassin: [
+        ['Lethality burst', `${squishy.length} squishy · ${n(squishy)}`, squishy, 1 + squishy.length * 0.8 - tanks.length * 0.6, ["Youmuu's Ghostblade", 'Opportunity', 'Hubris', 'Edge of Night', "Serylda's Grudge"]],
+        ['Bruiser', `${tanks.length + bruisers.length} tanky · ${n([...tanks, ...bruisers])}`, [...tanks, ...bruisers], 0.3 + tanks.length * 0.9 + bruisers.length * 0.4, ['Black Cleaver', "Serylda's Grudge", "Death's Dance", "Sterak's Gage", 'Eclipse']],
+      ],
+      enchanter: [
+        ['Shields and heals', 'keep your carry alive', [], 1 + divers.length * 0.3, ['Moonstone Renewer', 'Redemption', "Mikael's Blessing", 'Ardent Censer', 'Staff of Flowing Water']],
+        ['Anti-heal', `${healers.length} healers · ${n(healers)}`, healers, healers.length * 0.8, ['Morellonomicon', 'Moonstone Renewer', 'Redemption', 'Ardent Censer', 'Chemtech Putrifier']],
+      ],
+    }[cls];
+    if (!S) return null;
+    const map = mode === 'aram' ? '12' : '11';
+    const byName = this.itemByName || (this.itemByName = (() => {
+      const o = {};
+      for (const [id, it] of Object.entries(this.itemData)) if (it && it.gold && it.gold.purchasable && it.maps && it.maps['11'] && !o[it.name] && /^\d{4}$/.test(id)) o[it.name.toLowerCase()] = +id;
+      return o;
+    })());
+    const core = new Set(opggCore || []);
+    const styles = S.map(([style, why, vs, score, names]) => {
+      const items = names.map(x => byName[x.toLowerCase()]).filter(id => id && this.itemData[id] && (this.itemData[id].maps || {})[map] !== false).slice(0, 4);
+      const usual = items.filter(id => core.has(id)).length;   // OP.GG's usual build head start
+      return { style, why, vs: vs.map(e => e.key), score: score + usual * 0.45, items, usual: usual > 0 };
+    }).filter(x => x.items.length >= 3);
+    if (!styles.length) return null;
+    styles.sort((a, b) => b.score - a.score);
+    const best = styles[0];
+    const icons = best.items.map(id => 'item:' + id).filter(k => !this.icons.has(k));
+    if (icons.length) this.loadIcons(icons);
+    return { cls, style: best.style, why: best.vs.length || best.style === 'Mixed' ? best.why : '', vs: best.vs, items: best.items, names: best.items.map(id => (this.itemData[id] || {}).name || ''), others: styles.slice(1).map(x => x.style) };
+  }
+
   loadItemData() {
     if (this.itemData || this.itemDataLoading || !this.ddVersion) return;
     this.itemDataLoading = true;
