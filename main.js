@@ -498,7 +498,8 @@ function sendTaskbar() {
   const key = mode + '|' + dark;
   if (key === lastTaskbar) return;
   lastTaskbar = key;
-  taskbar.apply(mode, dark, helperLog).then(r => { taskbarState = r; broadcast('taskbar-state', r); });
+  taskbar.apply(mode, dark, helperLog, st => { taskbarState = st; broadcast('taskbar-state', st); })
+    .then(r => { taskbarState = r; broadcast('taskbar-state', r); });
 }
 let taskbarState = { installed: taskbar.installed() };
 

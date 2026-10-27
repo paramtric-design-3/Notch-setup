@@ -68,9 +68,31 @@ function write(mode, dark) {
   fs.writeFileSync(settingsFile(), JSON.stringify(next, null, 2));
 }
 
+// Installs TranslucentTB from the Microsoft Store with winget (part of Windows 10/11), for this
+// user only and without questions, so a new PC only needs WALL-E.
+let installing = null;
+function install(log) {
+  if (installing) return installing;
+  installing = new Promise(res => {
+    execFile('winget', ['install', '--id', '9PF4KZ2VN4W9', '--source', 'msstore', '--accept-package-agreements', '--accept-source-agreements', '--silent', '--disable-interactivity'],
+      { windowsHide: true, timeout: 5 * 60 * 1000 }, (err, out, errOut) => {
+        installing = null;
+        if (installed()) return res(true);
+        log('taskbar: TranslucentTB install failed: ' + String((err && err.message) || errOut || out || '').split(/\r?\n/).filter(Boolean).slice(-2).join(' ').slice(0, 300));
+        res(false);
+      });
+  });
+  return installing;
+}
+
 // mode: 'off' | 'clear' | 'blur' | 'acrylic'. Returns a short status for Settings.
-async function apply(mode, dark, log = () => {}) {
-  if (!installed()) return { ok: false, installed: false };
+async function apply(mode, dark, log = () => {}, progress = () => {}) {
+  if (process.platform !== 'win32') return { ok: false, installed: false };
+  if (!installed()) {
+    if (mode === 'off') return { ok: true, installed: false };
+    progress({ installed: false, installing: true });
+    if (!(await install(log))) return { ok: false, installed: false, failed: true };
+  }
   try {
     if (mode === 'off') {
       if (await running()) {
@@ -88,4 +110,4 @@ async function apply(mode, dark, log = () => {}) {
   }
 }
 
-module.exports = { apply, installed, STORE };
+module.exports = { apply, installed, install, STORE };

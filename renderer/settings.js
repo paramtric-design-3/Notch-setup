@@ -132,10 +132,16 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   $('#upBtn').onclick = () => api.send(UP && UP.state === 'ready' ? 'install-update' : 'check-updates');
   document.querySelectorAll('#theme button').forEach(b => b.onclick = () => save({ theme: b.dataset.v }));
   document.querySelectorAll('#taskbar button').forEach(b => b.onclick = () => save({ taskbar: b.dataset.v }));
-  const tbNote = st => { $('#tbNote').hidden = !!(st && st.installed); };
+  // TranslucentTB is installed by itself the first time you pick a look; only say something while
+  // that happens, or if it didn't work
+  const tbNote = st => {
+    const n = $('#tbNote');
+    if (st && st.installing) { n.hidden = false; n.textContent = 'Setting up the see-through taskbar (installing TranslucentTB from the Microsoft Store)…'; return; }
+    if (st && st.failed) { n.hidden = false; n.innerHTML = 'Couldn\'t install TranslucentTB by itself. <button class="lnkbtn" id="tbGet">Get it from the Microsoft Store</button>'; $('#tbGet').onclick = () => api.send('taskbar-install'); return; }
+    n.hidden = true;
+  };
   api.invoke('taskbar-state').then(tbNote).catch(() => {});
   api.on('taskbar-state', tbNote);
-  $('#tbGet').onclick = () => api.send('taskbar-install');
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
   $('#ovShow').onchange = e => save({ overlay: { ...(S.overlay || {}), show: e.target.checked } });
