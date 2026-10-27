@@ -820,8 +820,6 @@ function leagueChampSelect(cs) {
         ${chIcon(me, 'csbig')}
         <div class="csinfo">
           <div class="csname">${esc(me.name)} <span class="muted">${me.locked ? 'locked in' : 'hovering'}</span></div>
-          <div class="csstat">Your games: ${statLine(me.stats)}</div>
-          <div class="csrunes">${r ? `${r.keystoneId ? imgIcon('rune:' + r.keystoneId, r.keystone) : I.trophy}<b>${esc(r.keystone || r.primaryName)}</b>&nbsp;· ${esc(r.primaryName)} + ${esc(r.secondaryName)}` : '<span class="muted">Loading recommended runes…</span>'}</div>
         </div>
       </div>
       <div class="csbtns">
