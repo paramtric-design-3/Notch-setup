@@ -1,6 +1,6 @@
 {
   "name": "fjbc-notch",
-  "version": "1.58.2",
+  "version": "1.59.0",
   "description": "A Dynamic Island for Windows",
   "main": "main.js",
   "scripts": {
@@ -34,6 +34,7 @@
       "opgg.js",
       "todo.js",
       "nativedrag.js",
+      "taskbar.js",
       "!node_modules/koffi/build/koffi/!(win32_x64)/**",
       "!node_modules/koffi/src/**",
       "preload.js",

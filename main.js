@@ -8,6 +8,7 @@ const {
   clipboard, shell, nativeTheme, safeStorage
 } = require('electron');
 const nativeDrag = require('./nativedrag');
+const taskbar = require('./taskbar');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -490,7 +491,16 @@ function startHelper() {
   sendHelper({ c: 'mode', open: islandOpen });
   sendTaskbar();
 }
-function sendTaskbar() { sendHelper({ c: 'taskbar', mode: settings.taskbar || 'off', dark: settings.theme === 'dark' }); }
+// See-through taskbar: through TranslucentTB (taskbar.js); applied when the choice or theme changes.
+let lastTaskbar = '';
+function sendTaskbar() {
+  const mode = settings.taskbar || 'off', dark = settings.theme === 'dark';
+  const key = mode + '|' + dark;
+  if (key === lastTaskbar) return;
+  lastTaskbar = key;
+  taskbar.apply(mode, dark, helperLog).then(r => { taskbarState = r; broadcast('taskbar-state', r); });
+}
+let taskbarState = { installed: taskbar.installed() };
 
 function sendHelper(cmd) {
   if (helper && helper.stdin.writable) helper.stdin.write(JSON.stringify(cmd) + '\n');
@@ -1056,6 +1066,8 @@ ipcMain.on('shelf-drag', (e, req) => {
 ipcMain.on('shelf-open', (_e, id) => { const x = shelf.find(y => y.id === id); if (x) shell.showItemInFolder(x.path); });
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('league-import-runes', (_e, source) => league ? league.importRunes(source) : { ok: false, error: 'League is not open' });
+ipcMain.handle('taskbar-state', () => ({ ...taskbarState, installed: taskbar.installed() }));
+ipcMain.on('taskbar-install', () => shell.openExternal(taskbar.STORE));
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));
 ipcMain.on('install-update', () => installUpdate());
@@ -1142,12 +1154,6 @@ app.on('second-instance', openSettings);
 app.on('window-all-closed', e => e.preventDefault());
 app.on('before-quit', e => {
   // give the taskbar its normal look back before the helper goes
-  if (!quitting && settings.taskbar && settings.taskbar !== 'off' && helper) {
-    e.preventDefault(); quitting = true;
-    sendHelper({ c: 'taskbar', mode: 'off' });
-    setTimeout(() => app.quit(), 400);
-    return;
-  }
   quitting = true;
   if (helper) { try { helper.kill(); } catch {} }
 });

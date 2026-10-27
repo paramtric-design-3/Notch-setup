@@ -3,10 +3,10 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const ON = new Set([
   'settings', 'media', 'art', 'lyrics', 'radios', 'volume', 'brightness', 'dark',
-  'weather', 'messages', 'calendar', 'peek', 'displays', 'update', 'pointer', 'outputs', 'league', 'overlay', 'shelf', 'todo', 'appout', 'shelfdrag',
+  'weather', 'messages', 'calendar', 'peek', 'displays', 'update', 'pointer', 'outputs', 'league', 'overlay', 'shelf', 'todo', 'appout', 'shelfdrag', 'taskbar-state',
 ]);
-const SEND = new Set(['island-size', 'island-open', 'helper', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update', 'overlay-mouse', 'overlay-drag', 'shelf-drag', 'shelf-open', 'todo-done', 'todo-important', 'todo-add', 'todo-sync', 'island-focus']);
-const INVOKE = new Set(['get-settings', 'set-settings', 'copy-text', 'initial-state', 'get-displays', 'get-update', 'league-import-runes', 'shelf-add', 'shelf-remove', 'shelf-clear', 'shelf-list', 'todo-signin', 'todo-signout', 'todo-lists', 'todo-state']);
+const SEND = new Set(['island-size', 'island-open', 'helper', 'open-settings', 'open-url', 'refresh-all', 'identify-screens', 'check-updates', 'install-update', 'overlay-mouse', 'overlay-drag', 'shelf-drag', 'shelf-open', 'todo-done', 'todo-important', 'todo-add', 'todo-sync', 'island-focus', 'taskbar-install']);
+const INVOKE = new Set(['get-settings', 'set-settings', 'copy-text', 'initial-state', 'get-displays', 'get-update', 'league-import-runes', 'shelf-add', 'shelf-remove', 'shelf-clear', 'shelf-list', 'todo-signin', 'todo-signout', 'todo-lists', 'todo-state', 'taskbar-state']);
 
 contextBridge.exposeInMainWorld('notch', {
   on: (ch, cb) => { if (ON.has(ch)) ipcRenderer.on(ch, (_e, d) => cb(d)); },
