@@ -99,6 +99,21 @@
     .lnkbtn { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; }
     .lnkbtn:hover { text-decoration: underline; }
     .tophead .verbtn:disabled { color: var(--text-2); cursor: default; text-decoration: none; }
+    /* WALL-E's rounded dropdowns */
+    .rsel { position: relative; flex: 1; min-width: 0; }
+    .rsel.tdfield { flex: 0 0 auto; max-width: 220px; }
+    .rsel-btn { width: 100%; height: 34px; display: flex; align-items: center; gap: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 10px 0 12px; font: inherit; cursor: pointer; text-align: left; }
+    .rsel-btn:hover { background: var(--btn-h); }
+    .rsel.open .rsel-btn { border-color: var(--accent); }
+    .rsel-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rsel-btn svg { flex: none; color: var(--text-2); transition: transform .15s; }
+    .rsel.open .rsel-btn svg { transform: rotate(180deg); }
+    .rsel.tdfield .rsel-btn { height: 32px; border: 0; background: var(--btn); font-weight: 600; font-size: 12.5px; }
+    .rsel-menu { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0; min-width: 180px; padding: 5px; border-radius: 12px; background: var(--tile); border: 1px solid var(--line); box-shadow: 0 12px 32px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 1px; max-height: 260px; overflow-y: auto; }
+    .rsel.tdfield .rsel-menu { left: auto; }
+    .rsel-item { text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rsel-item:hover { background: var(--btn-h); }
+    .rsel-item.on { color: var(--accent); font-weight: 600; }
   </style>
 </head>
 <body>

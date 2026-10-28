@@ -193,3 +193,45 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   tdRender();
   if (TD && TD.status === 'ok') tdLists();
 })();
+
+// Rounded dropdowns: Windows draws a <select>'s open list itself (square corners), so each select
+// gets WALL-E's own menu on top. The <select> stays as the source of truth (its options, value and
+// change event), so the rest of this file doesn't change.
+function roundSelect(sel) {
+  const wrap = document.createElement('div');
+  wrap.className = 'rsel ' + sel.className;
+  if (sel.id) wrap.id = sel.id + 'Box';
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(sel);
+  sel.hidden = true;
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'rsel-btn';
+  btn.innerHTML = '<span class="rsel-label"></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  const menu = document.createElement('div');
+  menu.className = 'rsel-menu'; menu.hidden = true;
+  wrap.append(btn, menu);
+  const label = () => { const o = sel.options[sel.selectedIndex]; btn.querySelector('.rsel-label').textContent = o ? o.textContent : ''; };
+  const close = () => { menu.hidden = true; wrap.classList.remove('open'); };
+  btn.onclick = e => {
+    e.stopPropagation();
+    if (!menu.hidden) return close();
+    document.querySelectorAll('.rsel.open').forEach(w => { w.classList.remove('open'); w.querySelector('.rsel-menu').hidden = true; });
+    menu.innerHTML = '';
+    [...sel.options].forEach(o => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'rsel-item' + (o.value === sel.value ? ' on' : '');
+      b.textContent = o.textContent;
+      b.onclick = ev => { ev.stopPropagation(); close(); if (sel.value !== o.value) { sel.value = o.value; label(); sel.dispatchEvent(new Event('change')); } };
+      menu.appendChild(b);
+    });
+    menu.hidden = false; wrap.classList.add('open');
+  };
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  new MutationObserver(label).observe(sel, { childList: true, subtree: true, attributes: true });
+  setInterval(label, 400);   // the value is also set from code
+  label();
+  // keep "hidden" on the select's row working
+  return wrap;
+}
+document.querySelectorAll('select').forEach(roundSelect);
