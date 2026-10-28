@@ -18,7 +18,7 @@ const compactL = $('.compact-l');
 const compactR = $('.compact-r');
 
 // No camera on this screen: no dead space in the middle, and no black band when open.
-const NOTCH_W = 120, NOTCH_H = 30, COMPACT_W = 132, COMPACT_TIMER_W = 140, PEEK_W = 360, PERM_W = 580;
+const NOTCH_W = 104, NOTCH_H = 26, COMPACT_W = 132, COMPACT_TIMER_W = 140, PEEK_W = 360, PERM_W = 580;
 
 // ------------------------------------------------------------------ data
 const D = {

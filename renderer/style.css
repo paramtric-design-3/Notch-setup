@@ -4,8 +4,8 @@
   --gap: 8px;
   --tile-h: 112px;
   --pad: 12px;
-  --notch-w: 120px;
-  --notch-h: 30px;
+  --notch-w: 104px;
+  --notch-h: 26px;
   --ear: 10px;
   --spring: cubic-bezier(.32, 1.28, .5, 1);
   --ease: cubic-bezier(.3, .8, .3, 1);
