@@ -127,7 +127,9 @@ function displayName(d, index, bare = false) {
 
 function listDisplays() {
   const all = screen.getAllDisplays();
-  return all.map((d, i) => ({ id: String(d.id), name: displayName(d, i), primary: d.id === screen.getPrimaryDisplay().id }));
+  // "Screen 1", "Screen 2"…: the same numbers Identify shows on each screen
+  const prim = screen.getPrimaryDisplay().id;
+  return all.map((d, i) => ({ id: String(d.id), name: `Screen ${i + 1}${d.id === prim ? ' (main)' : ''}`, primary: d.id === prim }));
 }
 
 function targetDisplay() {
@@ -139,7 +141,7 @@ function targetDisplay() {
     if (byId) return byId;
     // The id can change after a driver update or replugging: fall back to the remembered name.
     const byName = settings.displayLabel && all.find(d => displayName(d, 0, true) === settings.displayLabel);
-    if (byName) return byName;
+    if (byName) { settings.display = String(byName.id); saveSettings(); return byName; }   // same screen, new id: remember the new one
   }
   return screen.getPrimaryDisplay();
 }

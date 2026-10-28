@@ -27,10 +27,10 @@ function renderDisplays() {
   const sel = $('#display');
   const opts = [['primary', 'Main screen'], ['mouse', 'Screen with the mouse'], ...DISPLAYS.map(d => [d.id, d.name])];
   const cur = String(S.display || 'primary');
-  // keep a remembered screen visible even while it's unplugged
-  if (!opts.some(o => o[0] === cur)) opts.push([cur, (S.displayLabel || 'Saved screen') + ' (not connected)']);
+  // only connected screens are listed; a remembered screen that's unplugged shows as Main screen
+  // (that's where WALL-E is meanwhile) and comes back by itself when it's plugged in again
   sel.innerHTML = opts.map(([v, n]) => `<option value="${v}">${n.replace(/[<>&]/g, '')}</option>`).join('');
-  sel.value = cur;
+  sel.value = opts.some(o => o[0] === cur) ? cur : 'primary';
 }
 
 function render() {
