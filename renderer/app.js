@@ -712,10 +712,10 @@ function runePage(r, spells) {
   const names = {};
   for (const row of [...((r.tree && r.tree.primary) || []), ...((r.tree && r.tree.secondary) || [])]) for (const x of row) names[x.id] = x.name;
   const dot = (id, on, big) => `<span class="rdot ${on ? 'on' : ''} ${big ? 'big' : ''}" title="${esc(names[id] || '')}">${LICON['rune:' + id] ? `<img src="${LICON['rune:' + id]}" alt="">` : ''}</span>`;
-  const row = (list, big) => `<div class="rrow">${list.map(x => dot(x.id, picked.has(x.id), big)).join('')}</div>`;
+  const row = (list, big) => `<div class="rrow ${big ? 'key' : ''}" style="--n:${list.length}">${list.map(x => dot(x.id, picked.has(x.id), big)).join('')}</div>`;
   const head = (id, name) => `<div class="rstyle">${imgIcon('rune:' + id, name)}<b>${esc(name)}</b></div>`;
   if (!r.tree) return `<div class="rpage"><div class="rhead"><span class="olabel">Rune page</span><span class="muted">Loading…</span></div></div>`;
-  const shardRow = (opts, i) => `<div class="rrow shards">${opts.map(id => `<span class="rshard ${shards[i] === id ? 'on' : ''}" title="${esc(SHARDS[id] || '')}">${LICON['shard:' + id] ? `<img src="${LICON['shard:' + id]}" alt="">` : ''}</span>`).join('')}</div>`;
+  const shardRow = (opts, i) => `<div class="rrow shards" style="--n:${opts.length}">${opts.map(id => `<span class="rshard ${shards[i] === id ? 'on' : ''}" title="${esc(SHARDS[id] || '')}">${LICON['shard:' + id] ? `<img src="${LICON['shard:' + id]}" alt="">` : ''}</span>`).join('')}</div>`;
   return `<div class="rpage">
     <div class="rhead"><span class="olabel">Rune page</span>
       <span class="rimp">${(spells || []).map(x => imgIcon('spell:' + x, 'Summoner spell')).join('')}<button class="pbtn allow" data-import>Import runes &amp; spells</button></span></div>

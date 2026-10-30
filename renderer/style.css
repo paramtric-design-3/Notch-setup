@@ -1005,3 +1005,18 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .todo .tdplus { color: var(--text); }
 .todo .tdmenu { max-height: 78px; padding: 3px; }
 .todo .tdmenu button { padding: 4px 8px; }
+/* rune page, aligned: every row is a centred grid of equal slots, so columns line up from row to
+   row (and the shards sit right under the secondary runes); rows evenly spaced, top-aligned */
+.league .rpage { gap: 12px; padding: 12px 16px 14px; }
+.league.ugg .uload > .rpage { flex: 1; justify-content: flex-start; }
+.league .rtrees { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.league .rtree { display: flex; flex-direction: column; gap: 9px; }
+.league .rstyle { margin: 0 0 4px; justify-content: center; }
+.league .rrow, .league .rrow.shards { display: grid; grid-template-columns: repeat(var(--n, 3), 36px); justify-content: center; justify-items: center; align-items: center; column-gap: 18px; padding: 0; margin: 0; }
+.league .rrow.key { grid-template-columns: repeat(var(--n, 4), 38px); column-gap: 10px; }
+.league .rtree > .rrow.shards + .rrow.shards { margin-top: -3px; }
+.league .rdot { width: 24px; height: 24px; }
+.league .rdot.big { width: 38px; height: 38px; }
+.league .rshard { width: 18px; height: 18px; }
+.league .rshard img { width: 14px; height: 14px; }
+.league .rline { margin: 2px auto; width: 70%; }
