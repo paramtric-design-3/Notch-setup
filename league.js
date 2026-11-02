@@ -406,6 +406,14 @@ class League {
     const m = this.game && this.game.mine;
     if (!m) return null;
     if (!m.champId || !m.mode) return { unsupported: true, gm: m.gm || '', mapNo: m.mapNo || 0, champ: m.champId ? this.champ(m.champId) : null };
+    // Arena: OP.GG has no Arena builds, so the build is the style that fits the other players best
+    // (Arena's own versions of the items), with the counter items under it
+    if (m.mode === 'arena') {
+      const plan = this.gamePlan(m, []);
+      const champ = this.champ(m.champId);
+      if (!plan) return { loading: true, champ, mode: 'arena' };
+      return { champ, mode: 'arena', level: m.level, owned: m.items, starter: [], boots: [], core: [], later: [], skills: [], plan, situational: this.situational(m, plan.items), names: {} };
+    }
     const lane = m.mode !== 'ranked' ? 'none' : (POS[m.pos] || 'none');
     const hit = this.analysis.get(m.mode === 'ranked' ? `${m.champId}:${lane}` : `${m.champId}:${lane}:${m.mode}`);
     const champ = this.champ(m.champId);
@@ -473,7 +481,7 @@ class League {
     const add = (id, why, tag, vs) => {
       if (!id || out.some(o => o.id === id)) return;
       const it = this.itemData[id];
-      if (!it || (it.gold && it.gold.purchasable === false) || (it.maps && it.maps[m.mode === 'aram' ? '12' : '11'] === false)) return;
+      if (!it || (it.gold && it.gold.purchasable === false) || (it.maps && it.maps[m.mode === 'aram' ? '12' : m.mode === 'arena' ? '30' : '11'] === false)) return;
       out.push({ id, why, tag, vs: (vs || []).map(e => e.key), inBuild: inBuild.includes(id) });
     };
     if (healers.length >= (cls === 'tank' ? 2 : 1)) add(pick[0], `Anti-heal · ${names(healers)}`, 'Anti-heal', healers);
@@ -542,10 +550,16 @@ class League {
       ],
     }[cls];
     if (!S) return null;
-    const map = mode === 'aram' ? '12' : '11';
-    const byName = this.itemByName || (this.itemByName = (() => {
+    const map = mode === 'aram' ? '12' : mode === 'arena' ? '30' : '11';
+    // item name -> id, per map (Arena has its own copies of many items, with other ids)
+    this.itemByName = this.itemByName || {};
+    const byName = this.itemByName[map] || (this.itemByName[map] = (() => {
       const o = {};
-      for (const [id, it] of Object.entries(this.itemData)) if (it && it.gold && it.gold.purchasable && it.maps && it.maps['11'] && !o[it.name] && /^\d{4}$/.test(id)) o[it.name.toLowerCase()] = +id;
+      for (const [id, it] of Object.entries(this.itemData)) {
+        if (!it || !it.gold || !it.gold.purchasable || !it.maps || !it.maps[map]) continue;
+        const k = it.name.toLowerCase();
+        if (!o[k] || (map !== '30' && id.length < String(o[k]).length)) o[k] = +id;
+      }
       return o;
     })());
     const core = new Set(opggCore || []);
@@ -999,12 +1013,12 @@ class League {
       const mapNo = +((live.gameData && live.gameData.mapNumber) || 0);
       // ARAM by its map (Howling Abyss is map 12), so every ARAM variant (Mayhem…) counts;
       // Summoner's Rift (map 11) uses the ranked builds.
-      const mode = mapNo === 12 || /ARAM|KIWI/.test(gm) ? 'aram' : gm === 'URF' || gm === 'ARURF' ? 'urf' : (mapNo === 11 || gm === 'CLASSIC') ? 'ranked' : '';
+      const mode = gm === 'CHERRY' || mapNo === 30 ? 'arena' : mapNo === 12 || /ARAM|KIWI/.test(gm) ? 'aram' : gm === 'URF' || gm === 'ARURF' ? 'urf' : (mapNo === 11 || gm === 'CLASSIC') ? 'ranked' : '';
       let pos = ({ TOP: 'top', JUNGLE: 'jungle', MIDDLE: 'middle', MID: 'middle', BOTTOM: 'bottom', UTILITY: 'utility', SUPPORT: 'utility' })[String(meP.position || '').toUpperCase()] || '';
       if (!pos && mode === 'ranked') pos = (this.cs && this.cs.myPos) || this.lastMyPos || this.mainLaneOf(cid);
       if (!cid || !mode) { const why = `game ${gm || '?'} on map ${mapNo || '?'}, champion ${key || meP.championName || '?'} -> ${cid || 'not found'}`; if (this.mineWhy !== why) { this.mineWhy = why; this.log('league build: ' + why); } }
       this.game.mine = { champId: cid, pos, mode, gm, mapNo, level: (live.activePlayer && live.activePlayer.level) || meP.level || 1, items: (meP.items || []).map(i => i.itemID).filter(Boolean) };
-      if (cid && mode) {
+      if (cid && mode && mode !== 'arena') {   // Arena: no OP.GG builds; the build comes from the enemy comp (gameBuild)
         const bk = `${cid}:${pos}:${mode}`;
         const gb = this.gameBuild();
         const retry = gb && gb.failed && Date.now() - (this.gameBuildAt || 0) > 2 * 60 * 1000;
@@ -1199,7 +1213,7 @@ class League {
         enemies: this.cs.enemies.map(e => ({ ...e, icon: this.icons.get(e.key) || null, counters: e.guess ? this.countersOf(e.id, e.guess) : [] })) },
       top: this.history ? this.topChamps('', 6) .map(c => ({ ...c, icon: this.icons.get(c.key) || null })) : [],
       recent: this.history ? this.history.slice().sort((a, b) => b.at - a.at).slice(0, 6).map(g => ({ ...this.champ(g.champ), icon: this.icons.get((this.champ(g.champ) || {}).key) || null, win: g.win, remake: g.remake, k: g.k, d: g.d, a: g.a, lane: g.lane, queue: QUEUES[g.queue] || 'Custom', at: g.at, dur: g.dur })) : [],
-      game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players, build: this.gameBuild(), aram: !!(this.game.mine && this.game.mine.mode === 'aram') },
+      game: this.game && { queue: this.game.queue && this.game.queue.name, time: this.game.time, players: this.game.players, build: this.gameBuild(), aram: !!(this.game.mine && this.game.mine.mode === 'aram'), arena: !!(this.game.mine && this.game.mine.mode === 'arena') },
       meta: this.meta ? Object.fromEntries(Object.keys(this.meta).map(l => [l, this.metaFor(l, 10).map(({ icon, ...c }) => c)])) : null,
       mainLane: this.mainLane(),
     };

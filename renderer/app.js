@@ -629,7 +629,10 @@ function wr(r) {
 }
 function leagueGame(g) {
   const t = el('div', 'tile league game');
-  const side = team => g.players.filter(p => p.team === team).map(p => {
+  // Arena puts everyone on one team: split the lobby over both columns instead
+  const half = Math.ceil(g.players.length / 2);
+  const inSide = (p, team, i) => g.arena ? (team === 'blue' ? i < half : i >= half) : p.team === team;
+  const side = team => g.players.filter((p, i) => inSide(p, team, i)).map(p => {
     const form = (p.recent || []).slice(0, 10).map(w => `<i class="${w ? 'w' : 'l'}"></i>`).join('');
     const r = p.rank;
     return `<div class="lp ${p.me ? 'me' : ''}">
@@ -655,9 +658,15 @@ function planHtml(p, owned, cls = 'gplan') {
 // and the skill order with the next level-up highlighted.
 function gameBuild(b) {
   if (!b) return '';
-  const title = `<span class="gbtitle">${chIcon(b.champ, 'lch')}<b>Your build</b><span class="muted">${esc((b.champ && b.champ.name) || '')}${b.mode === 'aram' ? ' · ARAM' : b.mode === 'urf' ? ' · URF' : b.pos ? ' · ' + esc(ROLE[b.pos] || '') : ''}</span></span>`;
+  const title = `<span class="gbtitle">${chIcon(b.champ, 'lch')}<b>Your build</b><span class="muted">${esc((b.champ && b.champ.name) || '')}${b.mode === 'aram' ? ' · ARAM' : b.mode === 'arena' ? ' · Arena' : b.mode === 'urf' ? ' · URF' : b.pos ? ' · ' + esc(ROLE[b.pos] || '') : ''}</span></span>`;
   if (b.unsupported) return '';
   if (b.loading || b.failed) return `<div class="gbuild">${title}<span class="muted">${b.failed ? 'OP.GG has no build for this champion here' : 'Loading the build…'}</span></div>`;
+  // Arena: the build for this lobby and the counter items, no OP.GG path or skill order
+  if (b.mode === 'arena') return `<div class="gbuild">
+    ${title}
+    ${b.plan ? planHtml({ ...b.plan }, b.owned).replace('Vs this comp', 'Build') : ''}
+    ${(b.situational || []).length ? `<span class="gsit"><span class="glabel">Vs this lobby</span>${b.situational.map(x => `<span class="gitem sit ${(b.owned || []).includes(x.id) ? 'own' : ''}" title="${esc(x.name)} · ${esc(x.why)}">${imgIcon('item:' + x.id, '')}${(b.owned || []).includes(x.id) ? `<i>${I.check}</i>` : ''}</span>`).join('')}</span>` : ''}
+  </div>`;
   const owned = (b.owned || []).slice();
   const has = id => { const i = owned.indexOf(id); if (i < 0) return false; owned.splice(i, 1); return true; };
   const want = [...b.boots, ...b.core, ...b.later];
