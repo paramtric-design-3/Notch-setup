@@ -129,6 +129,16 @@ island.addEventListener('click', e => {
   if (state === 'open') { csPinned = false; pinned = !pinned; island.classList.toggle('pinned', pinned); if (!pinned && !hovering) settle(); }
   else { pinned = true; setState('open'); }
 });
+// Clicking anywhere outside WALL-E closes it, even when it was clicked open, except while you're
+// in League (champ select or a game), where it stays put
+api.on('outside-click', () => {
+  const L = D.league;
+  if (L && (L.cs || (L.game && L.game.players && L.game.players.length))) return;
+  if (tdTyping && document.activeElement) document.activeElement.blur();   // ends typing a task
+  csPinned = false;
+  if (pinned) { pinned = false; island.classList.remove('pinned'); }
+  if (!hovering && state === 'open') settle();
+});
 island.addEventListener('contextmenu', e => { e.preventDefault(); api.send('open-settings'); });
 
 // ------------------------------------------------------------------ helpers

@@ -548,6 +548,14 @@ async function onHelperMessage(m) {
       for (const a of (m.data.closed || []).slice(0, 2)) peekApp(a, 'closed');
       break;
     }
+    case 'mousedown': {
+      // a click outside WALL-E (the island window) while it's open: tell it, it decides to close
+      if (!island || island.isDestroyed()) break;
+      const c = screen.getCursorScreenPoint(), b = island.getBounds();
+      const inside = c.x >= b.x && c.x < b.x + b.width && c.y >= b.y && c.y < b.y + b.height;
+      if (!inside) toIsland('outside-click', true);
+      break;
+    }
     case 'tab':
       tabDown = !!m.data;
       updateOverlay();

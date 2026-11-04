@@ -834,6 +834,14 @@ while (-not [NotchPump]::Closed) {
         Every 'outputs' 30000 { Poll-Outputs }
         Every 'league' 8000 { Poll-League }
     }
+    # While WALL-E is open: report mouse clicks (left or right), so a click outside it can close it.
+    # Only the button state is read; the click itself goes where it was going.
+    if ($script:open) {
+        $down = $false
+        try { $down = (([NotchNative]::GetAsyncKeyState(1) -band 0x8001) -ne 0) -or (([NotchNative]::GetAsyncKeyState(2) -band 0x8001) -ne 0) } catch { }
+        if ($down -and -not $script:lastDown) { Emit 'mousedown' $true }
+        $script:lastDown = $down
+    } else { $script:lastDown = $false }
     # While a League game is up, watch the Tab key (for the item overlay) a few times a second.
     $inGame = $script:lastGameWin -and $script:lastGameWin -ne 'min'
     if ($inGame) {
