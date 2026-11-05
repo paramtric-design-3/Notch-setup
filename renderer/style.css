@@ -1021,7 +1021,7 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .league .rshard img { width: 14px; height: 14px; }
 .league .rline { margin: 2px auto; width: 70%; }
 /* enemy rows: red when locked in, darker red while picking, black while nothing is picked */
-.league .uteam.red .uplayer.es-locked { background: rgba(208, 72, 60, .32); border-left-color: #e0503f; }
-.league .uteam.red .uplayer.es-picking { background: rgba(110, 24, 18, .55); border-left-color: #8e2a20; }
+.league .uteam.red .uplayer.es-locked { background: rgba(225, 55, 45, .55); border-left-color: #ff5544; }
+.league .uteam.red .uplayer.es-picking { background: rgba(120, 30, 24, .32); border-left-color: #7a2a22; }
 .league .uteam.red .uplayer.es-empty { background: rgba(0, 0, 0, .35); border-left-color: #3a1512; }
 .league .uteam.red .uplayer.es-locked.opp .ellipsis { font-weight: 600; }
