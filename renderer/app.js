@@ -814,7 +814,9 @@ function leagueChampSelect(cs) {
   const enemyRows = (cs.enemyRows || cs.enemies.map((e, i) => ({ champ: e, status: 'Locked in', n: i + 1 }))).map(r => {
     const e = r.champ && (byId.get(r.champ.id) || r.champ);
     const isOpp = e && cs.opponent && cs.opponent.id === e.id;
-    return `<div class="uplayer enemy ${e ? '' : 'vacant'} ${isOpp ? 'opp' : ''} ${r.turn ? 'turn' : ''}">
+    // locked in: red, picking right now: darker red, nothing picked yet: black
+    const st = r.status === 'Locked in' || (e && !r.turn && r.status !== 'Hovering') ? 'locked' : (r.turn || r.status === 'Hovering') ? 'picking' : 'empty';
+    return `<div class="uplayer enemy es-${st} ${e ? '' : 'vacant'} ${isOpp ? 'opp' : ''} ${r.turn ? 'turn' : ''}">
       ${chIcon(e, 'uch')}
       <span class="uname"><b class="ellipsis">${e ? esc(e.name) : 'Enemy ' + r.n}</b><span class="ustat">${e && e.guess ? `<span class="upred">${roleIcon(e.guess)}${esc(ROLE[e.guess])}${e.sure ? '' : '?'}</span>${isOpp ? ' your lane' : ' predicted'}` : esc(r.status)}</span></span>
       <span class="uwr">${e && e.winRate ? `<b>${pct0(e.winRate)}</b><span class="muted">${esc(ROLE[e.guess] || '')} WR</span>` : ''}</span>
