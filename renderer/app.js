@@ -534,6 +534,11 @@ tilesView.addEventListener('click', async e => {
     rerenderTile('music'); return;   // stay open so a refusal from Windows shows up here
   }
   if (b.dataset.outclose !== undefined) { D.outPicker = false; rerenderTile('music'); return; }
+  if (b.dataset.gameout) {
+    api.send('helper', { c: 'setoutput', id: b.dataset.gameout });
+    D.outputs = D.outputs.map(o => ({ ...o, default: o.id === b.dataset.gameout }));
+    rerenderTile('league'); return;
+  }
   if (b.dataset.outid) {
     api.send('helper', { c: 'setoutput', id: b.dataset.outid });
     D.outputs = D.outputs.map(o => ({ ...o, default: o.id === b.dataset.outid }));   // show it right away
@@ -637,6 +642,15 @@ function wr(r) {
   const pct = Math.round(100 * r.wins / games);
   return `<b class="${pct >= 55 ? 'hot' : pct < 47 ? 'cold' : ''}">${pct}%</b> ${games}g`;
 }
+// In game: switch the sound output (headset / speakers…) right from the League panel. Changes the
+// PC's output, which the game follows.
+function gameOutputs() {
+  const list = D.outputs || [];
+  if (list.length < 2) return '<span></span>';
+  const short = o => String(o.name || 'Device').replace(/\s*\(.*\)\s*$/, '') || o.name;
+  const names = list.map(short);
+  return `<span class="gouts" title="Sound output">${list.map((o, i) => `<button class="gout ${o.default ? 'on' : ''}" data-gameout="${esc(o.id)}" title="${esc(o.name)}">${outputIcon(o)}<span>${esc(names.filter(n => n === names[i]).length > 1 ? o.name : names[i])}</span></button>`).join('')}</span>`;
+}
 function leagueGame(g) {
   const t = el('div', 'tile league game');
   // Arena puts everyone on one team: split the lobby over both columns instead
@@ -652,7 +666,7 @@ function leagueGame(g) {
     </div>`;
   }).join('');
   t.innerHTML = `
-    <div class="lhead"><span class="cstatus">${I.trophy}${esc(g.queue || 'In game')}</span><span></span></div>
+    <div class="lhead"><span class="cstatus">${I.trophy}${esc(g.queue || 'In game')}</span>${gameOutputs()}</div>
     ${gameBuild(g.build)}
     ${g.aram ? '' : `<div class="lteams"><div class="lteam blue">${side('blue')}</div><div class="lteam red">${side('red')}</div></div>`}`;
   return t;
