@@ -1020,8 +1020,9 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .league .rshard { width: 18px; height: 18px; }
 .league .rshard img { width: 14px; height: 14px; }
 .league .rline { margin: 2px auto; width: 70%; }
-/* enemy rows: red when locked in, darker red while picking, black while nothing is picked */
-.league .uteam.red .uplayer.es-locked { background: rgba(225, 55, 45, .55); border-left-color: #ff5544; }
-.league .uteam.red .uplayer.es-picking { background: rgba(120, 30, 24, .32); border-left-color: #7a2a22; }
-.league .uteam.red .uplayer.es-empty { background: rgba(0, 0, 0, .35); border-left-color: #3a1512; }
-.league .uteam.red .uplayer.es-locked.opp .ellipsis { font-weight: 600; }
+/* champ select rows: standard grey; only the one picking right now is tinted (blue for your team,
+   red for theirs) */
+.league .uteam .uplayer, .league .uteam .uplayer.me, .league .uteam .uplayer.opp, .league .uteam.red .uplayer.es-locked, .league .uteam.red .uplayer.es-picking, .league .uteam.red .uplayer.es-empty { background: var(--btn); }
+.league .uteam.blue .uplayer.turn { background: linear-gradient(90deg, rgba(60, 130, 230, .28), rgba(60, 130, 230, .08)); border-left-color: #4a8ce6; }
+.league .uteam.red .uplayer.turn { background: linear-gradient(90deg, rgba(225, 60, 50, .28), rgba(225, 60, 50, .08)); border-left-color: #e0503f; }
+.league .uteam.red .uplayer { border-left-color: #d0584a; }
