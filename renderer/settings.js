@@ -34,9 +34,9 @@ function renderDisplays() {
 }
 
 function render() {
-  document.documentElement.dataset.theme = S.theme === 'dark' ? 'dark' : 'white';
-  // White Matte is EVE, Dark Matte is WALL-E
-  const name = S.theme === 'dark' ? 'WALL-E' : 'EVE';
+  document.documentElement.dataset.theme = (S.theme === 'dark' || S.theme === 'bmo') ? S.theme : 'white';
+  // each theme has its own name: White = EVE, Dark = WALL-E, Green = BMO
+  const name = S.theme === 'bmo' ? 'BMO' : S.theme === 'dark' ? 'WALL-E' : 'EVE';
   document.querySelectorAll('.appname').forEach(e => { e.textContent = name; });
   document.title = name + ' settings';
   document.querySelectorAll('#theme button').forEach(b => b.classList.toggle('on', b.dataset.v === S.theme));

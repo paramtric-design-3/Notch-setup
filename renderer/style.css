@@ -54,6 +54,26 @@ html[data-theme="dark"] {
   --mono-bg: #0C0C0C;
 }
 
+html[data-theme="bmo"] {
+  /* BMO: a little mint-green game friend. Dark teal screen, pale-mint text, cyan-green glow. */
+  --bg: #11322B;          /* BMO's body, in shadow */
+  --tile: #0E2A24;        /* the screen */
+  --text: #E4F6ED;
+  --text-2: #7FC2AC;
+  --accent: #35D6B0;      /* screen glow */
+  --line: rgba(120, 220, 190, .12);
+  --track: rgba(170, 240, 215, .16);
+  --btn: rgba(120, 220, 190, .08);
+  --btn-hover: rgba(120, 220, 190, .15);
+  --btn-on: rgba(53, 214, 176, .18);
+  --shadow: 0 16px 40px rgba(0, 20, 14, .5), 0 2px 6px rgba(0, 20, 14, .35);
+  --sun: #F2C94C;
+  --cloud: #BfeaDC;
+  --cloud-dark: #6FAE9C;
+  --moon: #CFEDE0;
+  --mono-bg: #0A2019;
+}
+
 * { box-sizing: border-box; }
 html, body {
   margin: 0; height: 100%; background: transparent; overflow: hidden;

@@ -31,7 +31,7 @@ app.setAppUserModelId('com.fjbc.notch');
 
 // ---------------------------------------------------------------- settings
 const DEFAULT_SETTINGS = {
-  theme: 'white',               // 'white' | 'dark'
+  theme: 'white',               // 'white' | 'dark' | 'bmo'
   city: 'Amsterdam',
   launchAtLogin: false,
   display: 'primary',          // 'primary' | 'mouse' | a display id
@@ -179,9 +179,9 @@ function identifyScreens() {
     });
     w.setAlwaysOnTop(true, 'screen-saver');
     w.setIgnoreMouseEvents(true);
-    const dark = settings.theme === 'dark';
+    const ch = themeChrome();
     const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;display:grid;place-items:center;height:100vh;background:transparent;font-family:'Segoe UI Variable Display','Segoe UI',sans-serif">
-      <div style="background:${dark ? '#111111' : '#F7F8FA'};color:${dark ? '#ECECEC' : '#1E2129'};border-radius:24px;padding:22px 34px;text-align:center;box-shadow:0 14px 34px rgba(0,0,0,.25)">
+      <div style="background:${ch.bg};color:${ch.fg};border-radius:24px;padding:22px 34px;text-align:center;box-shadow:0 14px 34px rgba(0,0,0,.25)">
       <div style="font-size:84px;font-weight:300;line-height:1">${i + 1}</div>
       <div style="font-size:14px;color:${dark ? '#9A9A9A' : '#545A69'};margin-top:8px">${displayName(d, i).replace(/[<>&]/g, '')}</div></div></body>`;
     w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -254,7 +254,7 @@ function openSettings() {
   settingsWin = new BrowserWindow({
     width: 520, height: 720, minWidth: 460, minHeight: 520,
     title: appName() + ' settings',
-    backgroundColor: settings.theme === 'dark' ? '#111111' : '#F7F8FA',
+    backgroundColor: themeChrome().bg,
     autoHideMenuBar: true,
     icon: trayImage(),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
@@ -268,8 +268,8 @@ function openSettings() {
 // The settings window's title bar follows WALL-E's theme (White = light bar, Dark = dark bar).
 function colorSettingsBar() {
   if (!settingsWin || settingsWin.isDestroyed()) return;
-  const dark = settings.theme === 'dark';
-  try { nativeDrag.titleBar(settingsWin.getNativeWindowHandle(), dark, dark ? '#111111' : '#F7F8FA', dark ? '#ECECEC' : '#1E2129'); } catch { /* older Windows: default bar */ }
+  const ch = themeChrome();
+  try { nativeDrag.titleBar(settingsWin.getNativeWindowHandle(), themeIsDark(), ch.bg, ch.fg); } catch { /* older Windows: default bar */ }
   settingsWin.setBackgroundColor(dark ? '#111111' : '#F7F8FA');
 }
 function broadcast(channel, data) {
@@ -389,8 +389,17 @@ function overlayPayload() {
 }
 
 // ---------------------------------------------------------------- tray
-// White Matte is EVE, Dark Matte is WALL-E.
-function appName() { return settings && settings.theme === 'white' ? 'EVE' : 'WALL-E'; }
+// Each theme has its own name: White = EVE, Dark = WALL-E, Green = BMO.
+function appName() { const t = settings && settings.theme; return t === 'bmo' ? 'BMO' : t === 'white' ? 'EVE' : 'WALL-E'; }
+// Any non-white theme is "dark" for window chrome, overlays and the taskbar tint.
+function themeIsDark() { return !settings || settings.theme !== 'white'; }
+// The page background / text for the current theme (for native window chrome).
+function themeChrome() {
+  const t = settings && settings.theme;
+  if (t === 'bmo') return { bg: '#11322B', fg: '#E4F6ED' };
+  if (t === 'white') return { bg: '#F7F8FA', fg: '#1E2129' };
+  return { bg: '#111111', fg: '#ECECEC' };
+}
 
 function trayImage() {
   return nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
@@ -436,6 +445,7 @@ function buildTrayMenu() {
       label: 'Theme', submenu: [
         { label: 'White Matte', type: 'radio', checked: settings.theme === 'white', click: () => applySettings({ theme: 'white' }) },
         { label: 'Dark Matte', type: 'radio', checked: settings.theme === 'dark', click: () => applySettings({ theme: 'dark' }) },
+        { label: 'BMO', type: 'radio', checked: settings.theme === 'bmo', click: () => applySettings({ theme: 'bmo' }) },
       ],
     },
     { label: `Weather city: ${settings.city || '—'}…`, click: openSettings },
@@ -496,7 +506,7 @@ function startHelper() {
 // See-through taskbar: through TranslucentTB (taskbar.js); applied when the choice or theme changes.
 let lastTaskbar = '';
 function sendTaskbar() {
-  const mode = settings.taskbar || 'off', dark = settings.theme === 'dark';
+  const mode = settings.taskbar || 'off', dark = themeIsDark();
   const key = mode + '|' + dark;
   if (key === lastTaskbar) return;
   lastTaskbar = key;

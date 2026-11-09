@@ -7,6 +7,7 @@
   <style>
     html[data-theme="white"] { --bg:#F7F8FA; --tile:#FBFBFC; --text:#1E2129; --text-2:#545A69; --accent:#2196B8; --line:rgba(30,33,41,.09); --btn:rgba(30,33,41,.05); --btn-h:rgba(30,33,41,.09); --on:rgba(33,150,184,.14); --mono:#F1F3F6; }
     html[data-theme="dark"]  { --bg:#111111; --tile:#151515; --text:#ECECEC; --text-2:#9A9A9A; --accent:#F29A4A; --line:#292929; --btn:rgba(255,255,255,.055); --btn-h:rgba(255,255,255,.1); --on:rgba(242,154,74,.16); --mono:#0C0C0C; }
+    html[data-theme="bmo"]   { --bg:#11322B; --tile:#0E2A24; --text:#E4F6ED; --text-2:#7FC2AC; --accent:#35D6B0; --line:rgba(120,220,190,.12); --btn:rgba(120,220,190,.08); --btn-h:rgba(120,220,190,.15); --on:rgba(53,214,176,.18); --mono:#0A2019; }
     * { box-sizing: border-box; }
     body { margin:0; background:var(--bg); color:var(--text); font:13.5px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
     main { padding: 22px 22px 28px; max-width: 640px; margin: 0 auto; }
@@ -24,6 +25,7 @@
    .seg button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
    .seg button.on { background: var(--tile); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     html[data-theme="dark"].seg button.on { background: #2A2A2A; }
+    html[data-theme="bmo"].seg button.on { background: #19463C; }
    .switch { position: relative; width: 38px; height: 22px; flex: none; }
    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
    .switch span { position: absolute; inset: 0; border-radius: 11px; background: var(--btn-h); transition: background.15s; cursor: pointer; }
@@ -38,6 +40,7 @@
    .btn.primary { background: var(--accent); color: #fff; }
    .btn:disabled { opacity:.45; cursor: default; }
     html[data-theme="dark"].btn.primary { color: #2A1606; }
+    html[data-theme="bmo"].btn.primary { color: #04231B; }
     pre { background: var(--mono); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: 11.5px/1.5 "Cascadia Mono", Consolas, monospace; overflow: auto; max-height: 220px; margin: 8px 0; user-select: text; }
     p { margin: 6px 0; }
    .note { color: var(--text-2); font-size: 12px; }
@@ -125,7 +128,7 @@
   <section>
     <h2>Look</h2>
     <div class="row"><span class="grow">Theme</span>
-      <div class="seg" id="theme"><button data-v="white">White Matte</button><button data-v="dark">Dark Matte</button></div>
+      <div class="seg" id="theme"><button data-v="white">White Matte</button><button data-v="dark">Dark Matte</button><button data-v="bmo">BMO</button></div>
     </div>
     <div class="row"><span class="grow">Taskbar</span>
       <div class="seg" id="taskbar"><button data-v="off">Normal</button><button data-v="clear">Clear</button><button data-v="blur">Blur</button><button data-v="acrylic">Acrylic</button></div>
