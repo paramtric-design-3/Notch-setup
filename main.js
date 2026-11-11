@@ -183,7 +183,7 @@ function identifyScreens() {
     const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;display:grid;place-items:center;height:100vh;background:transparent;font-family:'Segoe UI Variable Display','Segoe UI',sans-serif">
       <div style="background:${ch.bg};color:${ch.fg};border-radius:24px;padding:22px 34px;text-align:center;box-shadow:0 14px 34px rgba(0,0,0,.25)">
       <div style="font-size:84px;font-weight:300;line-height:1">${i + 1}</div>
-      <div style="font-size:14px;color:${dark ? '#9A9A9A' : '#545A69'};margin-top:8px">${displayName(d, i).replace(/[<>&]/g, '')}</div></div></body>`;
+      <div style="font-size:14px;color:${themeIsDark() ? '#9A9A9A' : '#545A69'};margin-top:8px">${displayName(d, i).replace(/[<>&]/g, '')}</div></div></body>`;
     w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
     w.once('ready-to-show', () => w.showInactive());
     return w;
@@ -270,7 +270,7 @@ function colorSettingsBar() {
   if (!settingsWin || settingsWin.isDestroyed()) return;
   const ch = themeChrome();
   try { nativeDrag.titleBar(settingsWin.getNativeWindowHandle(), themeIsDark(), ch.bg, ch.fg); } catch { /* older Windows: default bar */ }
-  settingsWin.setBackgroundColor(dark ? '#111111' : '#F7F8FA');
+  settingsWin.setBackgroundColor(ch.bg);
 }
 function broadcast(channel, data) {
   for (const w of [island, settingsWin]) {
