@@ -100,7 +100,7 @@
     .row > .grow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #ovOpacity { width: auto; flex: 0 1 150px; min-width: 70px; }
     .row:has(#ovOpacity) > .grow { flex: 1 0 auto; }
-    .tophead { display: flex; align-items: center; gap: 13px; margin: 0 4px 18px; }
+    .tophead { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 0 4px 18px; }
     /* logo: no tile around it once an icon is set; the empty picker keeps a faint target box */
     .tophead .appicon { position: relative; width: 52px; height: 52px; flex: none; padding: 0; border: 0; background: none; color: var(--text-2); cursor: pointer; display: grid; place-items: center; }
     .tophead .appicon:not(.set) { border: 1px dashed var(--line); border-radius: 12px; background: var(--btn); }
