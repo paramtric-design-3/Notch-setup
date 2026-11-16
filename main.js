@@ -468,9 +468,19 @@ function createTray() {
 }
 
 // Pick up your own icon.png / icon.ico the moment you drop it in the data folder (no restart).
+function customIconDataUrl() {
+  try {
+    for (const name of ['icon.png', 'icon.ico']) {
+      const p = path.join(app.getPath('userData'), name);
+      if (fs.existsSync(p)) { const img = nativeImage.createFromPath(p); if (!img.isEmpty()) return img.toDataURL(); }
+    }
+  } catch { /* none */ }
+  return '';
+}
 function refreshIcon() {
   try { if (tray && !tray.isDestroyed()) tray.setImage(trayImage()); } catch { /* ignore */ }
   try { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.setIcon(trayImage()); } catch { /* ignore */ }
+  broadcast('app-icon', customIconDataUrl());
 }
 function watchCustomIcon() {
   try {
@@ -1104,6 +1114,7 @@ ipcMain.on('shelf-open', (_e, id) => { const x = shelf.find(y => y.id === id); i
 ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('league-import-runes', (_e, source) => league ? league.importRunes(source) : { ok: false, error: 'League is not open' });
 ipcMain.handle('taskbar-state', () => ({ ...taskbarState, installed: taskbar.installed() }));
+ipcMain.handle('app-icon', () => customIconDataUrl());
 ipcMain.on('taskbar-install', () => shell.openExternal(taskbar.STORE));
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));

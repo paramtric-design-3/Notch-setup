@@ -139,6 +139,10 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   };
   api.invoke('taskbar-state').then(tbNote).catch(() => {});
   api.on('taskbar-state', tbNote);
+  // your own icon above the title, if you dropped icon.png / icon.ico in the data folder
+  const setIcon = url => { const el = $('#appIcon'); if (url) { el.src = url; el.hidden = false; } else { el.removeAttribute('src'); el.hidden = true; } };
+  api.invoke('app-icon').then(setIcon).catch(() => {});
+  api.on('app-icon', setIcon);
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
   $('#ovShow').onchange = e => save({ overlay: { ...(S.overlay || {}), show: e.target.checked } });
