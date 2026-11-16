@@ -5,7 +5,7 @@
 
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, powerMonitor,
-  clipboard, shell, nativeTheme, safeStorage
+  clipboard, shell, nativeTheme, safeStorage, dialog
 } = require('electron');
 const nativeDrag = require('./nativedrag');
 const taskbar = require('./taskbar');
@@ -402,10 +402,12 @@ function themeChrome() {
   return { bg: '#111111', fg: '#ECECEC' };
 }
 
+// Your own icon, read from the data folder in this order of preference.
+const ICON_NAMES = ['icon.png', 'icon.ico', 'icon.jpg', 'icon.jpeg', 'icon.webp'];
 function trayImage() {
   // Your own icon, if you drop one in: <userData>\icon.png (or icon.ico). Falls back to the built-in.
   try {
-    for (const name of ['icon.png', 'icon.ico']) {
+    for (const name of ICON_NAMES) {
       const p = path.join(app.getPath('userData'), name);
       if (fs.existsSync(p)) { const img = nativeImage.createFromPath(p); if (!img.isEmpty()) return img; }
     }
@@ -470,7 +472,7 @@ function createTray() {
 // Pick up your own icon.png / icon.ico the moment you drop it in the data folder (no restart).
 function customIconDataUrl() {
   try {
-    for (const name of ['icon.png', 'icon.ico']) {
+    for (const name of ICON_NAMES) {
       const p = path.join(app.getPath('userData'), name);
       if (fs.existsSync(p)) { const img = nativeImage.createFromPath(p); if (!img.isEmpty()) return img.toDataURL(); }
     }
@@ -1115,6 +1117,25 @@ ipcMain.handle('get-displays', () => listDisplays());
 ipcMain.handle('league-import-runes', (_e, source) => league ? league.importRunes(source) : { ok: false, error: 'League is not open' });
 ipcMain.handle('taskbar-state', () => ({ ...taskbarState, installed: taskbar.installed() }));
 ipcMain.handle('app-icon', () => customIconDataUrl());
+// Pick any image; WALL-E saves it as icon.png in the data folder and uses it everywhere.
+ipcMain.handle('choose-icon', async () => {
+  const r = await dialog.showOpenDialog(settingsWin || undefined, { title: 'Choose an icon', properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'ico', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'] }] });
+  if (r.canceled || !r.filePaths || !r.filePaths[0]) return customIconDataUrl();
+  const img = nativeImage.createFromPath(r.filePaths[0]);
+  if (img.isEmpty()) return 'error';
+  try {
+    const dir = app.getPath('userData');
+    for (const n of ICON_NAMES) { try { fs.rmSync(path.join(dir, n), { force: true }); } catch { /* ignore */ } }
+    fs.writeFileSync(path.join(dir, 'icon.png'), img.toPNG());
+  } catch (e) { helperLog('icon save: ' + e.message); return 'error'; }
+  refreshIcon();
+  return customIconDataUrl();
+});
+ipcMain.handle('clear-icon', () => {
+  try { const dir = app.getPath('userData'); for (const n of ICON_NAMES) fs.rmSync(path.join(dir, n), { force: true }); } catch { /* ignore */ }
+  refreshIcon();
+  return '';
+});
 ipcMain.on('taskbar-install', () => shell.openExternal(taskbar.STORE));
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));

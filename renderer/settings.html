@@ -101,7 +101,13 @@
     #ovOpacity { width: auto; flex: 0 1 150px; min-width: 70px; }
     .row:has(#ovOpacity) > .grow { flex: 1 0 auto; }
     .tophead { display: flex; align-items: center; gap: 12px; margin: 0 4px 16px; }
-    .tophead .appicon { width: 44px; height: 44px; border-radius: 11px; object-fit: contain; flex: none; }
+    .tophead .appicon { position: relative; width: 44px; height: 44px; border-radius: 11px; flex: none; padding: 0; border: 1px dashed var(--line); background: var(--btn); color: var(--text-2); cursor: pointer; display: grid; place-items: center; overflow: visible; }
+    .tophead .appicon:hover { background: var(--btn-h); }
+    .tophead .appicon img { width: 100%; height: 100%; border-radius: 10px; object-fit: contain; }
+    .tophead .appicon .ph { font-size: 22px; font-weight: 300; line-height: 1; }
+    .tophead .appicon.set { border-style: solid; }
+    .tophead .appicon .xclear { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--danger, #C25B5B); color: #fff; font-size: 13px; line-height: 18px; text-align: center; opacity: 0; }
+    .tophead .appicon:hover .xclear { opacity: 1; }
     .tophead h1 { margin: 0; }
     .tophead .ver { font-size: 12.5px; color: var(--text-2, #8a8f98); margin-top: 2px; }
     .tophead .verbtn { font: inherit; font-size: 12.5px; color: var(--accent); background: none; border: 0; padding: 0; margin-top: 3px; cursor: pointer; }
@@ -130,7 +136,7 @@
 <body>
 <main>
   <header class="tophead">
-    <img class="appicon" id="appIcon" alt="" hidden>
+    <button class="appicon" id="appIconBtn" type="button" title="Choose an icon"><img id="appIcon" alt="" hidden><span class="ph" id="appIconPh">+</span><span class="xclear" id="appIconClear" title="Remove" hidden>×</span></button>
     <div class="grow"><h1 class="appname">WALL-E</h1><div class="ver" id="upText">Version …</div><button class="verbtn" id="upBtn">Check now</button></div>
   </header>
 

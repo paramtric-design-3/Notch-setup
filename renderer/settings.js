@@ -139,10 +139,17 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   };
   api.invoke('taskbar-state').then(tbNote).catch(() => {});
   api.on('taskbar-state', tbNote);
-  // your own icon above the title, if you dropped icon.png / icon.ico in the data folder
-  const setIcon = url => { const el = $('#appIcon'); if (url) { el.src = url; el.hidden = false; } else { el.removeAttribute('src'); el.hidden = true; } };
+  // your own icon above the title: click to pick any image (WALL-E saves it as icon.png), x to remove
+  const appImg = $('#appIcon'), appPh = $('#appIconPh'), appClear = $('#appIconClear'), appBtn = $('#appIconBtn');
+  const setIcon = url => {
+    const on = !!url && url !== 'error';
+    if (on) appImg.src = url; else appImg.removeAttribute('src');
+    appImg.hidden = !on; appPh.hidden = on; appClear.hidden = !on; appBtn.classList.toggle('set', on);
+  };
   api.invoke('app-icon').then(setIcon).catch(() => {});
   api.on('app-icon', setIcon);
+  appBtn.onclick = e => { if (e.target === appClear) return; api.invoke('choose-icon').then(setIcon).catch(() => {}); };
+  appClear.onclick = e => { e.stopPropagation(); api.invoke('clear-icon').then(() => setIcon('')).catch(() => {}); };
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
   $('#ovShow').onchange = e => save({ overlay: { ...(S.overlay || {}), show: e.target.checked } });
