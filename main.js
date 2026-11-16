@@ -403,6 +403,13 @@ function themeChrome() {
 }
 
 function trayImage() {
+  // Your own icon, if you drop one in: <userData>\icon.png (or icon.ico). Falls back to the built-in.
+  try {
+    for (const name of ['icon.png', 'icon.ico']) {
+      const p = path.join(app.getPath('userData'), name);
+      if (fs.existsSync(p)) { const img = nativeImage.createFromPath(p); if (!img.isEmpty()) return img; }
+    }
+  } catch { /* fall back */ }
   return nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
 }
 
