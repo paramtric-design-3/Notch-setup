@@ -1,17 +1,24 @@
 <!doctype html>
-<html lang="en" data-theme="white">
+<html lang="en" data-theme="bmo">
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
-  <title>WALL-E settings</title>
+  <title>BMO settings</title>
   <style>
     html[data-theme="white"] { --bg:#F7F8FA; --tile:#FBFBFC; --text:#1E2129; --text-2:#545A69; --accent:#2196B8; --line:rgba(30,33,41,.09); --btn:rgba(30,33,41,.05); --btn-h:rgba(30,33,41,.09); --on:rgba(33,150,184,.14); --mono:#F1F3F6; }
     html[data-theme="dark"]  { --bg:#111111; --tile:#151515; --text:#ECECEC; --text-2:#9A9A9A; --accent:#F29A4A; --line:#292929; --btn:rgba(255,255,255,.055); --btn-h:rgba(255,255,255,.1); --on:rgba(242,154,74,.16); --mono:#0C0C0C; }
     html[data-theme="bmo"]   { --bg:#11322B; --tile:#0E2A24; --text:#E4F6ED; --text-2:#7FC2AC; --accent:#35D6B0; --line:rgba(120,220,190,.12); --btn:rgba(120,220,190,.08); --btn-h:rgba(120,220,190,.15); --on:rgba(53,214,176,.18); --mono:#0A2019; }
     * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font:13.5px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+    @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:300;font-display:swap;src:url('../assets/fonts/BDOGrotesk-300.ttf') format('truetype');}
+    @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:400;font-display:swap;src:url('../assets/fonts/BDOGrotesk-400.ttf') format('truetype');}
+    @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:500;font-display:swap;src:url('../assets/fonts/BDOGrotesk-500.ttf') format('truetype');}
+    @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:600;font-display:swap;src:url('../assets/fonts/BDOGrotesk-600.ttf') format('truetype');}
+    @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:700;font-display:swap;src:url('../assets/fonts/BDOGrotesk-700.ttf') format('truetype');}
+    @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:800;font-display:swap;src:url('../assets/fonts/BDOGrotesk-800.ttf') format('truetype');}
+    @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:900;font-display:swap;src:url('../assets/fonts/BDOGrotesk-900.ttf') format('truetype');}
+    body { margin:0; background:var(--bg); color:var(--text); font:13.5px/1.45 "BDO Grotesk","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
     main { padding: 22px 22px 28px; max-width: 640px; margin: 0 auto; }
-    h1 { font: 600 20px "Segoe UI Variable Display","Segoe UI",system-ui; margin: 0 0 2px; letter-spacing: -.2px; }
+    h1 { font: 600 20px "BDO Grotesk","Segoe UI",system-ui; margin: 0 0 2px; letter-spacing: -.2px; }
    .lead { color: var(--text-2); margin: 0 0 18px; font-size: 13px; }
     section { background: var(--tile); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
     h2 { font-size: 12px; font-weight: 600; letter-spacing:.6px; text-transform: uppercase; color: var(--text-2); margin: 0 0 10px; }
@@ -127,9 +134,6 @@
 
   <section>
     <h2>Look</h2>
-    <div class="row"><span class="grow">Theme</span>
-      <div class="seg" id="theme"><button data-v="white">EVE</button><button data-v="dark">WALL-E</button><button data-v="bmo">BMO</button></div>
-    </div>
     <div class="row"><span class="grow">Taskbar</span>
       <div class="seg" id="taskbar"><button data-v="off">Normal</button><button data-v="clear">Clear</button><button data-v="blur">Blur</button><button data-v="acrylic">Acrylic</button></div>
     </div>

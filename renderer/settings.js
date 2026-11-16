@@ -34,12 +34,10 @@ function renderDisplays() {
 }
 
 function render() {
-  document.documentElement.dataset.theme = (S.theme === 'dark' || S.theme === 'bmo') ? S.theme : 'white';
-  // each theme has its own name: White = EVE, Dark = WALL-E, Green = BMO
-  const name = S.theme === 'bmo' ? 'BMO' : S.theme === 'dark' ? 'WALL-E' : 'EVE';
+  document.documentElement.dataset.theme = 'bmo';   // BMO is the only theme
+  const name = 'BMO';
   document.querySelectorAll('.appname').forEach(e => { e.textContent = name; });
   document.title = name + ' settings';
-  document.querySelectorAll('#theme button').forEach(b => b.classList.toggle('on', b.dataset.v === S.theme));
   document.querySelectorAll('#taskbar button').forEach(b => b.classList.toggle('on', b.dataset.v === (S.taskbar || 'off')));
   $('#login').checked = !!S.launchAtLogin;
   renderDisplays();
@@ -130,7 +128,6 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   UP = await api.invoke('get-update'); renderUpdate();
   api.on('update', u => { UP = u; renderUpdate(); });
   $('#upBtn').onclick = () => api.send(UP && UP.state === 'ready' ? 'install-update' : 'check-updates');
-  document.querySelectorAll('#theme button').forEach(b => b.onclick = () => save({ theme: b.dataset.v }));
   document.querySelectorAll('#taskbar button').forEach(b => b.onclick = () => save({ taskbar: b.dataset.v }));
   // TranslucentTB is installed by itself the first time you pick a look; only say something while
   // that happens, or if it didn't work

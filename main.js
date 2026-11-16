@@ -31,7 +31,7 @@ app.setAppUserModelId('com.fjbc.notch');
 
 // ---------------------------------------------------------------- settings
 const DEFAULT_SETTINGS = {
-  theme: 'white',               // 'white' | 'dark' | 'bmo'
+  theme: 'bmo',                 // only BMO
   city: 'Amsterdam',
   launchAtLogin: false,
   display: 'primary',          // 'primary' | 'mouse' | a display id
@@ -64,6 +64,7 @@ function loadSettings() {
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) } };
+    settings.theme = 'bmo';   // BMO is the only theme now
     // keep any tile added in a newer version
     const ids = new Set(settings.tiles.map(t => t.id));
     for (const t of DEFAULT_SETTINGS.tiles) if (!ids.has(t.id)) settings.tiles.push({ ...t });
@@ -390,9 +391,9 @@ function overlayPayload() {
 
 // ---------------------------------------------------------------- tray
 // Each theme has its own name: White = EVE, Dark = WALL-E, Green = BMO.
-function appName() { const t = settings && settings.theme; return t === 'bmo' ? 'BMO' : t === 'white' ? 'EVE' : 'WALL-E'; }
+function appName() { return 'BMO'; }
 // Any non-white theme is "dark" for window chrome, overlays and the taskbar tint.
-function themeIsDark() { return !settings || settings.theme !== 'white'; }
+function themeIsDark() { return true; }
 // The page background / text for the current theme (for native window chrome).
 function themeChrome() {
   const t = settings && settings.theme;
@@ -439,13 +440,6 @@ function buildTrayMenu() {
         })),
         { type: 'separator' },
         { label: 'Identify screens', click: identifyScreens },
-      ],
-    },
-    {
-      label: 'Theme', submenu: [
-        { label: 'White Matte', type: 'radio', checked: settings.theme === 'white', click: () => applySettings({ theme: 'white' }) },
-        { label: 'Dark Matte', type: 'radio', checked: settings.theme === 'dark', click: () => applySettings({ theme: 'dark' }) },
-        { label: 'BMO', type: 'radio', checked: settings.theme === 'bmo', click: () => applySettings({ theme: 'bmo' }) },
       ],
     },
     { label: `Weather city: ${settings.city || '—'}…`, click: openSettings },

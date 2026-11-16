@@ -1,3 +1,10 @@
+@font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:300;font-display:swap;src:url('../assets/fonts/BDOGrotesk-300.ttf') format('truetype');}
+@font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:400;font-display:swap;src:url('../assets/fonts/BDOGrotesk-400.ttf') format('truetype');}
+@font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:500;font-display:swap;src:url('../assets/fonts/BDOGrotesk-500.ttf') format('truetype');}
+@font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:600;font-display:swap;src:url('../assets/fonts/BDOGrotesk-600.ttf') format('truetype');}
+@font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:700;font-display:swap;src:url('../assets/fonts/BDOGrotesk-700.ttf') format('truetype');}
+@font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:800;font-display:swap;src:url('../assets/fonts/BDOGrotesk-800.ttf') format('truetype');}
+@font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:900;font-display:swap;src:url('../assets/fonts/BDOGrotesk-900.ttf') format('truetype');}
 /* FJBC Notch — flat matte themes, no glass, no gradients. */
 :root {
   --cell: 84px;
@@ -12,8 +19,8 @@
   --warn: #C9A24A;      /* muted yellow */
   --alert: #C9A24A;     /* muted amber (orange is now the accent) */
   --danger: #C25B5B;    /* muted red */
-  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font: "BDO Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-display: "BDO Grotesk", "Segoe UI", system-ui, sans-serif;
 }
 
 html[data-theme="white"] {
