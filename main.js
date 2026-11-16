@@ -257,7 +257,7 @@ function openSettings() {
     title: appName() + ' settings',
     backgroundColor: themeChrome().bg,
     autoHideMenuBar: true,
-    icon: trayImage(),
+    icon: windowIcon(),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   settingsWin.setMenu(null);
@@ -479,9 +479,23 @@ function customIconDataUrl() {
   } catch { /* none */ }
   return '';
 }
+// A crisp small icon for window chrome: resize the supplied image to the sizes Windows actually
+// shows (16/24/32/48) with high-quality scaling, instead of letting it downscale a big image live.
+function windowIcon() {
+  const base = trayImage();
+  try {
+    if (base.isEmpty()) return base;
+    const img = nativeImage.createEmpty();
+    for (const [size, sf] of [[16, 1], [24, 1.5], [32, 2], [48, 3]]) {
+      const r = base.resize({ width: size, height: size, quality: 'best' });
+      img.addRepresentation({ scaleFactor: sf, width: size, height: size, buffer: r.toPNG() });
+    }
+    return img.isEmpty() ? base : img;
+  } catch { return base; }
+}
 function refreshIcon() {
   try { if (tray && !tray.isDestroyed()) tray.setImage(trayImage()); } catch { /* ignore */ }
-  try { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.setIcon(trayImage()); } catch { /* ignore */ }
+  try { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.setIcon(windowIcon()); } catch { /* ignore */ }
   broadcast('app-icon', customIconDataUrl());
 }
 function watchCustomIcon() {
