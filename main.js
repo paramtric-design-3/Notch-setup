@@ -464,6 +464,21 @@ function createTray() {
   tray.setToolTip(appName());
   tray.on('click', openSettings);
   buildTrayMenu();
+  watchCustomIcon();
+}
+
+// Pick up your own icon.png / icon.ico the moment you drop it in the data folder (no restart).
+function refreshIcon() {
+  try { if (tray && !tray.isDestroyed()) tray.setImage(trayImage()); } catch { /* ignore */ }
+  try { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.setIcon(trayImage()); } catch { /* ignore */ }
+}
+function watchCustomIcon() {
+  try {
+    let t = null;
+    fs.watch(app.getPath('userData'), (_e, name) => {
+      if (name && /^icon\.(png|ico)$/i.test(name)) { clearTimeout(t); t = setTimeout(refreshIcon, 300); }
+    });
+  } catch { /* watching not available: the icon still loads at startup */ }
 }
 
 // ---------------------------------------------------------------- Windows helper (PowerShell)
