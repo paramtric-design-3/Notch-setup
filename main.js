@@ -9,7 +9,6 @@ const {
 } = require('electron');
 const nativeDrag = require('./nativedrag');
 const taskbar = require('./taskbar');
-const { Folders } = require('./folders');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -44,7 +43,6 @@ const DEFAULT_SETTINGS = {
   peeks: { apps: false, power: true },
   taskbar: 'off',               // see-through taskbar: 'off' | 'clear' | 'blur' | 'acrylic'
   overlay: { show: true, place: 'minimap', onTab: true },   // in-game item overlay: 'minimap' | 'top' | 'left'; onTab: only while Tab is held
-  folderRules: { enabled: false, rules: [] },   // Folder rules: watch folders and move/copy/rename/trash matching files
   schema: 2,
   tiles: [
     { id: 'music', show: true, size: 3 },
@@ -55,9 +53,6 @@ const DEFAULT_SETTINGS = {
     { id: 'league', show: true, size: 3 },
     { id: 'shelf', show: true, size: 2 },
     { id: 'todo', show: true, size: 3 },
-    { id: 'clipboard', show: false, size: 2 },
-    { id: 'mixer', show: false, size: 2 },
-    { id: 'folders', show: false, size: 2 },
   ],
 };
 
@@ -68,7 +63,7 @@ function loadSettings() {
   settingsPath = path.join(app.getPath('userData'), 'settings.json');
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) }, folderRules: { ...settings.folderRules, ...(saved.folderRules || {}) } };
+    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) } };
     settings.theme = 'bmo';   // BMO is the only theme now
     // keep any tile added in a newer version
     const ids = new Set(settings.tiles.map(t => t.id));
@@ -113,7 +108,6 @@ function applySettings(next, { fromSettingsWindow = false } = {}) {
   buildTrayMenu();
   updateOverlay();
   sendTaskbar();
-  syncMixer();
   if (!fromSettingsWindow && settingsWin) settingsWin.webContents.send('settings', settings);
 }
 
@@ -423,7 +417,7 @@ function trayImage() {
 
 const TILE_NAMES = {
   league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages',
-  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history', mixer: 'Volume mixer', folders: 'Folder rules',
+  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do',
 };
 
 function buildTrayMenu() {
@@ -518,7 +512,7 @@ let helper = null;
 let helperBuf = '';
 let helperRestarts = 0;
 let league = null;
-const state = { league: null, media: null, radios: {}, volume: null, brightness: null, dark: null, outputs: [], mixer: [] };
+const state = { league: null, media: null, radios: {}, volume: null, brightness: null, dark: null, outputs: [] };
 
 function helperPath() {
   // Not inside asar (packaged with asar disabled), so PowerShell can read it.
@@ -598,10 +592,6 @@ async function onHelperMessage(m) {
       state.outputs = (m.data && m.data.devices) || [];
       state.appout = { app: (m.data && m.data.app) || '', out: (m.data && m.data.appOut) || '', ok: !(m.data && m.data.appOk === false), err: (m.data && m.data.appErr) || '' };
       toIsland('outputs', state.outputs); toIsland('appout', state.appout); buildTrayMenu();
-      break;
-    case 'mixer':
-      state.mixer = (m.data && m.data.apps) || [];
-      toIsland('mixer', state.mixer);
       break;
     case 'apps': {
       if (!appsBaselineDone) { appsBaselineDone = true; break; }  // no peeks for apps already open
@@ -1041,82 +1031,12 @@ ipcMain.on('island-open', (_e, open) => {
   islandOpen = !!open;
   sendHelper({ c: 'mode', open: islandOpen });
   if (islandOpen) refreshMessages();
-  syncMixer();
 });
-// The per-app mixer only polls while the notch is open and the mixer tile is on.
-let mixerWanted = false;
-function syncMixer() {
-  const on = islandOpen && (settings.tiles || []).some(t => t.id === 'mixer' && t.show);
-  if (on === mixerWanted) return;
-  mixerWanted = on;
-  sendHelper({ c: 'mixer', on });
-}
 ipcMain.on('helper', (_e, cmd) => sendHelper(cmd));
 ipcMain.on('open-settings', () => openSettings());
 ipcMain.on('open-url', (_e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSettingsWindow: true }); return settings; });
-// ---------------------------------------------------------------- clipboard history
-// Keeps the last texts you copied so you can paste an older one. Local only, nothing leaves the PC.
-const CLIP_MAX = 25;
-let clipList = [];              // [{ text, at }]
-let clipLast = '';
-let clipMuted = false;         // true briefly while WE write to the clipboard (don't re-add it)
-function clipFile() { return path.join(app.getPath('userData'), 'clipboard.json'); }
-function loadClip() { try { clipList = JSON.parse(fs.readFileSync(clipFile(), 'utf8')) || []; } catch { clipList = []; } clipLast = (clipList[0] && clipList[0].text) || ''; }
-function saveClip() { try { fs.writeFileSync(clipFile(), JSON.stringify(clipList.slice(0, CLIP_MAX))); } catch { /* ignore */ } }
-function sendClip() { toIsland('clip', clipList); }
-function clipOn() { const t = (settings.tiles || []).find(x => x.id === 'clipboard'); return !!(t && t.show); }
-function startClipboard() {
-  loadClip();
-  setInterval(() => {
-    if (!clipOn()) return;                     // only collect while the tile is on
-    let t = '';
-    try { t = clipboard.readText(); } catch { return; }
-    if (clipMuted || !t || t === clipLast) return;
-    clipLast = t;
-    clipList = [{ text: t.slice(0, 20000), at: Date.now() }, ...clipList.filter(x => x.text !== t)].slice(0, CLIP_MAX);
-    saveClip(); sendClip();
-  }, 1000);
-}
-ipcMain.handle('clip-list', () => clipList);
-ipcMain.on('clip-copy', (_e, text) => {
-  const t = String(text || ''); if (!t) return;
-  clipMuted = true; clipLast = t;
-  try { clipboard.writeText(t); } catch { /* ignore */ }
-  setTimeout(() => { clipMuted = false; }, 400);
-  clipList = [{ text: t, at: Date.now() }, ...clipList.filter(x => x.text !== t)].slice(0, CLIP_MAX);
-  saveClip(); sendClip();
-});
-ipcMain.on('clip-remove', (_e, text) => { clipList = clipList.filter(x => x.text !== text); saveClip(); sendClip(); });
-ipcMain.on('clip-clear', () => { clipList = []; saveClip(); sendClip(); });
-
-// ---------------------------------------------------------------- folder rules (file automation)
-let folders = null;
-function startFolders() {
-  folders = new Folders({
-    getSettings: () => settings.folderRules,
-    setSettings: fr => { applySettings({ folderRules: fr }); },
-    trashItem: p => shell.trashItem(p),
-    log: helperLog,
-    onChange: () => toIsland('rules', folders.state()),
-  });
-  folders.start();
-}
-ipcMain.handle('rules-get', () => (folders ? folders.state() : { enabled: false, rules: [], history: [] }));
-ipcMain.handle('rules-set', (_e, fr) => {               // save rules and restart watching
-  applySettings({ folderRules: { enabled: !!(fr && fr.enabled), rules: (fr && fr.rules) || [] } });
-  if (folders) folders.start();
-  return folders ? folders.state() : null;
-});
-ipcMain.handle('rules-pick-folder', async () => {
-  const r = await dialog.showOpenDialog(settingsWin || undefined, { title: 'Watch a folder', properties: ['openDirectory'] });
-  return (r.canceled || !r.filePaths[0]) ? '' : r.filePaths[0];
-});
-ipcMain.handle('rules-run', async (_e, { id, dryRun } = {}) => (folders ? folders.runNow(id, dryRun) : []));
-ipcMain.handle('rules-undo', async (_e, index) => (folders ? folders.undo(index) : false));
-ipcMain.on('rules-clear', () => { if (folders) folders.clearHistory(); });
-
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state: { ...state, shelf } }));
 
@@ -1268,8 +1188,6 @@ app.whenReady().then(() => {
   app.setLoginItemSettings({ openAtLogin: !!settings.launchAtLogin });
   createIsland();
   createTray();
-  startClipboard();
-  startFolders();
   startHelper();
   setupUpdater();
   // League of Legends: the helper reports the client; tests can pass NOTCH_LCU=port:token.

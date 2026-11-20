@@ -287,58 +287,6 @@ const TILE = {
     return t;
   },
 
-  folders(size) {
-    const t = el('div', `tile folders w${size}`);
-    const r = D.rules || { enabled: false, rules: [], history: [] };
-    const nRules = (r.rules || []).length;
-    if (size === 1) { t.innerHTML = `<div class="big-ico">${I.folder}</div>${r.enabled ? `<span class="badge">${nRules}</span>` : ''}`; return t; }
-    const when = ms => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'now' : m < 60 ? m + 'm' : m < 1440 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd'; };
-    const act = { move: 'Moved', copy: 'Copied', rename: 'Renamed', trash: 'Trashed' };
-    const hist = (r.history || []).slice(0, 6).map((h, i) => `<div class="frow ${h.error ? 'err' : ''} ${h.undone ? 'undone' : ''}">
-        <span class="fact">${esc(act[h.kind] || h.kind)}</span>
-        <span class="fname ellipsis" title="${esc(h.from)}${h.to ? ' -> ' + esc(h.to) : ''}">${esc((h.from || '').split(/[\\/]/).pop())}</span>
-        <span class="fwhen">${when(h.at)}</span>
-        ${h.undo && !h.undone && !h.error ? `<button class="fundo" data-rulesundo="${i}" title="Undo">${I.reset}</button>` : ''}</div>`).join('');
-    t.innerHTML = `
-      <div class="fhead"><span class="olabel">Folder rules</span>
-        <label class="switch sm" title="${r.enabled ? 'On' : 'Off'}"><input type="checkbox" data-rulestoggle ${r.enabled ? 'checked' : ''}><span></span></label></div>
-      <div class="fbody">
-        ${nRules ? `<div class="flist">${hist || '<div class="muted fnone">No activity yet</div>'}</div>
-        <div class="frun"><button class="pbtn allow" data-rulesrun>Run now</button><button class="lnk" data-opensettings>Edit rules</button></div>`
-        : `<div class="empty"><div class="ico">${I.folder}</div>No rules yet<br><button class="tdlink" data-opensettings>Add one in Settings</button></div>`}
-      </div>`;
-    return t;
-  },
-
-  mixer(size) {
-    const t = el('div', `tile mixer w${size}`);
-    const apps = (D.mixer || []).slice().sort((a, b) => a.name.localeCompare(b.name));
-    if (size === 1) { t.innerHTML = `<div class="big-ico">${I.speaker}</div>${apps.length ? `<span class="badge">${apps.length}</span>` : ''}`; return t; }
-    if (!apps.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.speaker}</div>Play sound in an app to set its volume</div>`; return t; }
-    const pretty = n => { const s = String(n || '').replace(/\.exe$/i, ''); return s.charAt(0).toUpperCase() + s.slice(1); };
-    const row = a => `<div class="mxrow">
-        <button class="ibtn mxmute" data-mxmute="${a.pid}" data-v="${a.mute ? 0 : 1}" title="${a.mute ? 'Unmute' : 'Mute'}">${a.mute || a.vol === 0 ? I.mute : I.volume}</button>
-        <div class="mxmain"><span class="mxname ellipsis" title="${esc(pretty(a.name))}">${esc(pretty(a.name))}</span>
-          <input type="range" min="0" max="100" step="1" value="${a.mute ? 0 : a.vol}" style="--p:${a.mute ? 0 : a.vol}%" data-mxvol="${a.pid}" aria-label="${esc(pretty(a.name))} volume"></div>
-        <span class="mxval">${a.mute ? 'Muted' : a.vol + '%'}</span></div>`;
-    t.innerHTML = `<div class="mxhead"><span class="olabel">Volume mixer</span></div><div class="mxlist">${apps.map(row).join('')}</div>`;
-    return t;
-  },
-
-  clipboard(size) {
-    const t = el('div', `tile clip w${size}`);
-    const list = D.clip || [];
-    if (size === 1) { t.innerHTML = `<div class="big-ico">${I.clipboard}</div>${list.length ? `<span class="badge">${list.length}</span>` : ''}`; return t; }
-    if (!list.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.clipboard}</div>Copied text shows up here</div>`; return t; }
-    const one = x => `<div class="cliprow" data-clipcopy="${esc(x.text)}" title="Click to copy">
-        <span class="cliptext">${esc(x.text.replace(/\s+/g, ' ').trim()).slice(0, 220)}</span>
-        <button class="clipx" data-clipdel="${esc(x.text)}" title="Remove">×</button></div>`;
-    t.innerHTML = `
-      <div class="cliphead"><span class="olabel">Clipboard</span><button class="shclear" data-clipclear title="Clear all">Clear</button></div>
-      <div class="cliplist">${list.map(one).join('')}</div>`;
-    return t;
-  },
-
   shelf(size) {   // eslint-disable-line
     const t = el('div', `tile shelf w${size}`);
     const dragging = D.shelfDrag || [];
@@ -502,8 +450,6 @@ function layoutWidth(shown) {
   const cells = Math.max(2, ...rows);
   return cells * CELL + (cells - 1) * GAP + 2 * PAD;
 }
-// brief highlight after an action (e.g. a clipboard item copied)
-function flashTile(el) { if (!el) return; el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 450); }
 function renderTiles() {
   if (!D.settings) return;
   let shown = D.settings.tiles.filter(x => x.show && (x.id !== 'league' || (D.league && D.league.client))
@@ -563,13 +509,6 @@ tilesView.addEventListener('click', async e => {
   }
   if (b.dataset.shelflist !== undefined) { D.shelfList = !D.shelfList; rerenderTile('shelf'); return; }
   if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); renderTiles(); return; }
-  if (b.dataset.rulestoggle !== undefined) { const r = D.rules || {}; D.rules = await api.invoke('rules-set', { enabled: b.checked, rules: r.rules || [] }).catch(() => D.rules); rerenderTile('folders'); return; }
-  if (b.dataset.rulesrun !== undefined) { b.disabled = true; b.textContent = 'Running…'; await api.invoke('rules-run', { dryRun: false }).catch(() => {}); b.disabled = false; b.textContent = 'Run now'; return; }
-  if (b.dataset.rulesundo !== undefined) { await api.invoke('rules-undo', +b.dataset.rulesundo).catch(() => {}); return; }
-  if (b.dataset.mxmute !== undefined) { const pid = +b.dataset.mxmute, mute = +b.dataset.v; api.send('helper', { c: 'mixer', pid, mute }); return; }
-  if (b.dataset.clipdel !== undefined) { api.send('clip-remove', b.dataset.clipdel); return; }
-  if (b.dataset.clipclear !== undefined) { api.send('clip-clear'); return; }
-  if (b.dataset.clipcopy !== undefined) { api.send('clip-copy', b.dataset.clipcopy); flashTile(e.target.closest('.cliprow')); return; }
   if (b.dataset.buildsrc) { D.buildSrc = b.dataset.buildsrc; rerenderTile('league'); return; }
   if (b.dataset.tierlane) { D.tierLane = b.dataset.tierlane; rerenderTile('league'); return; }
   if (b.dataset.import !== undefined) {
@@ -662,14 +601,6 @@ document.addEventListener('drop', async e => {
 
 // volume slider in the music tile
 tilesView.addEventListener('input', e => {
-  if (e.target.matches('[data-mxvol]')) {
-    const v = +e.target.value, pid = +e.target.dataset.mxvol;
-    e.target.style.setProperty('--p', v + '%');
-    const row = e.target.closest('.mxrow'); if (row) { const val = row.querySelector('.mxval'); if (val) val.textContent = v + '%'; }
-    const a = (D.mixer || []).find(x => x.pid === pid); if (a) { a.vol = v; a.mute = false; }
-    api.send('helper', { c: 'mixer', pid, vol: v, mute: 0 });
-    return;
-  }
   if (!e.target.matches('[data-volslider]')) return;
   const v = +e.target.value;
   D.volume = { ...(D.volume || {}), level: v, muted: false };
@@ -1230,12 +1161,6 @@ tilesView.addEventListener('load', e => {
   img.classList.toggle('tall', r < 0.85);
 }, true);
 api.on('shelfdrag', ids => { D.shelfDrag = ids || null; rerenderTile('shelf'); });
-tilesView.addEventListener('change', async e => {
-  if (e.target.matches('[data-rulestoggle]')) { const r = D.rules || {}; D.rules = await api.invoke('rules-set', { enabled: e.target.checked, rules: r.rules || [] }).catch(() => D.rules); rerenderTile('folders'); }
-});
-api.on('rules', st => { const had = !!(D.rules && (D.rules.rules || []).length); D.rules = st || D.rules; const now = !!(st && (st.rules || []).length); if (had !== now) renderTiles(); else rerenderTile('folders'); });
-api.on('mixer', apps => { const had = (D.mixer || []).length > 0; D.mixer = apps || []; if (had !== (D.mixer.length > 0)) renderTiles(); else if (!tilesView.querySelector('[data-mxvol]:focus, [data-mxvol]:active')) rerenderTile('mixer'); });
-api.on('clip', list => { const had = (D.clip || []).length > 0; D.clip = list || []; if (had !== (D.clip.length > 0)) renderTiles(); else rerenderTile('clipboard'); });
 api.on('shelf', list => { if (!(list || []).length) D.shelfList = false; const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
 api.on('appout', a => { D.appout = a; if (D.outPicker) rerenderTile('music'); });
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
@@ -1262,10 +1187,9 @@ api.on('league', L => {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.clip = s.clip || []; D.mixer = s.mixer || []; D.rules = s.rules || null; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();
   watchBattery();
-  api.invoke('rules-get').then(st => { if (st) { D.rules = st; rerenderTile('folders'); } }).catch(() => {});
 })();
