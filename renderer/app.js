@@ -287,6 +287,21 @@ const TILE = {
     return t;
   },
 
+  mixer(size) {
+    const t = el('div', `tile mixer w${size}`);
+    const apps = (D.mixer || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+    if (size === 1) { t.innerHTML = `<div class="big-ico">${I.speaker}</div>${apps.length ? `<span class="badge">${apps.length}</span>` : ''}`; return t; }
+    if (!apps.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.speaker}</div>Play sound in an app to set its volume</div>`; return t; }
+    const pretty = n => { const s = String(n || '').replace(/\.exe$/i, ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+    const row = a => `<div class="mxrow">
+        <button class="ibtn mxmute" data-mxmute="${a.pid}" data-v="${a.mute ? 0 : 1}" title="${a.mute ? 'Unmute' : 'Mute'}">${a.mute || a.vol === 0 ? I.mute : I.volume}</button>
+        <div class="mxmain"><span class="mxname ellipsis" title="${esc(pretty(a.name))}">${esc(pretty(a.name))}</span>
+          <input type="range" min="0" max="100" step="1" value="${a.mute ? 0 : a.vol}" style="--p:${a.mute ? 0 : a.vol}%" data-mxvol="${a.pid}" aria-label="${esc(pretty(a.name))} volume"></div>
+        <span class="mxval">${a.mute ? 'Muted' : a.vol + '%'}</span></div>`;
+    t.innerHTML = `<div class="mxhead"><span class="olabel">Volume mixer</span></div><div class="mxlist">${apps.map(row).join('')}</div>`;
+    return t;
+  },
+
   clipboard(size) {
     const t = el('div', `tile clip w${size}`);
     const list = D.clip || [];
@@ -525,6 +540,7 @@ tilesView.addEventListener('click', async e => {
   }
   if (b.dataset.shelflist !== undefined) { D.shelfList = !D.shelfList; rerenderTile('shelf'); return; }
   if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); renderTiles(); return; }
+  if (b.dataset.mxmute !== undefined) { const pid = +b.dataset.mxmute, mute = +b.dataset.v; api.send('helper', { c: 'mixer', pid, mute }); return; }
   if (b.dataset.clipdel !== undefined) { api.send('clip-remove', b.dataset.clipdel); return; }
   if (b.dataset.clipclear !== undefined) { api.send('clip-clear'); return; }
   if (b.dataset.clipcopy !== undefined) { api.send('clip-copy', b.dataset.clipcopy); flashTile(e.target.closest('.cliprow')); return; }
@@ -620,6 +636,14 @@ document.addEventListener('drop', async e => {
 
 // volume slider in the music tile
 tilesView.addEventListener('input', e => {
+  if (e.target.matches('[data-mxvol]')) {
+    const v = +e.target.value, pid = +e.target.dataset.mxvol;
+    e.target.style.setProperty('--p', v + '%');
+    const row = e.target.closest('.mxrow'); if (row) { const val = row.querySelector('.mxval'); if (val) val.textContent = v + '%'; }
+    const a = (D.mixer || []).find(x => x.pid === pid); if (a) { a.vol = v; a.mute = false; }
+    api.send('helper', { c: 'mixer', pid, vol: v, mute: 0 });
+    return;
+  }
   if (!e.target.matches('[data-volslider]')) return;
   const v = +e.target.value;
   D.volume = { ...(D.volume || {}), level: v, muted: false };
@@ -1180,6 +1204,7 @@ tilesView.addEventListener('load', e => {
   img.classList.toggle('tall', r < 0.85);
 }, true);
 api.on('shelfdrag', ids => { D.shelfDrag = ids || null; rerenderTile('shelf'); });
+api.on('mixer', apps => { const had = (D.mixer || []).length > 0; D.mixer = apps || []; if (had !== (D.mixer.length > 0)) renderTiles(); else if (!tilesView.querySelector('[data-mxvol]:focus, [data-mxvol]:active')) rerenderTile('mixer'); });
 api.on('clip', list => { const had = (D.clip || []).length > 0; D.clip = list || []; if (had !== (D.clip.length > 0)) renderTiles(); else rerenderTile('clipboard'); });
 api.on('shelf', list => { if (!(list || []).length) D.shelfList = false; const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
 api.on('appout', a => { D.appout = a; if (D.outPicker) rerenderTile('music'); });
@@ -1207,7 +1232,7 @@ api.on('league', L => {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.clip = s.clip || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.clip = s.clip || []; D.mixer = s.mixer || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();

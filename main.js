@@ -54,6 +54,7 @@ const DEFAULT_SETTINGS = {
     { id: 'shelf', show: true, size: 2 },
     { id: 'todo', show: true, size: 3 },
     { id: 'clipboard', show: false, size: 2 },
+    { id: 'mixer', show: false, size: 2 },
   ],
 };
 
@@ -109,6 +110,7 @@ function applySettings(next, { fromSettingsWindow = false } = {}) {
   buildTrayMenu();
   updateOverlay();
   sendTaskbar();
+  syncMixer();
   if (!fromSettingsWindow && settingsWin) settingsWin.webContents.send('settings', settings);
 }
 
@@ -418,7 +420,7 @@ function trayImage() {
 
 const TILE_NAMES = {
   league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages',
-  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history',
+  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history', mixer: 'Volume mixer',
 };
 
 function buildTrayMenu() {
@@ -513,7 +515,7 @@ let helper = null;
 let helperBuf = '';
 let helperRestarts = 0;
 let league = null;
-const state = { league: null, media: null, radios: {}, volume: null, brightness: null, dark: null, outputs: [] };
+const state = { league: null, media: null, radios: {}, volume: null, brightness: null, dark: null, outputs: [], mixer: [] };
 
 function helperPath() {
   // Not inside asar (packaged with asar disabled), so PowerShell can read it.
@@ -593,6 +595,10 @@ async function onHelperMessage(m) {
       state.outputs = (m.data && m.data.devices) || [];
       state.appout = { app: (m.data && m.data.app) || '', out: (m.data && m.data.appOut) || '', ok: !(m.data && m.data.appOk === false), err: (m.data && m.data.appErr) || '' };
       toIsland('outputs', state.outputs); toIsland('appout', state.appout); buildTrayMenu();
+      break;
+    case 'mixer':
+      state.mixer = (m.data && m.data.apps) || [];
+      toIsland('mixer', state.mixer);
       break;
     case 'apps': {
       if (!appsBaselineDone) { appsBaselineDone = true; break; }  // no peeks for apps already open
@@ -1032,7 +1038,16 @@ ipcMain.on('island-open', (_e, open) => {
   islandOpen = !!open;
   sendHelper({ c: 'mode', open: islandOpen });
   if (islandOpen) refreshMessages();
+  syncMixer();
 });
+// The per-app mixer only polls while the notch is open and the mixer tile is on.
+let mixerWanted = false;
+function syncMixer() {
+  const on = islandOpen && (settings.tiles || []).some(t => t.id === 'mixer' && t.show);
+  if (on === mixerWanted) return;
+  mixerWanted = on;
+  sendHelper({ c: 'mixer', on });
+}
 ipcMain.on('helper', (_e, cmd) => sendHelper(cmd));
 ipcMain.on('open-settings', () => openSettings());
 ipcMain.on('open-url', (_e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });

@@ -1073,3 +1073,18 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .clip .cliprow:hover .clipx { opacity: 1; }
 .clip .clipx:hover { color: var(--text); }
 .clip .cliphead .olabel { font-size: 10px; letter-spacing: .5px; text-transform: uppercase; font-weight: 600; color: var(--text-2); }
+/* per-app volume mixer */
+.tile.mixer { display: flex; flex-direction: column; gap: 6px; }
+.mixer .mxhead .olabel { font-size: 10px; letter-spacing: .5px; text-transform: uppercase; font-weight: 600; color: var(--text-2); }
+.mixer .mxlist { flex: 1; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 6px; }
+.mixer .mxlist::-webkit-scrollbar { display: none; }
+.mixer .mxrow { display: flex; align-items: center; gap: 8px; }
+.mixer .mxmute { width: 22px; height: 22px; flex: none; color: var(--text-2); }
+.mixer .mxmute svg { width: 15px; height: 15px; }
+.mixer .mxmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mixer .mxname { font-size: 11.5px; color: var(--text); }
+.mixer .mxval { flex: none; width: 38px; text-align: right; font-size: 10.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.mixer input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 14px; margin: 0; background: none; cursor: pointer; }
+.mixer input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--text) var(--p, 50%), var(--track) var(--p, 50%)); }
+.mixer input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; margin-top: -3px; border-radius: 50%; border: 0; background: var(--text); opacity: 0; transition: opacity .15s; }
+.mixer .mxrow:hover input[type=range]::-webkit-slider-thumb, .mixer input[type=range]:active::-webkit-slider-thumb { opacity: 1; }

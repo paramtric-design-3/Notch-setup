@@ -160,6 +160,61 @@ public static class NotchSessions {
         return list.ToArray();
     }
 }
+// Per-app volume mixer: list each app that has a sound session with its volume and mute, and set them.
+[Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface ISimpleAudioVolume {
+    int SetMasterVolume(float level, ref Guid ctx);
+    int GetMasterVolume(out float level);
+    int SetMute(int mute, ref Guid ctx);
+    int GetMute(out int mute);
+}
+public static class NotchMixer {
+    static IAudioSessionEnumerator Sessions() {
+        var e = (IMMDeviceEnumerator)(new MMDeviceEnumeratorCom());
+        IMMDevice dev; if (e.GetDefaultAudioEndpoint(0, 1, out dev) != 0) return null;
+        var iid = typeof(IAudioSessionManager2).GUID;
+        object o; if (((IMMDeviceAny)(object)dev).Activate(ref iid, 23, IntPtr.Zero, out o) != 0) return null;
+        IAudioSessionEnumerator se; if (((IAudioSessionManager2)o).GetSessionEnumerator(out se) != 0) return null;
+        return se;
+    }
+    // "pid<TAB>process<TAB>volume(0..100)<TAB>mute(0/1)" per app on the default output
+    public static string[] List() {
+        var outl = new System.Collections.Generic.List<string>();
+        var seen = new System.Collections.Generic.HashSet<uint>();
+        try {
+            var se = Sessions(); if (se == null) return outl.ToArray();
+            int c; se.GetCount(out c);
+            for (int k = 0; k < c; k++) {
+                IAudioSessionControl2 sc; if (se.GetSession(k, out sc) != 0) continue;
+                uint pid; if (sc.GetProcessId(out pid) != 0 || pid == 0 || seen.Contains(pid)) continue;
+                seen.Add(pid);
+                float v = 1; int m = 0;
+                try { var sv = (ISimpleAudioVolume)(object)sc; sv.GetMasterVolume(out v); sv.GetMute(out m); } catch { }
+                string name = "";
+                try { name = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+                if (string.IsNullOrEmpty(name)) name = "pid " + pid;
+                outl.Add(pid + "\t" + name + "\t" + ((int)System.Math.Round(v * 100)) + "\t" + m);
+            }
+        } catch { }
+        return outl.ToArray();
+    }
+    public static void Set(uint pid, int volume, int mute) {
+        try {
+            var se = Sessions(); if (se == null) return;
+            int c; se.GetCount(out c);
+            var g = System.Guid.Empty;
+            for (int k = 0; k < c; k++) {
+                IAudioSessionControl2 sc; if (se.GetSession(k, out sc) != 0) continue;
+                uint p; if (sc.GetProcessId(out p) != 0 || p != pid) continue;
+                try {
+                    var sv = (ISimpleAudioVolume)(object)sc;
+                    if (volume >= 0) sv.SetMasterVolume(System.Math.Max(0f, System.Math.Min(1f, volume / 100f)), ref g);
+                    if (mute >= 0) sv.SetMute(mute, ref g);
+                } catch { }
+            }
+        } catch { }
+    }
+}
 // Dragging shelf files out the way Explorer does it: Windows draws the file's thumbnail and the
 // "Move" / "Copy" label, and does the move or copy itself.
 [ComImport, Guid("b63ea76d-1f85-456f-a19c-48159efa858b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -679,6 +734,19 @@ function Set-AppOutput($deviceId) {
     else { $script:appOutWant = $deviceId }
 }
 
+$script:mixerOn = $false
+$script:lastMixer = ''
+function Poll-Mixer {
+    if (-not $script:mixerOn) { return }
+    $apps = @()
+    foreach ($line in [NotchMixer]::List()) {
+        $f = $line -split "`t"
+        if ($f.Count -lt 4) { continue }
+        $apps += , ([ordered]@{ pid = [int]$f[0]; name = $f[1]; vol = [int]$f[2]; mute = ($f[3] -eq '1') }) 
+    }
+    $sig = ($apps | ForEach-Object { "$($_.pid):$($_.vol):$($_.mute)" }) -join ';'
+    if ($sig -ne $script:lastMixer) { $script:lastMixer = $sig; Emit 'mixer' ([ordered]@{ apps = $apps }) }
+}
 function Poll-Outputs {
     $devs = @()
     foreach ($line in [NotchAudio]::ListOutputs()) {
@@ -795,6 +863,10 @@ function Handle-Command($line) {
         'drag' { try { [NotchDrag]::Start([string[]]@($c.paths)) } catch { Log "drag: $($_.Exception.Message)" } }
         'appout' { Set-AppOutput ([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0 }
         'setoutput' { [NotchAudio]::SetDefaultOutput([string]$c.id); $script:lastOutputs = ''; $script:due['outputs'] = 0; $script:lastVol = ''; $script:due['volume'] = 0 }
+        'mixer' {
+            if ($null -ne $c.on) { $script:mixerOn = [bool]$c.on; $script:lastMixer = ''; if ($script:mixerOn) { $script:due['mixer'] = 0 } }
+            if ($null -ne $c.pid) { try { [NotchMixer]::Set([uint32]$c.pid, [int]$(if ($null -ne $c.vol) { $c.vol } else { -1 }), [int]$(if ($null -ne $c.mute) { $c.mute } else { -1 })) } catch { Log "mixer set: $($_.Exception.Message)" }; $script:lastMixer = ''; $script:due['mixer'] = 0 }
+        }
         'start' { [NotchNative]::PressWin() }
     }
 }
@@ -824,6 +896,7 @@ while (-not [NotchPump]::Closed) {
         Every 'dark' 5000 { Poll-Dark }
         Every 'apps' 2000 { Poll-Apps }
         Every 'outputs' 5000 { Poll-Outputs }
+        Every 'mixer' 1500 { Poll-Mixer }
         Every 'league' 5000 { Poll-League }
     } else {
         Every 'media' 1500 { Poll-Media }
