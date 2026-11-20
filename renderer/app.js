@@ -287,6 +287,20 @@ const TILE = {
     return t;
   },
 
+  clipboard(size) {
+    const t = el('div', `tile clip w${size}`);
+    const list = D.clip || [];
+    if (size === 1) { t.innerHTML = `<div class="big-ico">${I.clipboard}</div>${list.length ? `<span class="badge">${list.length}</span>` : ''}`; return t; }
+    if (!list.length) { t.innerHTML = `<div class="empty"><div class="ico">${I.clipboard}</div>Copied text shows up here</div>`; return t; }
+    const one = x => `<div class="cliprow" data-clipcopy="${esc(x.text)}" title="Click to copy">
+        <span class="cliptext">${esc(x.text.replace(/\s+/g, ' ').trim()).slice(0, 220)}</span>
+        <button class="clipx" data-clipdel="${esc(x.text)}" title="Remove">×</button></div>`;
+    t.innerHTML = `
+      <div class="cliphead"><span class="olabel">Clipboard</span><button class="shclear" data-clipclear title="Clear all">Clear</button></div>
+      <div class="cliplist">${list.map(one).join('')}</div>`;
+    return t;
+  },
+
   shelf(size) {   // eslint-disable-line
     const t = el('div', `tile shelf w${size}`);
     const dragging = D.shelfDrag || [];
@@ -450,6 +464,8 @@ function layoutWidth(shown) {
   const cells = Math.max(2, ...rows);
   return cells * CELL + (cells - 1) * GAP + 2 * PAD;
 }
+// brief highlight after an action (e.g. a clipboard item copied)
+function flashTile(el) { if (!el) return; el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 450); }
 function renderTiles() {
   if (!D.settings) return;
   let shown = D.settings.tiles.filter(x => x.show && (x.id !== 'league' || (D.league && D.league.client))
@@ -509,6 +525,9 @@ tilesView.addEventListener('click', async e => {
   }
   if (b.dataset.shelflist !== undefined) { D.shelfList = !D.shelfList; rerenderTile('shelf'); return; }
   if (b.dataset.shelfclear !== undefined) { D.shelf = await api.invoke('shelf-clear'); renderTiles(); return; }
+  if (b.dataset.clipdel !== undefined) { api.send('clip-remove', b.dataset.clipdel); return; }
+  if (b.dataset.clipclear !== undefined) { api.send('clip-clear'); return; }
+  if (b.dataset.clipcopy !== undefined) { api.send('clip-copy', b.dataset.clipcopy); flashTile(e.target.closest('.cliprow')); return; }
   if (b.dataset.buildsrc) { D.buildSrc = b.dataset.buildsrc; rerenderTile('league'); return; }
   if (b.dataset.tierlane) { D.tierLane = b.dataset.tierlane; rerenderTile('league'); return; }
   if (b.dataset.import !== undefined) {
@@ -1161,6 +1180,7 @@ tilesView.addEventListener('load', e => {
   img.classList.toggle('tall', r < 0.85);
 }, true);
 api.on('shelfdrag', ids => { D.shelfDrag = ids || null; rerenderTile('shelf'); });
+api.on('clip', list => { const had = (D.clip || []).length > 0; D.clip = list || []; if (had !== (D.clip.length > 0)) renderTiles(); else rerenderTile('clipboard'); });
 api.on('shelf', list => { if (!(list || []).length) D.shelfList = false; const had = (D.shelf || []).length > 0; D.shelf = list || []; if (had !== (D.shelf.length > 0)) renderTiles(); else rerenderTile('shelf'); });
 api.on('appout', a => { D.appout = a; if (D.outPicker) rerenderTile('music'); });
 api.on('outputs', list => { D.outputs = list || []; rerenderTile('music'); });
@@ -1187,7 +1207,7 @@ api.on('league', L => {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.clip = s.clip || []; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();

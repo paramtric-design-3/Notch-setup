@@ -53,6 +53,7 @@ const DEFAULT_SETTINGS = {
     { id: 'league', show: true, size: 3 },
     { id: 'shelf', show: true, size: 2 },
     { id: 'todo', show: true, size: 3 },
+    { id: 'clipboard', show: false, size: 2 },
   ],
 };
 
@@ -417,7 +418,7 @@ function trayImage() {
 
 const TILE_NAMES = {
   league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages',
-  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do',
+  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history',
 };
 
 function buildTrayMenu() {
@@ -1037,6 +1038,41 @@ ipcMain.on('open-settings', () => openSettings());
 ipcMain.on('open-url', (_e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSettingsWindow: true }); return settings; });
+// ---------------------------------------------------------------- clipboard history
+// Keeps the last texts you copied so you can paste an older one. Local only, nothing leaves the PC.
+const CLIP_MAX = 25;
+let clipList = [];              // [{ text, at }]
+let clipLast = '';
+let clipMuted = false;         // true briefly while WE write to the clipboard (don't re-add it)
+function clipFile() { return path.join(app.getPath('userData'), 'clipboard.json'); }
+function loadClip() { try { clipList = JSON.parse(fs.readFileSync(clipFile(), 'utf8')) || []; } catch { clipList = []; } clipLast = (clipList[0] && clipList[0].text) || ''; }
+function saveClip() { try { fs.writeFileSync(clipFile(), JSON.stringify(clipList.slice(0, CLIP_MAX))); } catch { /* ignore */ } }
+function sendClip() { toIsland('clip', clipList); }
+function clipOn() { const t = (settings.tiles || []).find(x => x.id === 'clipboard'); return !!(t && t.show); }
+function startClipboard() {
+  loadClip();
+  setInterval(() => {
+    if (!clipOn()) return;                     // only collect while the tile is on
+    let t = '';
+    try { t = clipboard.readText(); } catch { return; }
+    if (clipMuted || !t || t === clipLast) return;
+    clipLast = t;
+    clipList = [{ text: t.slice(0, 20000), at: Date.now() }, ...clipList.filter(x => x.text !== t)].slice(0, CLIP_MAX);
+    saveClip(); sendClip();
+  }, 1000);
+}
+ipcMain.handle('clip-list', () => clipList);
+ipcMain.on('clip-copy', (_e, text) => {
+  const t = String(text || ''); if (!t) return;
+  clipMuted = true; clipLast = t;
+  try { clipboard.writeText(t); } catch { /* ignore */ }
+  setTimeout(() => { clipMuted = false; }, 400);
+  clipList = [{ text: t, at: Date.now() }, ...clipList.filter(x => x.text !== t)].slice(0, CLIP_MAX);
+  saveClip(); sendClip();
+});
+ipcMain.on('clip-remove', (_e, text) => { clipList = clipList.filter(x => x.text !== text); saveClip(); sendClip(); });
+ipcMain.on('clip-clear', () => { clipList = []; saveClip(); sendClip(); });
+
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state: { ...state, shelf } }));
 
@@ -1188,6 +1224,7 @@ app.whenReady().then(() => {
   app.setLoginItemSettings({ openAtLogin: !!settings.launchAtLogin });
   createIsland();
   createTray();
+  startClipboard();
   startHelper();
   setupUpdater();
   // League of Legends: the helper reports the client; tests can pass NOTCH_LCU=port:token.

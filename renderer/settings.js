@@ -1,7 +1,7 @@
 'use strict';
 const api = window.notch;
 const $ = s => document.querySelector(s);
-const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do' };
+const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history' };
 let S = null;
 let DRAG = null;   // index of the tile row being dragged
 
