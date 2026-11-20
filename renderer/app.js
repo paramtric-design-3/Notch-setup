@@ -1082,7 +1082,7 @@ async function watchBattery() {
 }
 
 // ------------------------------------------------------------------ events from main
-function applyTheme() { document.documentElement.dataset.theme = 'bmo'; }
+function applyTheme() { document.documentElement.dataset.theme = (D.settings && D.settings.theme === 'white') ? 'white' : 'dark'; }
 
 api.on('settings', s => { D.settings = s; applyTheme(); if (state === 'open') renderTiles(); });
 api.on('media', m => {

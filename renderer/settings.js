@@ -34,12 +34,13 @@ function renderDisplays() {
 }
 
 function render() {
-  document.documentElement.dataset.theme = 'bmo';   // BMO is the only theme
-  const name = 'BMO';
+  document.documentElement.dataset.theme = S.theme === 'white' ? 'white' : 'dark';
+  const name = S.theme === 'white' ? 'EVE' : 'WALL-E';
   document.querySelectorAll('.appname').forEach(e => { e.textContent = name; });
   document.title = name + ' settings';
   document.querySelectorAll('#taskbar button').forEach(b => b.classList.toggle('on', b.dataset.v === (S.taskbar || 'off')));
   $('#login').checked = !!S.launchAtLogin;
+  document.querySelectorAll('#theme button').forEach(b => b.classList.toggle('on', b.dataset.v === (S.theme === 'white' ? 'white' : 'dark')));
   renderDisplays();
   $('#msgAll').checked = !!S.messageAllApps;
   const ov = S.overlay || { show: true, place: 'minimap' };
@@ -150,6 +151,7 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   api.on('app-icon', setIcon);
   appBtn.onclick = e => { if (e.target === appClear) return; api.invoke('choose-icon').then(setIcon).catch(() => {}); };
   appClear.onclick = e => { e.stopPropagation(); api.invoke('clear-icon').then(() => setIcon('')).catch(() => {}); };
+  document.querySelectorAll('#theme button').forEach(b => b.onclick = () => save({ theme: b.dataset.v }));
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
   $('#ovShow').onchange = e => save({ overlay: { ...(S.overlay || {}), show: e.target.checked } });

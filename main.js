@@ -31,7 +31,7 @@ app.setAppUserModelId('com.fjbc.notch');
 
 // ---------------------------------------------------------------- settings
 const DEFAULT_SETTINGS = {
-  theme: 'bmo',                 // only BMO
+  theme: 'dark',                // 'white' (EVE) | 'dark' (WALL-E)
   city: 'Amsterdam',
   launchAtLogin: false,
   display: 'primary',          // 'primary' | 'mouse' | a display id
@@ -64,7 +64,7 @@ function loadSettings() {
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) } };
-    settings.theme = 'bmo';   // BMO is the only theme now
+    if (settings.theme !== 'white' && settings.theme !== 'dark') settings.theme = 'dark';   // only EVE / WALL-E
     // keep any tile added in a newer version
     const ids = new Set(settings.tiles.map(t => t.id));
     for (const t of DEFAULT_SETTINGS.tiles) if (!ids.has(t.id)) settings.tiles.push({ ...t });
@@ -390,17 +390,11 @@ function overlayPayload() {
 }
 
 // ---------------------------------------------------------------- tray
-// Each theme has its own name: White = EVE, Dark = WALL-E, Green = BMO.
-function appName() { return 'BMO'; }
-// Any non-white theme is "dark" for window chrome, overlays and the taskbar tint.
-function themeIsDark() { return true; }
+// White Matte is EVE, Dark Matte is WALL-E.
+function appName() { return settings && settings.theme === 'white' ? 'EVE' : 'WALL-E'; }
+function themeIsDark() { return !settings || settings.theme !== 'white'; }
 // The page background / text for the current theme (for native window chrome).
-function themeChrome() {
-  const t = settings && settings.theme;
-  if (t === 'bmo') return { bg: '#11322B', fg: '#E4F6ED' };
-  if (t === 'white') return { bg: '#F7F8FA', fg: '#1E2129' };
-  return { bg: '#111111', fg: '#ECECEC' };
-}
+function themeChrome() { return themeIsDark() ? { bg: '#111111', fg: '#ECECEC' } : { bg: '#F7F8FA', fg: '#1E2129' }; }
 
 // Your own icon, read from the data folder in this order of preference.
 const ICON_NAMES = ['icon.png', 'icon.ico', 'icon.jpg', 'icon.jpeg', 'icon.webp'];
@@ -449,6 +443,12 @@ function buildTrayMenu() {
         })),
         { type: 'separator' },
         { label: 'Identify screens', click: identifyScreens },
+      ],
+    },
+    {
+      label: 'Theme', submenu: [
+        { label: 'EVE (White Matte)', type: 'radio', checked: settings.theme === 'white', click: () => applySettings({ theme: 'white' }) },
+        { label: 'WALL-E (Dark Matte)', type: 'radio', checked: settings.theme !== 'white', click: () => applySettings({ theme: 'dark' }) },
       ],
     },
     { label: `Weather city: ${settings.city || '—'}…`, click: openSettings },
