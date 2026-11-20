@@ -9,6 +9,7 @@ const {
 } = require('electron');
 const nativeDrag = require('./nativedrag');
 const taskbar = require('./taskbar');
+const { Folders } = require('./folders');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -43,6 +44,7 @@ const DEFAULT_SETTINGS = {
   peeks: { apps: false, power: true },
   taskbar: 'off',               // see-through taskbar: 'off' | 'clear' | 'blur' | 'acrylic'
   overlay: { show: true, place: 'minimap', onTab: true },   // in-game item overlay: 'minimap' | 'top' | 'left'; onTab: only while Tab is held
+  folderRules: { enabled: false, rules: [] },   // Folder rules: watch folders and move/copy/rename/trash matching files
   schema: 2,
   tiles: [
     { id: 'music', show: true, size: 3 },
@@ -55,6 +57,7 @@ const DEFAULT_SETTINGS = {
     { id: 'todo', show: true, size: 3 },
     { id: 'clipboard', show: false, size: 2 },
     { id: 'mixer', show: false, size: 2 },
+    { id: 'folders', show: false, size: 2 },
   ],
 };
 
@@ -65,7 +68,7 @@ function loadSettings() {
   settingsPath = path.join(app.getPath('userData'), 'settings.json');
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) } };
+    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) }, folderRules: { ...settings.folderRules, ...(saved.folderRules || {}) } };
     settings.theme = 'bmo';   // BMO is the only theme now
     // keep any tile added in a newer version
     const ids = new Set(settings.tiles.map(t => t.id));
@@ -420,7 +423,7 @@ function trayImage() {
 
 const TILE_NAMES = {
   league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages',
-  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history', mixer: 'Volume mixer',
+  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history', mixer: 'Volume mixer', folders: 'Folder rules',
 };
 
 function buildTrayMenu() {
@@ -1088,6 +1091,32 @@ ipcMain.on('clip-copy', (_e, text) => {
 ipcMain.on('clip-remove', (_e, text) => { clipList = clipList.filter(x => x.text !== text); saveClip(); sendClip(); });
 ipcMain.on('clip-clear', () => { clipList = []; saveClip(); sendClip(); });
 
+// ---------------------------------------------------------------- folder rules (file automation)
+let folders = null;
+function startFolders() {
+  folders = new Folders({
+    getSettings: () => settings.folderRules,
+    setSettings: fr => { applySettings({ folderRules: fr }); },
+    trashItem: p => shell.trashItem(p),
+    log: helperLog,
+    onChange: () => toIsland('rules', folders.state()),
+  });
+  folders.start();
+}
+ipcMain.handle('rules-get', () => (folders ? folders.state() : { enabled: false, rules: [], history: [] }));
+ipcMain.handle('rules-set', (_e, fr) => {               // save rules and restart watching
+  applySettings({ folderRules: { enabled: !!(fr && fr.enabled), rules: (fr && fr.rules) || [] } });
+  if (folders) folders.start();
+  return folders ? folders.state() : null;
+});
+ipcMain.handle('rules-pick-folder', async () => {
+  const r = await dialog.showOpenDialog(settingsWin || undefined, { title: 'Watch a folder', properties: ['openDirectory'] });
+  return (r.canceled || !r.filePaths[0]) ? '' : r.filePaths[0];
+});
+ipcMain.handle('rules-run', async (_e, { id, dryRun } = {}) => (folders ? folders.runNow(id, dryRun) : []));
+ipcMain.handle('rules-undo', async (_e, index) => (folders ? folders.undo(index) : false));
+ipcMain.on('rules-clear', () => { if (folders) folders.clearHistory(); });
+
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
 ipcMain.handle('initial-state', () => ({ settings, state: { ...state, shelf } }));
 
@@ -1240,6 +1269,7 @@ app.whenReady().then(() => {
   createIsland();
   createTray();
   startClipboard();
+  startFolders();
   startHelper();
   setupUpdater();
   // League of Legends: the helper reports the client; tests can pass NOTCH_LCU=port:token.

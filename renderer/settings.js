@@ -1,7 +1,8 @@
 'use strict';
 const api = window.notch;
 const $ = s => document.querySelector(s);
-const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history', mixer: 'Volume mixer' };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', clipboard: 'Clipboard history', mixer: 'Volume mixer', folders: 'Folder rules' };
 let S = null;
 let DRAG = null;   // index of the tile row being dragged
 
@@ -243,3 +244,81 @@ function roundSelect(sel) {
   return wrap;
 }
 document.querySelectorAll('select').forEach(roundSelect);
+
+// ---------------------------------------------------------------- Folder rules editor
+let RULES = { enabled: false, rules: [] };
+const uid = () => 'r' + Math.random().toString(36).slice(2, 9);
+let rulesSaveT = null;
+function saveRules() { clearTimeout(rulesSaveT); rulesSaveT = setTimeout(() => { api.invoke('rules-set', { enabled: RULES.enabled, rules: RULES.rules }).catch(() => {}); }, 400); }
+
+const COND_FIELDS = [['name', 'Name'], ['ext', 'Extension'], ['size', 'Size (MB)'], ['age', 'Age (days)']];
+const COND_OPS = {
+  name: [['contains', 'contains'], ['startsWith', 'starts with'], ['endsWith', 'ends with'], ['matches', 'matches (glob)']],
+  ext: [['is', 'is one of']],
+  size: [['>', 'greater than'], ['<', 'less than']],
+  age: [['olderThan', 'older than'], ['newerThan', 'newer than']],
+};
+const ACTIONS = [['move', 'Move to'], ['copy', 'Copy to'], ['rename', 'Rename to'], ['trash', 'Recycle Bin']];
+
+function opt(list, val) { return list.map(([v, l]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${l}</option>`).join(''); }
+
+function renderRules() {
+  const box = $('#rulesEditor');
+  if (!box) return;
+  box.innerHTML = '';
+  (RULES.rules || []).forEach((r, ri) => {
+    r.conditions = r.conditions || [];
+    r.action = r.action || { type: 'move', dest: '' };
+    const card = document.createElement('div');
+    card.className = 'rulecard';
+    const conds = r.conditions.map((c, ci) => `
+      <div class="condrow" data-ci="${ci}">
+        <select data-cf>${opt(COND_FIELDS, c.field || 'name')}</select>
+        <select data-co>${opt(COND_OPS[c.field || 'name'] || COND_OPS.name, c.op)}</select>
+        <input type="text" data-cv value="${esc(c.value == null ? '' : c.value)}" placeholder="${(c.field === 'ext') ? 'pdf, jpg' : (c.field === 'size' || c.field === 'age') ? 'number' : 'text'}">
+        <button class="ic" data-condel title="Remove">×</button>
+      </div>`).join('');
+    const a = r.action;
+    const actExtra = (a.type === 'move' || a.type === 'copy')
+      ? `<input type="text" data-adest value="${esc(a.dest || '')}" placeholder="C:\\Users\\...\\Sorted\\{year}"><button class="btn sm" data-apick>Pick…</button>`
+      : (a.type === 'rename') ? `<input type="text" data-apat value="${esc(a.pattern || '{name}')}" placeholder="{name}-{year}{month}{day}">` : '';
+    card.innerHTML = `
+      <div class="rulecardhead">
+        <label class="switch sm"><input type="checkbox" data-ren ${r.enabled !== false ? 'checked' : ''}><span></span></label>
+        <input type="text" class="rulename" data-rn value="${esc(r.name || '')}" placeholder="Rule name">
+        <button class="ic" data-ruledel title="Delete rule">×</button>
+      </div>
+      <div class="rulerow"><span class="rl">Folder</span><input type="text" data-rfolder value="${esc(r.folder || '')}" placeholder="Choose a folder" readonly><button class="btn sm" data-rpick>Pick…</button></div>
+      <div class="rulerow"><label class="chk"><input type="checkbox" data-rrec ${r.recursive ? 'checked' : ''}> include subfolders</label>
+        <span class="rl2">Match</span><select data-rmatch>${opt([['all', 'all conditions'], ['any', 'any condition']], r.match || 'all')}</select></div>
+      <div class="conds">${conds || '<div class="muted" style="font-size:12px">No conditions — add one</div>'}</div>
+      <div class="rulerow"><button class="btn sm" data-condadd>+ Condition</button></div>
+      <div class="rulerow act"><span class="rl">Action</span><select data-atype>${opt(ACTIONS, a.type)}</select>${actExtra}</div>`;
+    box.append(card);
+
+    const upd = () => { saveRules(); };
+    card.querySelector('[data-ren]').onchange = e => { r.enabled = e.target.checked; upd(); };
+    card.querySelector('[data-rn]').oninput = e => { r.name = e.target.value; upd(); };
+    card.querySelector('[data-ruledel]').onclick = () => { RULES.rules.splice(ri, 1); renderRules(); saveRules(); };
+    card.querySelector('[data-rpick]').onclick = async () => { const f = await api.invoke('rules-pick-folder').catch(() => ''); if (f) { r.folder = f; renderRules(); saveRules(); } };
+    card.querySelector('[data-rrec]').onchange = e => { r.recursive = e.target.checked; upd(); };
+    card.querySelector('[data-rmatch]').onchange = e => { r.match = e.target.value; upd(); };
+    card.querySelector('[data-condadd]').onclick = () => { r.conditions.push({ field: 'name', op: 'contains', value: '' }); renderRules(); saveRules(); };
+    card.querySelectorAll('.condrow').forEach(row => {
+      const ci = +row.dataset.ci;
+      row.querySelector('[data-cf]').onchange = e => { r.conditions[ci].field = e.target.value; r.conditions[ci].op = (COND_OPS[e.target.value] || COND_OPS.name)[0][0]; renderRules(); saveRules(); };
+      row.querySelector('[data-co]').onchange = e => { r.conditions[ci].op = e.target.value; upd(); };
+      row.querySelector('[data-cv]').oninput = e => { r.conditions[ci].value = e.target.value; upd(); };
+      row.querySelector('[data-condel]').onclick = () => { r.conditions.splice(ci, 1); renderRules(); saveRules(); };
+    });
+    card.querySelector('[data-atype]').onchange = e => { r.action = { type: e.target.value, dest: r.action.dest || '', pattern: r.action.pattern || '{name}' }; renderRules(); saveRules(); };
+    const dest = card.querySelector('[data-adest]'); if (dest) dest.oninput = e => { r.action.dest = e.target.value; upd(); };
+    const pat = card.querySelector('[data-apat]'); if (pat) pat.oninput = e => { r.action.pattern = e.target.value; upd(); };
+    const apick = card.querySelector('[data-apick]'); if (apick) apick.onclick = async () => { const f = await api.invoke('rules-pick-folder').catch(() => ''); if (f) { r.action.dest = f; renderRules(); saveRules(); } };
+  });
+}
+if ($('#rulesAdd')) {
+  $('#rulesAdd').onclick = () => { RULES.rules.push({ id: uid(), name: 'New rule', folder: '', enabled: true, recursive: false, match: 'all', conditions: [{ field: 'name', op: 'contains', value: '' }], action: { type: 'move', dest: '' } }); renderRules(); saveRules(); };
+  api.invoke('rules-get').then(st => { if (st) { RULES = { enabled: !!st.enabled, rules: st.rules || [] }; renderRules(); } }).catch(() => {});
+  api.on('rules', st => { if (st) { RULES.enabled = !!st.enabled; } });
+}
