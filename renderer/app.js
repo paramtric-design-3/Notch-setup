@@ -105,7 +105,7 @@ function pointerEnter() {
   hovering = true;
   clearTimeout(leaveTimer);
   clearTimeout(hoverTimer);
-  if (state !== 'open') hoverTimer = setTimeout(() => { if (hovering) setState('open'); }, 250);
+  if (state !== 'open') hoverTimer = setTimeout(() => { if (hovering) setState('open'); }, 130);
 }
 function pointerLeave() {
   if (!hovering) return;
