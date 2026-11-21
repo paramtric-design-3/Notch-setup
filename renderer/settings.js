@@ -153,6 +153,7 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   appClear.onclick = e => { e.stopPropagation(); api.invoke('clear-icon').then(() => setIcon('')).catch(() => {}); };
   document.querySelectorAll('#theme button').forEach(b => b.onclick = () => save({ theme: b.dataset.v }));
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
+  if ($('#uninstall')) $('#uninstall').onclick = () => api.invoke('uninstall').catch(() => {});
   $('#msgAll').onchange = e => save({ messageAllApps: e.target.checked });
   $('#ovShow').onchange = e => save({ overlay: { ...(S.overlay || {}), show: e.target.checked } });
   $('#ovTab').onchange = e => save({ overlay: { ...(S.overlay || {}), onTab: e.target.checked } });

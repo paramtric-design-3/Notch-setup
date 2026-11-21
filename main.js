@@ -1151,6 +1151,25 @@ ipcMain.handle('clear-icon', () => {
   return '';
 });
 ipcMain.on('taskbar-install', () => shell.openExternal(taskbar.STORE));
+// Uninstall: run the installer's own uninstaller (NSIS), after a confirmation.
+ipcMain.handle('uninstall', async () => {
+  if (!app.isPackaged) { await dialog.showMessageBox(settingsWin || undefined, { type: 'info', message: 'Uninstall is only available in the installed app.' }); return { ok: false }; }
+  let unins = '';
+  try {
+    const dir = path.dirname(app.getPath('exe'));
+    const hit = fs.readdirSync(dir).find(f => /^Uninstall .*\.exe$/i.test(f));
+    if (hit) unins = path.join(dir, hit);
+  } catch { /* ignore */ }
+  const r = await dialog.showMessageBox(settingsWin || undefined, {
+    type: 'warning', buttons: ['Cancel', 'Uninstall'], defaultId: 0, cancelId: 0,
+    title: 'Uninstall Crumble', message: 'Uninstall Crumble?',
+    detail: unins ? 'This closes Crumble and opens the uninstaller.' : "The uninstaller wasn't found; Windows Apps settings will open so you can remove Crumble there.",
+  });
+  if (r.response !== 1) return { ok: false };
+  if (unins) { try { spawn(unins, ['--force-run'], { detached: true, stdio: 'ignore' }).unref(); } catch { shell.openExternal('ms-settings:appsfeatures'); } setTimeout(() => { quitting = true; app.quit(); }, 600); }
+  else shell.openExternal('ms-settings:appsfeatures');
+  return { ok: true };
+});
 ipcMain.handle('get-update', () => ({ ...update, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.on('check-updates', () => checkForUpdates(true));
 ipcMain.on('install-update', () => installUpdate());

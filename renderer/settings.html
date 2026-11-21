@@ -131,6 +131,8 @@
     .rsel-item { text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .rsel-item:hover { background: var(--btn-h); }
     .rsel-item.on { color: var(--accent); font-weight: 600; }
+    .btn.danger { background: none; border: 1px solid var(--line); color: var(--danger, #C25B5B); }
+    .btn.danger:hover { background: rgba(194,91,91,.12); }
   </style>
 </head>
 <body>
@@ -205,6 +207,7 @@
   </section>
 
 
+  <div class="row" style="justify-content:center;margin-top:14px"><button class="btn danger" id="uninstall">Uninstall Crumble</button></div>
   <p class="privacy">Nothing leaves this PC except weather requests (Open-Meteo), album covers when the player doesn't provide one (iTunes Search), League pictures (Riot Data Dragon), OP.GG's open champion data, your To Do tasks if you connect Microsoft To Do, and update checks (GitHub). No accounts, no analytics.</p>
 </main>
 <script src="settings.js"></script>
