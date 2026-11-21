@@ -391,7 +391,7 @@ function overlayPayload() {
 
 // ---------------------------------------------------------------- tray
 // White Matte is EVE, Dark Matte is WALL-E.
-function appName() { return settings && settings.theme === 'white' ? 'EVE' : 'WALL-E'; }
+function appName() { return 'Crumble'; }
 function themeIsDark() { return !settings || settings.theme !== 'white'; }
 // The page background / text for the current theme (for native window chrome).
 function themeChrome() { return themeIsDark() ? { bg: '#111111', fg: '#ECECEC' } : { bg: '#F7F8FA', fg: '#1E2129' }; }
