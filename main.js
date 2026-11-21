@@ -471,13 +471,15 @@ function createTray() {
 
 // Pick up your own icon.png / icon.ico the moment you drop it in the data folder (no restart).
 function customIconDataUrl() {
+  // your own icon from the data folder, or the built-in Crumble icon as a fallback.
   try {
     for (const name of ICON_NAMES) {
       const p = path.join(app.getPath('userData'), name);
-      if (fs.existsSync(p)) { const img = nativeImage.createFromPath(p); if (!img.isEmpty()) return img.toDataURL(); }
+      if (fs.existsSync(p)) { const img = nativeImage.createFromPath(p); if (!img.isEmpty()) return { url: img.toDataURL(), custom: true }; }
     }
   } catch { /* none */ }
-  return '';
+  try { const img = trayImage(); if (!img.isEmpty()) return { url: img.toDataURL(), custom: false }; } catch { /* ignore */ }
+  return { url: '', custom: false };
 }
 // A crisp small icon for window chrome: resize the supplied image to the sizes Windows actually
 // shows (16/24/32/48) with high-quality scaling, instead of letting it downscale a big image live.

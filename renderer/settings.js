@@ -142,15 +142,18 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   api.on('taskbar-state', tbNote);
   // your own icon above the title: click to pick any image (WALL-E saves it as icon.png), x to remove
   const appImg = $('#appIcon'), appPh = $('#appIconPh'), appClear = $('#appIconClear'), appBtn = $('#appIconBtn');
-  const setIcon = url => {
-    const on = !!url && url !== 'error';
-    if (on) appImg.src = url; else appImg.removeAttribute('src');
-    appImg.hidden = !on; appPh.hidden = on; appClear.hidden = !on; appBtn.classList.toggle('set', on);
+  const setIcon = r => {
+    if (typeof r === 'string') r = { url: r && r !== 'error' ? r : '', custom: true };   // older shape
+    const on = !!(r && r.url);
+    if (on) appImg.src = r.url; else appImg.removeAttribute('src');
+    appImg.hidden = !on; appPh.hidden = on;
+    appClear.hidden = !(r && r.custom);   // the × only when you set your own icon
+    appBtn.classList.toggle('set', on);
   };
   api.invoke('app-icon').then(setIcon).catch(() => {});
   api.on('app-icon', setIcon);
   appBtn.onclick = e => { if (e.target === appClear) return; api.invoke('choose-icon').then(setIcon).catch(() => {}); };
-  appClear.onclick = e => { e.stopPropagation(); api.invoke('clear-icon').then(() => setIcon('')).catch(() => {}); };
+  appClear.onclick = e => { e.stopPropagation(); api.invoke('clear-icon').then(() => api.invoke('app-icon')).then(setIcon).catch(() => {}); };
   document.querySelectorAll('#theme button').forEach(b => b.onclick = () => save({ theme: b.dataset.v }));
   $('#login').onchange = e => save({ launchAtLogin: e.target.checked });
   if ($('#uninstall')) $('#uninstall').onclick = () => api.invoke('uninstall').catch(() => {});
