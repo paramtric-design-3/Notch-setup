@@ -447,8 +447,8 @@ function buildTrayMenu() {
     },
     {
       label: 'Theme', submenu: [
-        { label: 'EVE (White Matte)', type: 'radio', checked: settings.theme === 'white', click: () => applySettings({ theme: 'white' }) },
-        { label: 'WALL-E (Dark Matte)', type: 'radio', checked: settings.theme !== 'white', click: () => applySettings({ theme: 'dark' }) },
+        { label: 'Light', type: 'radio', checked: settings.theme === 'white', click: () => applySettings({ theme: 'white' }) },
+        { label: 'Dark', type: 'radio', checked: settings.theme !== 'white', click: () => applySettings({ theme: 'dark' }) },
       ],
     },
     { label: `Weather city: ${settings.city || '—'}…`, click: openSettings },
