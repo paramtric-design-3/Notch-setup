@@ -391,7 +391,7 @@ function overlayPayload() {
 
 // ---------------------------------------------------------------- tray
 // White Matte is EVE, Dark Matte is WALL-E.
-function appName() { return 'Crumble'; }
+function appName() { return 'Notch'; }
 function themeIsDark() { return !settings || settings.theme !== 'white'; }
 // The page background / text for the current theme (for native window chrome).
 function themeChrome() { return themeIsDark() ? { bg: '#111111', fg: '#ECECEC' } : { bg: '#F7F8FA', fg: '#1E2129' }; }
@@ -471,7 +471,7 @@ function createTray() {
 
 // Pick up your own icon.png / icon.ico the moment you drop it in the data folder (no restart).
 function customIconDataUrl() {
-  // your own icon from the data folder, or the built-in Crumble icon as a fallback.
+  // your own icon from the data folder, or the built-in Notch icon as a fallback.
   try {
     for (const name of ICON_NAMES) {
       const p = path.join(app.getPath('userData'), name);
@@ -1164,8 +1164,8 @@ ipcMain.handle('uninstall', async () => {
   } catch { /* ignore */ }
   const r = await dialog.showMessageBox(settingsWin || undefined, {
     type: 'warning', buttons: ['Cancel', 'Uninstall'], defaultId: 0, cancelId: 0,
-    title: 'Uninstall Crumble', message: 'Uninstall Crumble?',
-    detail: unins ? 'This closes Crumble and opens the uninstaller.' : "The uninstaller wasn't found; Windows Apps settings will open so you can remove Crumble there.",
+    title: 'Uninstall Notch', message: 'Uninstall Notch?',
+    detail: unins ? 'This closes Notch and opens the uninstaller.' : "The uninstaller wasn't found; Windows Apps settings will open so you can remove Notch there.",
   });
   if (r.response !== 1) return { ok: false };
   if (unins) { try { spawn(unins, ['--force-run'], { detached: true, stdio: 'ignore' }).unref(); } catch { shell.openExternal('ms-settings:appsfeatures'); } setTimeout(() => { quitting = true; app.quit(); }, 600); }

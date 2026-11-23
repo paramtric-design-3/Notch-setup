@@ -1,6 +1,6 @@
 {
   "name": "fjbc-notch",
-  "version": "1.80.1",
+  "version": "1.80.2",
   "description": "A Dynamic Island for Windows",
   "main": "main.js",
   "scripts": {
@@ -15,7 +15,7 @@
     "electron": "^44.9.0",
     "electron-builder": "^26.15.3"
   },
-  "productName": "Crumble",
+  "productName": "Notch",
   "dependencies": {
     "electron-updater": "^6.8.9",
     "koffi": "^2.16.3"
@@ -26,7 +26,7 @@
   },
   "build": {
     "appId": "com.fjbc.notch",
-    "productName": "Crumble",
+    "productName": "Notch",
     "asar": false,
     "files": [
       "main.js",
@@ -56,7 +56,7 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "artifactName": "Crumble-Setup-${version}.${ext}"
+      "artifactName": "Notch-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -64,8 +64,8 @@
       "runAfterFinish": true,
       "createDesktopShortcut": false,
       "createStartMenuShortcut": true,
-      "shortcutName": "Crumble",
-      "uninstallDisplayName": "Crumble",
+      "shortcutName": "Notch",
+      "uninstallDisplayName": "Notch",
       "deleteAppDataOnUninstall": false
     },
     "publish": [
