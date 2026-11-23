@@ -5,8 +5,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
   <title>Notch settings</title>
   <style>
-    html[data-theme="white"] { --bg:#F6F3F1; --tile:#FFFFFF; --text:#161316; --text-2:#6B625C; --accent:#FF6D29; --brown:#453027; --line:rgba(69,48,39,.10); --btn:rgba(69,48,39,.05); --btn-h:rgba(69,48,39,.09); --on:rgba(255,109,41,.14); --mono:#EFEAE7; --glow:rgba(255,109,41,.10); }
-    html[data-theme="dark"]  { --bg:#161316; --tile:#1E1815; --text:#FFFFFF; --text-2:#BABABA; --accent:#FF6D29; --brown:#453027; --line:rgba(255,175,135,.14); --btn:rgba(150,100,70,.16); --btn-h:rgba(165,112,80,.28); --on:rgba(255,109,41,.20); --mono:#120F0E; --glow:rgba(255,109,41,.20); }
+    html[data-theme="white"] { --bg:#F6F3F1; --tile:#FFFFFF; --text:#161316; --text-2:#6B625C; --accent:#FF6D29; --brown:#453027; --line:rgba(69,48,39,.10); --btn:rgba(69,48,39,.05); --btn-h:rgba(69,48,39,.09); --on:rgba(255,109,41,.14); --mono:#EFEAE7; --glow:rgba(255,109,41,.10);
+      --panel:rgba(255,255,255,.62); --glass:rgba(255,255,255,.5); --glass-line:rgba(69,48,39,.12); --grad-top:#FBF4EF; --grad-mid:#FBE7D9; --grad-bot:#F6D9C6; --grad-glow:rgba(255,109,41,.22); }
+    html[data-theme="dark"]  { --bg:#161316; --tile:#1E1815; --text:#FFFFFF; --text-2:#BABABA; --accent:#FF6D29; --brown:#453027; --line:rgba(255,175,135,.14); --btn:rgba(150,100,70,.16); --btn-h:rgba(165,112,80,.28); --on:rgba(255,109,41,.20); --mono:#120F0E; --glow:rgba(255,109,41,.20);
+      --panel:rgba(26,19,16,.55); --glass:rgba(255,180,135,.10); --glass-line:rgba(255,200,170,.20); --grad-top:#17100B; --grad-mid:#43200F; --grad-bot:#2A150A; --grad-glow:rgba(255,109,41,.62); }
     * { box-sizing: border-box; }
     @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:300;font-display:swap;src:url('../assets/fonts/BDOGrotesk-300.ttf') format('truetype');}
     @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:400;font-display:swap;src:url('../assets/fonts/BDOGrotesk-400.ttf') format('truetype');}
@@ -15,20 +17,25 @@
     @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:700;font-display:swap;src:url('../assets/fonts/BDOGrotesk-700.ttf') format('truetype');}
     @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:800;font-display:swap;src:url('../assets/fonts/BDOGrotesk-800.ttf') format('truetype');}
     @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:900;font-display:swap;src:url('../assets/fonts/BDOGrotesk-900.ttf') format('truetype');}
-    body { margin:0; background:var(--bg); color:var(--text); font:13.5px/1.45 "BDO Grotesk","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+    body { margin:0; min-height:100vh;
+      background:
+        radial-gradient(72% 56% at -4% 46%, var(--grad-glow), rgba(255,109,41,0) 56%),
+        linear-gradient(168deg, var(--grad-top) 0%, var(--grad-mid) 54%, var(--grad-bot) 100%);
+      background-attachment: fixed;
+      color:var(--text); font:13.5px/1.45 "BDO Grotesk","Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
     main { padding: 22px 22px 28px; max-width: 640px; margin: 0 auto; }
     h1 { font: 600 20px "BDO Grotesk","Segoe UI",system-ui; margin: 0 0 2px; letter-spacing: -.2px; }
    .lead { color: var(--text-2); margin: 0 0 18px; font-size: 13px; }
-    section { background: var(--tile); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+    section { background: var(--panel); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid var(--glass-line); border-radius: 20px; padding: 14px 16px; margin-bottom: 12px; }
     h2 { font-size: 12px; font-weight: 600; letter-spacing:.6px; text-transform: uppercase; color: var(--text-2); margin: 0 0 10px; }
    .row { display: flex; align-items: center; gap: 10px; min-height: 36px; }
    .row +.row { border-top: 1px solid var(--line); }
    .row label.grow,.grow { flex: 1; min-width: 0; }
    .sub { color: var(--text-2); font-size: 12px; }
-    input[type=text] { width: 100%; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--btn); color: var(--text); padding: 0 11px; font: inherit; outline: none; }
+    input[type=text] { width: 100%; height: 36px; border-radius: 999px; border: 1px solid var(--glass-line); background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: var(--text); padding: 0 15px; font: inherit; outline: none; }
     input[type=text]:focus { border-color: var(--accent); }
-   .seg { display: inline-flex; background: var(--btn); border: 1px solid var(--line); border-radius: 11px; padding: 3px; gap: 2px; }
-   .seg button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
+   .seg { display: inline-flex; background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid var(--glass-line); border-radius: 999px; padding: 3px; gap: 2px; }
+   .seg button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
    .seg button.on { background: var(--on); color: var(--accent); font-weight: 600; }
    .switch { position: relative; width: 38px; height: 22px; flex: none; }
    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
@@ -39,7 +46,7 @@
    .arrow { border: 0; background: var(--btn); color: var(--text-2); width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 13px; }
    .arrow:hover { background: var(--btn-h); color: var(--text); }
    .arrow:disabled { opacity:.3; cursor: default; }
-   .btn { border: 0; background: var(--btn); color: var(--text); font: inherit; font-weight: 600; font-size: 12.5px; height: 32px; padding: 0 14px; border-radius: 10px; cursor: pointer; }
+   .btn { border: 1px solid var(--glass-line); background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: var(--text); font: inherit; font-weight: 600; font-size: 12.5px; height: 34px; padding: 0 16px; border-radius: 999px; cursor: pointer; }
    .btn:hover { background: var(--btn-h); }
    .btn.primary { background: var(--accent); color: #161316; font-weight: 500; }
    .btn:disabled { opacity:.45; cursor: default; }
@@ -49,7 +56,7 @@
     code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; background: var(--btn); padding: 1px 5px; border-radius: 5px; }
    .saved { color: var(--accent); font-size: 12px; opacity: 0; transition: opacity.2s; }
    .saved.show { opacity: 1; }
-    select { height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--btn); color: var(--text); padding: 0 10px; font: inherit; outline: none; min-width: 0; flex: 1; }
+    select { height: 36px; border-radius: 999px; border: 1px solid var(--glass-line); background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: var(--text); padding: 0 14px; font: inherit; outline: none; min-width: 0; flex: 1; }
     select:focus { border-color: var(--accent); }
     input[type=range] { width: 150px; accent-color: var(--accent); }
     /* foldable sections: click the title */
@@ -117,7 +124,7 @@
     /* WALL-E's rounded dropdowns */
     .rsel { position: relative; flex: 1; min-width: 0; }
     .rsel.tdfield { flex: 0 0 auto; max-width: 220px; }
-    .rsel-btn { width: 100%; height: 34px; display: flex; align-items: center; gap: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--btn); color: var(--text); padding: 0 10px 0 12px; font: inherit; cursor: pointer; text-align: left; }
+    .rsel-btn { width: 100%; height: 36px; display: flex; align-items: center; gap: 8px; border-radius: 999px; border: 1px solid var(--glass-line); background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: var(--text); padding: 0 14px; font: inherit; cursor: pointer; text-align: left; }
     .rsel-btn:hover { background: var(--btn-h); }
     .rsel.open .rsel-btn { border-color: var(--accent); }
     .rsel-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
