@@ -725,7 +725,7 @@ const chIcon = (c, cls = 'lch') => {
   return `<span class="${cls}">${src ? `<img src="${src}" alt="">` : esc(((c && c.name) || '?').slice(0, 2))}</span>`;
 };
 const imgIcon = (k, title) => LICON[k] ? `<img class="lit" src="${LICON[k]}" alt="" title="${esc(title || '')}">` : `<span class="lit none" title="${esc(title || '')}"></span>`;
-const OPGG_TIER = { 1: ['OP', '#F29A4A'], 2: ['Strong', '#d6a84c'], 3: ['Good', '#6b8ff0'], 4: ['Average', '#8a8a8a'], 5: ['Weak', '#6a6a6a'] };
+const OPGG_TIER = { 1: ['OP', '#FF6D29'], 2: ['Strong', '#d6a84c'], 3: ['Good', '#6b8ff0'], 4: ['Average', '#8a8a8a'], 5: ['Weak', '#6a6a6a'] };
 const tierPill = t => { const [n, c] = OPGG_TIER[t] || OPGG_TIER[t === 0 ? 1 : -1] || ['–', '#666']; return `<span class="ltier" style="--tier:${c}">${n}</span>`; };
 const pct = x => Math.round((x || 0) * 1000) / 10 + '%';
 const LANES = [['top', 'Top'], ['jungle', 'Jungle'], ['mid', 'Mid'], ['adc', 'Bot'], ['support', 'Support']];

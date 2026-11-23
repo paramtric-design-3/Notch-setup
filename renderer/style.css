@@ -29,12 +29,12 @@ html[data-theme="white"] {
   --tile: #FBFBFC;
   --text: #1E2129;
   --text-2: #545A69;
-  --accent: #2196B8;
+  --accent: #FF6D29;
   --line: rgba(30, 33, 41, .07);
   --track: rgba(30, 33, 41, .14);
   --btn: rgba(30, 33, 41, .05);
   --btn-hover: rgba(30, 33, 41, .09);
-  --btn-on: rgba(33, 150, 184, .14);
+  --btn-on: rgba(255, 109, 41, .14);
   --shadow: 0 14px 34px rgba(16, 20, 30, .16), 0 2px 6px rgba(16, 20, 30, .08);
   --sun: #E8B84A;
   --cloud: #DDE2EA;
@@ -48,12 +48,12 @@ html[data-theme="dark"] {
   --tile: #151515;
   --text: #ECECEC;
   --text-2: #9A9A9A;
-  --accent: #F29A4A;
+  --accent: #FF6D29;
   --line: #292929;
   --track: rgba(255, 255, 255, .14);
   --btn: rgba(255, 255, 255, .055);
   --btn-hover: rgba(255, 255, 255, .1);
-  --btn-on: rgba(242, 154, 74, .16);
+  --btn-on: rgba(255, 109, 41, .16);
   --shadow: 0 16px 40px rgba(0, 0, 0, .5), 0 2px 6px rgba(0, 0, 0, .35);
   --sun: #D9B25A;
   --cloud: #C8C8C8;
@@ -118,11 +118,11 @@ svg { display: block; width: 100%; height: 100%; }
 #island.s-compact .compact { opacity: 1; transition-delay: .12s; }
 .compact .mini-art { width: 20px; height: 20px; border-radius: 50%; background: #2a2a2a center/cover no-repeat; }
 .compact .mini-art.spin { animation: spin 8s linear infinite; will-change: transform; backface-visibility: hidden; }
-.compact .ico { width: 18px; height: 18px; color: #F29A4A; }
+.compact .ico { width: 18px; height: 18px; color: #FF6D29; }
 .compact .ctext { font-size: 12px; font-variant-numeric: tabular-nums; color: #ECECEC; letter-spacing: .2px; }
 
 .eq { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
-.eq i { width: 3px; border-radius: 2px; background: #F29A4A; height: 40%; animation: eq 1s ease-in-out infinite; }
+.eq i { width: 3px; border-radius: 2px; background: #FF6D29; height: 40%; animation: eq 1s ease-in-out infinite; }
 .eq i:nth-child(2) { animation-delay: -.3s; }
 .eq i:nth-child(3) { animation-delay: -.6s; }
 .eq i:nth-child(4) { animation-delay: -.15s; }
@@ -130,7 +130,7 @@ svg { display: block; width: 100%; height: 100%; }
 @keyframes eq { 0%, 100% { height: 30%; } 50% { height: 100%; } }
 
 .workgrid { display: grid; grid-template-columns: repeat(3, 4px); gap: 2px; }
-.workgrid i { width: 4px; height: 4px; border-radius: 1px; background: #F29A4A; opacity: .25; animation: blink 1.2s steps(1) infinite; }
+.workgrid i { width: 4px; height: 4px; border-radius: 1px; background: #FF6D29; opacity: .25; animation: blink 1.2s steps(1) infinite; }
 .workgrid i:nth-child(1) { animation-delay: 0s; } .workgrid i:nth-child(2) { animation-delay: .1s; }
 .workgrid i:nth-child(3) { animation-delay: .2s; } .workgrid i:nth-child(6) { animation-delay: .3s; }
 .workgrid i:nth-child(9) { animation-delay: .4s; } .workgrid i:nth-child(8) { animation-delay: .5s; }
@@ -370,7 +370,7 @@ html[data-theme="dark"] .pbtn.allow { color: #2A1606; }
 
 /* Claude's three dots: still when idle, a soft wave while Claude works */
 .dots { display: flex; align-items: center; gap: 4px; height: 14px; }
-.dots i { width: 5px; height: 5px; border-radius: 50%; background: #F29A4A; opacity: .9; }
+.dots i { width: 5px; height: 5px; border-radius: 50%; background: #FF6D29; opacity: .9; }
 .dots.go i { animation: dotwave 1.2s ease-in-out infinite; }
 .dots.go i:nth-child(2) { animation-delay: .15s; }
 .dots.go i:nth-child(3) { animation-delay: .3s; }
@@ -723,7 +723,7 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .rdot.on img { filter: none; opacity: 1; }
 .league .rdot.big { width: 34px; height: 34px; background: none; }
 .league .rdot.big.on { box-shadow: none; }
-.league .rdot.big.on img { filter: drop-shadow(0 0 4px rgba(242, 154, 74, .5)); }
+.league .rdot.big.on img { filter: drop-shadow(0 0 4px rgba(255, 109, 41, .5)); }
 .league .rline { display: block; height: 1px; background: var(--line, rgba(255,255,255,.08)); margin: 2px 6px; }
 .league .rrow.shards { gap: 10px; justify-content: center; }
 .league .rshard { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; background: rgba(0,0,0,.35); padding: 0; }
@@ -745,7 +745,7 @@ html[data-theme="dark"] .music.has-art .outbtn { color: rgba(242,244,248,.75); }
 .league .gsit { display: inline-flex; align-items: flex-start; gap: 6px; }
 .league .gsit .glabel { align-self: center; }
 .league .gitem.sit { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
-.league .gitem.sit .lit { box-shadow: 0 0 0 1.5px #2196b8; }
+.league .gitem.sit .lit { box-shadow: 0 0 0 1.5px #FF6D29; }
 .league .gitem.sit small { font-size: 8.5px; color: var(--text-2); white-space: nowrap; }
 .league .gitem.sit i { bottom: 12px; }
 
@@ -904,9 +904,9 @@ html[data-theme="dark"] .music.has-art .volbtn:not(.on) { color: rgba(242,244,24
 .todo .tdplus:hover { background: none; color: var(--accent); transform: scale(1.15); }
 
 /* White theme (EVE): the blue of the icon's eyes as the accent */
-html[data-theme="white"] .compact .ico { color: #2196B8; }
-html[data-theme="white"] .eq i, html[data-theme="white"] .workgrid i, html[data-theme="white"] .dots i { background: #2196B8; }
-html[data-theme="white"] .league .rdot.big.on img { filter: drop-shadow(0 0 4px rgba(33, 150, 184, .5)); }
+html[data-theme="white"] .compact .ico { color: #FF6D29; }
+html[data-theme="white"] .eq i, html[data-theme="white"] .workgrid i, html[data-theme="white"] .dots i { background: #FF6D29; }
+html[data-theme="white"] .league .rdot.big.on img { filter: drop-shadow(0 0 4px rgba(255, 109, 41, .5)); }
 html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data-theme="white"] .todo .tdplus:hover { color: #fff; }
 /* whose turn: same blue as your team (not a different cyan) */
 .league .uteam.blue .uplayer.turn { border-left-color: #4a7bd0; background: linear-gradient(90deg, rgba(74, 123, 208, .24), transparent 70%); }
@@ -998,7 +998,7 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .todo .tdnewrow { background: var(--btn); }
 /* build style for this enemy comp */
 .gplan { display: inline-flex; align-items: center; gap: 4px; }
-.gplan .pstyle { font-size: 11px; font-weight: 600; color: var(--accent); padding: 2px 7px; border-radius: 6px; background: var(--btn-on, rgba(242,154,74,.16)); white-space: nowrap; margin-right: 2px; }
+.gplan .pstyle { font-size: 11px; font-weight: 600; color: var(--accent); padding: 2px 7px; border-radius: 6px; background: var(--btn-on, rgba(255,109,41,.16)); white-space: nowrap; margin-right: 2px; }
 .csplan { display: flex; flex-direction: column; gap: 3px; margin: 6px 0 4px; }
 .csplan .pwhy { font-size: 11px; }
 /* To Do: the list name switches lists */
