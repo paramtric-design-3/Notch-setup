@@ -60,7 +60,7 @@
     section.nofold > h2::after { display: none; }
     section.folded > h2::after { transform: rotate(-45deg); margin-top: 0; }
     section.folded > :not(h2) { display: none !important; }
-    .privacy { font-size: 10.5px; line-height: 1.5; color: var(--text-2); opacity: .75; text-align: center; max-width: 440px; margin: 18px auto 0; }
+    .privacy { font-size: 12px; line-height: 1.5; color: var(--text-2); opacity: .75; text-align: center; max-width: 440px; margin: 18px auto 0; }
     .tilerow { cursor: default; }
     .tilerow .grip { cursor: grab; width: 14px; display: inline-flex; justify-content: center; user-select: none; }
     .tilerow .grip svg { fill: var(--text-2); opacity: .55; transition: opacity .12s, fill .12s; }
@@ -136,7 +136,7 @@
 <body>
 <main>
   <header class="tophead">
-    <button class="appicon" id="appIconBtn" type="button" title="Choose an icon"><img id="appIcon" alt="" hidden><span class="ph" id="appIconPh">+</span><span class="xclear" id="appIconClear" title="Remove" hidden>×</span></button>
+    <button class="appicon set" id="appIconBtn" type="button" title="Choose an icon"><img id="appIcon" alt="App icon" src="../assets/icon.png"><span class="ph" id="appIconPh" hidden>+</span><span class="xclear" id="appIconClear" title="Remove" hidden>×</span></button>
     <div class="grow"><h1 class="appname">WALL-E</h1><div class="ver" id="upText">Version …</div><button class="verbtn" id="upBtn">Check now</button></div>
   </header>
 
