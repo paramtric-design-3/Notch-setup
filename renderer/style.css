@@ -53,11 +53,11 @@ html[data-theme="dark"] {
   --text-2: #BABABA;
   --accent: #FF6D29;
   --brown: #453027;
-  --line: rgba(255, 170, 130, .12);
+  --line: rgba(255, 175, 135, .14);
   --track: rgba(255, 255, 255, .14);
-  --btn: rgba(255, 150, 110, .07);
-  --btn-hover: rgba(255, 150, 110, .14);
-  --btn-on: rgba(255, 109, 41, .18);
+  --btn: rgba(150, 100, 70, .16);
+  --btn-hover: rgba(165, 112, 80, .28);
+  --btn-on: rgba(255, 109, 41, .20);
   --shadow: 0 16px 40px rgba(0, 0, 0, .55), 0 2px 6px rgba(0, 0, 0, .4);
   --glow: rgba(255, 109, 41, .22);
   --sun: #D9B25A;

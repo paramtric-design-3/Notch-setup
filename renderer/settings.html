@@ -6,7 +6,7 @@
   <title>Notch settings</title>
   <style>
     html[data-theme="white"] { --bg:#F6F3F1; --tile:#FFFFFF; --text:#161316; --text-2:#6B625C; --accent:#FF6D29; --brown:#453027; --line:rgba(69,48,39,.10); --btn:rgba(69,48,39,.05); --btn-h:rgba(69,48,39,.09); --on:rgba(255,109,41,.14); --mono:#EFEAE7; --glow:rgba(255,109,41,.10); }
-    html[data-theme="dark"]  { --bg:#161316; --tile:#1E1815; --text:#FFFFFF; --text-2:#BABABA; --accent:#FF6D29; --brown:#453027; --line:rgba(255,170,130,.12); --btn:rgba(255,150,110,.07); --btn-h:rgba(255,150,110,.14); --on:rgba(255,109,41,.18); --mono:#120F0E; --glow:rgba(255,109,41,.20); }
+    html[data-theme="dark"]  { --bg:#161316; --tile:#1E1815; --text:#FFFFFF; --text-2:#BABABA; --accent:#FF6D29; --brown:#453027; --line:rgba(255,175,135,.14); --btn:rgba(150,100,70,.16); --btn-h:rgba(165,112,80,.28); --on:rgba(255,109,41,.20); --mono:#120F0E; --glow:rgba(255,109,41,.20); }
     * { box-sizing: border-box; }
     @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:300;font-display:swap;src:url('../assets/fonts/BDOGrotesk-300.ttf') format('truetype');}
     @font-face{font-family:'BDO Grotesk';font-style:normal;font-weight:400;font-display:swap;src:url('../assets/fonts/BDOGrotesk-400.ttf') format('truetype');}
@@ -25,9 +25,9 @@
    .row +.row { border-top: 1px solid var(--line); }
    .row label.grow,.grow { flex: 1; min-width: 0; }
    .sub { color: var(--text-2); font-size: 12px; }
-    input[type=text] { width: 100%; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 11px; font: inherit; outline: none; }
+    input[type=text] { width: 100%; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--btn); color: var(--text); padding: 0 11px; font: inherit; outline: none; }
     input[type=text]:focus { border-color: var(--accent); }
-   .seg { display: inline-flex; background: var(--btn); border-radius: 10px; padding: 3px; gap: 2px; }
+   .seg { display: inline-flex; background: var(--btn); border: 1px solid var(--line); border-radius: 11px; padding: 3px; gap: 2px; }
    .seg button { border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
    .seg button.on { background: var(--on); color: var(--accent); font-weight: 600; }
    .switch { position: relative; width: 38px; height: 22px; flex: none; }
@@ -49,7 +49,7 @@
     code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; background: var(--btn); padding: 1px 5px; border-radius: 5px; }
    .saved { color: var(--accent); font-size: 12px; opacity: 0; transition: opacity.2s; }
    .saved.show { opacity: 1; }
-    select { height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 10px; font: inherit; outline: none; min-width: 0; flex: 1; }
+    select { height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--btn); color: var(--text); padding: 0 10px; font: inherit; outline: none; min-width: 0; flex: 1; }
     select:focus { border-color: var(--accent); }
     input[type=range] { width: 150px; accent-color: var(--accent); }
     /* foldable sections: click the title */
@@ -117,7 +117,7 @@
     /* WALL-E's rounded dropdowns */
     .rsel { position: relative; flex: 1; min-width: 0; }
     .rsel.tdfield { flex: 0 0 auto; max-width: 220px; }
-    .rsel-btn { width: 100%; height: 34px; display: flex; align-items: center; gap: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 10px 0 12px; font: inherit; cursor: pointer; text-align: left; }
+    .rsel-btn { width: 100%; height: 34px; display: flex; align-items: center; gap: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--btn); color: var(--text); padding: 0 10px 0 12px; font: inherit; cursor: pointer; text-align: left; }
     .rsel-btn:hover { background: var(--btn-h); }
     .rsel.open .rsel-btn { border-color: var(--accent); }
     .rsel-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
