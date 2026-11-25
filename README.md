@@ -1,16 +1,16 @@
-# WALL-E
+# BJ
 
-A Dynamic Island for Windows. WALL-E is a black pill at the top-center of your screen that grows when something happens and opens into tiles when you hover it.
+A Dynamic Island for Windows. BJ is a black pill at the top-center of your screen that grows when something happens and opens into tiles when you hover it.
 
 ## Install it
 
-1. Download **WALL-E-Setup-x.y.z.exe** from the [latest release](https://github.com/paramtric-design-3/Notch-setup/releases/latest).
+1. Download **BJ-Setup-x.y.z.exe** from the [latest release](https://github.com/paramtric-design-3/Notch-setup/releases/latest).
 2. Run it. It installs for your user only (no admin rights needed) and starts the app.
 3. The first time, Windows SmartScreen may say "Windows protected your PC" because the installer isn't signed by a publisher. Click **More info**, then **Run anyway**. Updates after that install without this warning.
 
-WALL-E appears at the top-center of your main screen (you can change which screen), and an icon appears in the system tray (you may need to open the tray's ^ arrow to see it). WALL-E is also in the Start menu.
+BJ appears at the top-center of your main screen (you can change which screen), and an icon appears in the system tray (you may need to open the tray's ^ arrow to see it). BJ is also in the Start menu.
 
-- **Hover** WALL-E: it opens after a quarter second and closes when you move away.
+- **Hover** BJ: it opens after a quarter second and closes when you move away.
 - **Click** it: it stays open. Click again to let it close.
 - **Right-click** it, or click the tray icon: settings.
 - **Tray menu**: show or hide tiles, which screen, theme, weather city, launch at login, quit.
@@ -20,8 +20,8 @@ WALL-E appears at the top-center of your main screen (you can change which scree
 Tray icon → **Screen**, or Settings → **Screen**:
 
 - **Main screen** (default): the screen Windows marks as your main display.
-- **A specific screen**: pick it by name. If Windows renumbers your screens, WALL-E finds the same screen again by its name and resolution. If that screen is unplugged, WALL-E moves to the main screen until it's back.
-- **Screen with the mouse**: WALL-E moves to whichever screen your pointer is on (only while it's closed, so it never jumps away while you use it).
+- **A specific screen**: pick it by name. If Windows renumbers your screens, BJ finds the same screen again by its name and resolution. If that screen is unplugged, BJ moves to the main screen until it's back.
+- **Screen with the mouse**: BJ moves to whichever screen your pointer is on (only while it's closed, so it never jumps away while you use it).
 - **Identify screens** shows a big number on each screen for a moment so you know which is which.
 
 ## What's inside
@@ -29,13 +29,13 @@ Tray icon → **Screen**, or Settings → **Screen**:
 | Tile | Where the data comes from |
 |---|---|
 | Music | Windows media controls, so it works with Spotify, browsers and most players. If the player shares no cover, it's looked up by artist and title on iTunes Search (free, no key). Both are cached on your PC. |
-| League of Legends | Appears while the League client is open. Outside a game: your Solo and Flex rank, LP and win rate. In game: **your build** from OP.GG for your champion and role (ARAM builds in ARAM): starting items, boots, core and later items with the ones you own ticked and the next one to buy highlighted, situational items against the enemy team (anti-heal vs healers, magic resist or armor vs their main damage, penetration vs tanks, safety vs assassins), the skill order with your next level-up highlighted, and your keystone. When a game loads: both teams with each player's champion, rank, season win rate and their last 10 games, like Porofessor's loading screen. Uses only the League client on this PC (no Riot account key) plus champion pictures from Riot's Data Dragon. Ranks are looked up once the game is loading, not in champ select, because Riot doesn't allow revealing the hidden names there. **Champ select helper** (laid out like u.gg: both teams on the left with each champion's role win rate, enemy predicted roles and the champions that counter them, and Ban / Pick / Loadout tabs on the right that switch by themselves as the draft moves on): appears when you hover WALL-E during champ select (not in ARAM or Arena, where it stays out of the way and the tile just shows the mode) with your role and the timer, your stats on the champion you hover or lock, Riot's recommended runes with one-click Import runes (a page named "WALL-E: <champion>"), both teams' picks and the bans. From OP.GG's open data (free, no key): the champion's tier and win/pick/ban rate, summoner spells, starting items, boots and core items, skill order, the champions that counter you and the ones you beat (enemy picks are tagged), and OP.GG's most played rune page, which Import runes then uses. Every enemy pick gets an estimated role (from how often OP.GG sees that champion in each lane; a ? means it's a guess), and so do teammates in blind pick. Your likely lane opponent is highlighted. Once it's clear who that is, **Counter picks vs <champion>** lists the picks that do best against them head to head (OP.GG lane matchups), with your own record on each, and **Suggested picks** for your role mix champions that beat that opponent, your own good champions in this role and the strongest picks of the patch. Outside champ select, click the tile for your most played champions and a tier list per lane (Top, Jungle, Mid, Bot, Support). While the League panel is open it's the only tile in WALL-E. |
-| Build for this comp | In champ select (Loadout) and in game (build bar and overlay), WALL-E picks the build style that fits the enemy team best and shows its items: for mages full AP burst vs squishies, burn vs tanks and bruisers, battle mage vs divers; for marksmen crit, on-hit vs tanks or safety vs assassins; for fighters damage, anti-tank or tanky; for tanks armor, magic resist or mixed; for assassins lethality or bruiser; for enchanters shields and heals or anti-heal. Each style is scored on the enemy comp (tanks, squishies, divers, healers, magic vs physical damage), with OP.GG's usual build as a head start. Hover it to see why and the other options. Items come from Riot's current item list, so they follow the patches. |
+| League of Legends | Appears while the League client is open. Outside a game: your Solo and Flex rank, LP and win rate. In game: **your build** from OP.GG for your champion and role (ARAM builds in ARAM): starting items, boots, core and later items with the ones you own ticked and the next one to buy highlighted, situational items against the enemy team (anti-heal vs healers, magic resist or armor vs their main damage, penetration vs tanks, safety vs assassins), the skill order with your next level-up highlighted, and your keystone. When a game loads: both teams with each player's champion, rank, season win rate and their last 10 games, like Porofessor's loading screen. Uses only the League client on this PC (no Riot account key) plus champion pictures from Riot's Data Dragon. Ranks are looked up once the game is loading, not in champ select, because Riot doesn't allow revealing the hidden names there. **Champ select helper** (laid out like u.gg: both teams on the left with each champion's role win rate, enemy predicted roles and the champions that counter them, and Ban / Pick / Loadout tabs on the right that switch by themselves as the draft moves on): appears when you hover BJ during champ select (not in ARAM or Arena, where it stays out of the way and the tile just shows the mode) with your role and the timer, your stats on the champion you hover or lock, Riot's recommended runes with one-click Import runes (a page named "BJ: <champion>"), both teams' picks and the bans. From OP.GG's open data (free, no key): the champion's tier and win/pick/ban rate, summoner spells, starting items, boots and core items, skill order, the champions that counter you and the ones you beat (enemy picks are tagged), and OP.GG's most played rune page, which Import runes then uses. Every enemy pick gets an estimated role (from how often OP.GG sees that champion in each lane; a ? means it's a guess), and so do teammates in blind pick. Your likely lane opponent is highlighted. Once it's clear who that is, **Counter picks vs <champion>** lists the picks that do best against them head to head (OP.GG lane matchups), with your own record on each, and **Suggested picks** for your role mix champions that beat that opponent, your own good champions in this role and the strongest picks of the patch. Outside champ select, click the tile for your most played champions and a tier list per lane (Top, Jungle, Mid, Bot, Support). While the League panel is open it's the only tile in BJ. |
+| Build for this comp | In champ select (Loadout) and in game (build bar and overlay), BJ picks the build style that fits the enemy team best and shows its items: for mages full AP burst vs squishies, burn vs tanks and bruisers, battle mage vs divers; for marksmen crit, on-hit vs tanks or safety vs assassins; for fighters damage, anti-tank or tanky; for tanks armor, magic resist or mixed; for assassins lethality or bruiser; for enchanters shields and heals or anti-heal. Each style is scored on the enemy comp (tanks, squishies, divers, healers, magic vs physical damage), with OP.GG's usual build as a head start. Hover it to see why and the other options. Items come from Riot's current item list, so they follow the patches. |
 | In-game item overlay | While you play, a small see-through box above the minimap shows the next item to buy (with its name), the rest of your OP.GG build with owned items ticked, and your next skill. Clicks go through it. It needs the game in Borderless or Windowed mode. Turn it off or move it (above the minimap, top right, left) in Settings → League of Legends. |
-| Shelf | Drag files or folders onto WALL-E: it opens and holds them (only the paths, nothing is copied; the list survives restarts). Like Dropshelf, they sit in one stack with Windows' own thumbnails (folder previews, photos), newest on top, with the name (or how many) underneath. Drag the stack out to take everything; Windows shows the thumbnail with Move or Copy, like in Explorer (hold Shift to move, Ctrl to copy). Once dropped they leave the shelf; cancel the drag and they stay. Click the name to see them one by one and drag a single one out, × removes one, Clear empties the shelf; double-click shows it in its folder. |
+| Shelf | Drag files or folders onto BJ: it opens and holds them (only the paths, nothing is copied; the list survives restarts). Like Dropshelf, they sit in one stack with Windows' own thumbnails (folder previews, photos), newest on top, with the name (or how many) underneath. Drag the stack out to take everything; Windows shows the thumbnail with Move or Copy, like in Explorer (hold Shift to move, Ctrl to copy). Once dropped they leave the shelf; cancel the drag and they stay. Click the name to see them one by one and drag a single one out, × removes one, Clear empties the shelf; double-click shows it in its folder. |
 | To Do | Your Microsoft To Do list, synced both ways: tick a task to complete it, star it to mark it important, type in "+ Add a task" to add one. Changes from your phone or To Do itself show up within a minute. Connect it in Settings → Microsoft To Do (a one-time free app registration in Azure, then a sign-in on Microsoft's own page; the sign-in is kept encrypted on this PC). |
 | Sound output | The speaker button on the music tile (top right) moves just the music app (e.g. Spotify) to another playback device; the rest of the PC keeps its own output. **Same as PC** puts it back. This is the same per-app setting as Windows' Volume mixer, so Windows remembers it; a browser moves as a whole, and the music has to be playing when you pick a device. To change the whole PC's output, use the tray menu's **Sound output**. |
-| See-through taskbar | Settings → Look → Taskbar: **Clear**, **Blur** or **Acrylic** (tinted to WALL-E's theme), the same on the desktop and with windows open. The work is done by [TranslucentTB](https://apps.microsoft.com/detail/9PF4KZ2VN4W9) (free, Microsoft Store), which WALL-E installs by itself (with winget, for your user only) the first time you pick a look, then runs in the background: it writes TranslucentTB's settings file, hides its tray icon and starts it when needed; **Normal** puts the taskbar back and closes it. |
+| See-through taskbar | Settings → Look → Taskbar: **Clear**, **Blur** or **Acrylic** (tinted to BJ's theme), the same on the desktop and with windows open. The work is done by [TranslucentTB](https://apps.microsoft.com/detail/9PF4KZ2VN4W9) (free, Microsoft Store), which BJ installs by itself (with winget, for your user only) the first time you pick a look, then runs in the background: it writes TranslucentTB's settings file, hides its tray icon and starts it when needed; **Normal** puts the taskbar back and closes it. |
 | Weather | Open-Meteo (free, no key) for the city you type in Settings. |
 | Messages | The notifications Windows is still holding (WhatsApp, Telegram, Teams…). Read-only and local. |
 | Quick controls | Wi-Fi, Bluetooth, dark mode, volume (click mutes, scroll changes), brightness (laptop screens only; click cycles, scroll changes), Start menu. |
@@ -55,27 +55,27 @@ Each tile can be shown or hidden, set to 1, 2 or 3 cells wide and reordered in S
 - **App grid**: opens the Start menu.
 - **Messages**: Windows has no inbox to read from, so the tile shows the notifications Windows is holding from messaging apps.
 - **Do Not Disturb**: Windows has no public API for it, so there is no peek for it.
-- **Full screen**: WALL-E stays on top of normal and borderless full-screen windows, including browser videos. Games running in exclusive full-screen mode draw over it.
+- **Full screen**: BJ stays on top of normal and borderless full-screen windows, including browser videos. Games running in exclusive full-screen mode draw over it.
 
 ## Privacy
 
-Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), cover lookups (iTunes Search) when a player shares no cover, champion, item and rune pictures (Riot Data Dragon), OP.GG's open champion data and update checks (GitHub). There are no accounts and no analytics. Settings, the lyrics and cover caches, and a small troubleshooting log (`helper.log`) live in `%APPDATA%\WALL-E`.
+Nothing leaves your PC except weather requests (Open-Meteo), lyrics lookups (LRCLIB), cover lookups (iTunes Search) when a player shares no cover, champion, item and rune pictures (Riot Data Dragon), OP.GG's open champion data and update checks (GitHub). There are no accounts and no analytics. Settings, the lyrics and cover caches, and a small troubleshooting log (`helper.log`) live in `%APPDATA%\BJ`.
 
 ## Updates
 
-WALL-E updates itself from this repo's [releases](https://github.com/paramtric-design-3/Notch-setup/releases):
+BJ updates itself from this repo's [releases](https://github.com/paramtric-design-3/Notch-setup/releases):
 
 - It checks when it starts, every 5 minutes, and whenever your PC wakes from sleep or is unlocked.
 - A new version downloads quietly in the background.
-- Once it's downloaded, it installs by itself straight away while WALL-E is closed. WALL-E shows "Updating to x.y.z" and is back a few seconds later.
+- Once it's downloaded, it installs by itself straight away while BJ is closed. BJ shows "Updating to x.y.z" and is back a few seconds later.
 - To install straight away instead: tray icon → **Restart to update**.
 - Tray icon → **Check for updates**, or Settings → **Updates**, checks right away.
 
 ## Remove it
 
 1. Turn off **Launch at login** in Settings if you turned it on.
-2. Windows Settings → Apps → Installed apps → **WALL-E** → Uninstall.
-3. Optionally delete `%APPDATA%\WALL-E` (settings and lyrics cache).
+2. Windows Settings → Apps → Installed apps → **BJ** → Uninstall.
+3. Optionally delete `%APPDATA%\BJ` (settings and lyrics cache).
 
 ## Build from source
 

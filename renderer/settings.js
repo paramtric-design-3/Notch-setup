@@ -35,7 +35,7 @@ function renderDisplays() {
 
 function render() {
   document.documentElement.dataset.theme = S.theme === 'white' ? 'white' : 'dark';
-  const name = 'Notch';
+  const name = 'BJ';
   document.querySelectorAll('.appname').forEach(e => { e.textContent = name; });
   document.title = name + ' settings';
   document.querySelectorAll('#taskbar button').forEach(b => b.classList.toggle('on', b.dataset.v === (S.taskbar || 'off')));

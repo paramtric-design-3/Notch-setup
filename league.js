@@ -666,10 +666,10 @@ class League {
     const spellsDone = await this.importSpells(spells);
     const me = this.cs && this.cs.me;
     if (!r || !me || r.perkIds.length < 6) return { ok: false, error: 'No recommended runes yet' };
-    const body = { name: `WALL-E: ${me.name}`, primaryStyleId: r.primary, subStyleId: r.secondary, selectedPerkIds: r.perkIds, current: true };
+    const body = { name: `BJ: ${me.name}`, primaryStyleId: r.primary, subStyleId: r.secondary, selectedPerkIds: r.perkIds, current: true };
     try {
       const pages = (await this.lcuGet('/lol-perks/v1/pages')) || [];
-      const ours = pages.find(p => /^(Notch|WALL-E):/.test(p.name || '') && p.isEditable);
+      const ours = pages.find(p => /^(BJ|Notch|WALL-E):/.test(p.name || '') && p.isEditable);
       if (ours) await this.lcuSend('DELETE', `/lol-perks/v1/pages/${ours.id}`);
       try { await this.lcuSend('POST', '/lol-perks/v1/pages', body); } catch (e) {
         if (!/max pages|400/i.test(e.message)) throw e;
