@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { League } = require('./league');
 const { Todo } = require('./todo');
+const { Nearby, fmtSize } = require('./localsend');
 
 // The window is sized to the island itself (the renderer reports its size), so it
 // catches clicks normally and never covers the apps around it.
@@ -43,6 +44,9 @@ const DEFAULT_SETTINGS = {
   peeks: { apps: false, power: true },
   taskbar: 'off',               // see-through taskbar: 'off' | 'clear' | 'blur' | 'acrylic'
   overlay: { show: true, place: 'minimap', onTab: true },   // in-game item overlay: 'minimap' | 'top' | 'left'; onTab: only while Tab is held
+  // Nearby sharing (LocalSend): the name phones see, receiving on/off, also on public networks,
+  // an optional PIN senders must type, and where received files go ('' = Downloads)
+  nearby: { alias: 'Notch PC', receive: true, publicOk: false, pin: '', folder: '' },
   schema: 2,
   tiles: [
     { id: 'music', show: true, size: 3 },
@@ -52,6 +56,7 @@ const DEFAULT_SETTINGS = {
     { id: 'timer', show: false, size: 2 },
     { id: 'league', show: true, size: 3 },
     { id: 'shelf', show: true, size: 2 },
+    { id: 'nearby', show: true, size: 2 },
     { id: 'todo', show: true, size: 3 },
   ],
 };
@@ -63,7 +68,7 @@ function loadSettings() {
   settingsPath = path.join(app.getPath('userData'), 'settings.json');
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) } };
+    settings = { ...settings, ...saved, peeks: { ...settings.peeks, ...(saved.peeks || {}) }, overlay: { ...settings.overlay, ...(saved.overlay || {}) }, todo: { ...settings.todo, ...(saved.todo || {}) }, nearby: { ...settings.nearby, ...(saved.nearby || {}) } };
     if (settings.theme !== 'white' && settings.theme !== 'dark') settings.theme = 'dark';   // only EVE / WALL-E
     // keep any tile added in a newer version
     const ids = new Set(settings.tiles.map(t => t.id));
@@ -105,6 +110,7 @@ function applySettings(next, { fromSettingsWindow = false } = {}) {
   if (settings.calendarUrl !== prevCal) refreshCalendar(true);
   if (todo && settings.todo && settings.todo.listId !== prevList) todo.listChanged();
   refreshMessages();
+  if (nearby) nearby.apply();
   buildTrayMenu();
   updateOverlay();
   sendTaskbar();
@@ -411,7 +417,7 @@ function trayImage() {
 
 const TILE_NAMES = {
   league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages',
-  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do',
+  controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', nearby: 'Nearby',
 };
 
 function buildTrayMenu() {
@@ -1040,7 +1046,7 @@ ipcMain.on('open-url', (_e, url) => { if (/^https?:\/\//.test(url)) shell.openEx
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (_e, next) => { applySettings(next, { fromSettingsWindow: true }); return settings; });
 ipcMain.handle('copy-text', (_e, t) => { clipboard.writeText(String(t)); return true; });
-ipcMain.handle('initial-state', () => ({ settings, state: { ...state, shelf } }));
+ipcMain.handle('initial-state', () => ({ settings, state: { ...state, shelf, nearby: nearby ? nearby.state() : null } }));
 
 // ---------------------------------------------------------------- shelf
 // Drop files or folders on WALL-E to hold them for a while, then drag them out to another folder
@@ -1064,7 +1070,7 @@ async function loadShelf() {
   } catch { shelf = []; }
   sendShelf();
 }
-ipcMain.handle('shelf-add', async (_e, paths) => {
+async function addToShelf(paths) {
   for (const p of (Array.isArray(paths) ? paths : []).slice(0, 50)) {
     if (typeof p !== 'string' || !p || shelf.some(x => x.path === p)) continue;
     let st; try { st = fs.statSync(p); } catch { continue; }
@@ -1073,7 +1079,8 @@ ipcMain.handle('shelf-add', async (_e, paths) => {
   }
   saveShelf(); sendShelf();
   return shelf;
-});
+}
+ipcMain.handle('shelf-add', (_e, paths) => addToShelf(paths));
 ipcMain.handle('shelf-remove', (_e, id) => { shelf = shelf.filter(x => x.id !== id); saveShelf(); sendShelf(); return shelf; });
 ipcMain.handle('shelf-clear', () => { shelf = []; saveShelf(); sendShelf(); return shelf; });
 // Only things on the shelf, or inside a folder on the shelf, can be listed or dragged out.
@@ -1200,6 +1207,79 @@ ipcMain.on('island-focus', (_e, on) => {
   else { island.blur(); island.setFocusable(false); }
 });
 
+// ---------------------------------------------------------------- nearby sharing (LocalSend)
+// Phones and PCs with LocalSend on the same network. Receiving always asks first; received files
+// land in Downloads (or your folder) and on the shelf. See localsend.js.
+let nearby = null;
+function startNearby() {
+  nearby = new Nearby({
+    dir: app.getPath('userData'),
+    downloads: app.getPath('downloads'),
+    config: () => settings.nearby,
+    log: helperLog,
+    send: (s, kind) => {
+      state.nearby = s;
+      broadcast('nearby', s);
+      if (kind === 'request' && s.request) {
+        const r = s.request;
+        const what = r.text != null ? 'a message' : r.count === 1 ? r.names[0] : `${r.count} files · ${fmtSize(r.total)}`;
+        toIsland('peek', { kind: 'nearby', title: `${r.from} wants to send ${what}`, sub: 'Hover the notch to accept or decline', ms: 6000 });
+      }
+      if (kind === 'notice' && s.notice) toIsland('peek', { kind: 'nearby', title: s.notice.text, sub: '', tone: s.notice.tone, ms: 4000 });
+    },
+    received: async r => {
+      if (r.text != null) {
+        clipboard.writeText(r.text);
+        toIsland('peek', { kind: 'nearby', title: `Message from ${r.from} copied`, sub: r.text.replace(/\s+/g, ' ').slice(0, 80), ms: 5000 });
+        return;
+      }
+      await addToShelf(r.paths);
+      const n = r.count, where = settings.nearby.folder ? path.basename(settings.nearby.folder) : 'Downloads';
+      toIsland('peek', {
+        kind: 'nearby', tone: r.failed ? 'warn' : '',
+        title: r.failed ? `Received ${n} of ${n + r.failed} files from ${r.from}` : `Received ${n === 1 ? path.basename(r.paths[0]) : n + ' files'} from ${r.from}`,
+        sub: `On the shelf · saved in ${where}`, ms: 5000,
+      });
+    },
+  });
+  nearby.start().catch(e => helperLog('nearby: ' + e.message));
+  checkNetwork();
+  setInterval(checkNetwork, 2 * 60 * 1000);
+  powerMonitor.on('resume', () => setTimeout(checkNetwork, 5000));
+}
+// Whether Windows sees this network as private (home, work) or public (café, school, station).
+// One private connection is enough: virtual adapters (WSL, Hyper-V) are often marked public.
+function checkNetwork() {
+  if (process.platform !== 'win32' || !nearby) { if (nearby) nearby.setNetwork('private'); return; }
+  let out = '';
+  try {
+    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '(Get-NetConnectionProfile).NetworkCategory -join ","'], { windowsHide: true });
+    ps.stdout.on('data', d => { out += d; });
+    ps.on('error', () => {});
+    ps.on('close', () => {
+      const cats = out.trim().toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+      nearby.setNetwork(cats.some(c => c === 'private' || c.startsWith('domain')) ? 'private' : cats.includes('public') ? 'public' : 'unknown');
+    });
+  } catch { /* keep the last answer */ }
+}
+ipcMain.handle('nearby-state', () => nearby ? nearby.state() : null);
+ipcMain.on('nearby-decide', (_e, ok) => nearby && nearby.decide(!!ok));
+ipcMain.on('nearby-cancel', () => nearby && nearby.cancelSend());
+ipcMain.on('nearby-search', (_e, force) => nearby && nearby.search(!!force).catch(() => {}));
+ipcMain.on('nearby-pin', (_e, pin) => { if (nearby && typeof pin === 'string') Promise.resolve(nearby.sendPin(pin)).catch(() => {}); });
+// Send to a device: the shelf, or files dropped right on the device in the notch.
+ipcMain.handle('nearby-send', async (_e, req) => {
+  if (!nearby || !req || typeof req.id !== 'string') return { ok: false };
+  const paths = req.shelf ? shelf.map(x => x.path) : (Array.isArray(req.paths) ? req.paths : []).filter(p => typeof p === 'string' && path.isAbsolute(p));
+  return nearby.send(req.id, paths.filter(p => fs.existsSync(p)));
+});
+ipcMain.handle('nearby-folder', async () => {
+  const r = await dialog.showOpenDialog(settingsWin || undefined, { title: 'Save received files in', properties: ['openDirectory', 'createDirectory'], defaultPath: settings.nearby.folder || app.getPath('downloads') });
+  if (!r.canceled && r.filePaths && r.filePaths[0]) applySettings({ nearby: { ...settings.nearby, folder: r.filePaths[0] } });
+  return settings;
+});
+ipcMain.on('nearby-netsettings', () => shell.openExternal('ms-settings:network-status'));
+
 // ---------------------------------------------------------------- lifecycle
 let quitting = false;
 
@@ -1244,6 +1324,7 @@ app.whenReady().then(() => {
   });
   state.todo = todo.state;
   if (todo.token) { todo.sync(); todo.start(); }
+  startNearby();
   if (process.env.NOTCH_LCU) { const [port, token] = process.env.NOTCH_LCU.split(':'); league.setClient({ port: +port, token }); }
   island.webContents.once('did-finish-load', () => {
     toIsland('settings', settings);
@@ -1259,5 +1340,6 @@ app.on('window-all-closed', e => e.preventDefault());
 app.on('before-quit', e => {
   // give the taskbar its normal look back before the helper goes
   quitting = true;
+  if (nearby) { try { nearby.stop(); } catch {} }
   if (helper) { try { helper.kill(); } catch {} }
 });

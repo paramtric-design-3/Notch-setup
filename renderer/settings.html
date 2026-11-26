@@ -201,6 +201,17 @@
     </details>
   </section>
 
+  <section data-tile="nearby">
+    <h2>Nearby sharing</h2>
+    <div class="row"><span class="grow" id="nbStatus">Starting…</span><button class="btn" id="nbNet" hidden>Network settings</button></div>
+    <div class="row"><span class="grow">Name others see <span class="saved" id="nbAliasSaved">Saved</span></span><input type="text" id="nbAlias" class="tdfield" maxlength="40" placeholder="Notch PC" spellcheck="false"></div>
+    <div class="row"><span class="grow">Receive files</span><label class="switch"><input type="checkbox" id="nbReceive"><span></span></label></div>
+    <div class="row"><span class="grow">Also on public networks</span><label class="switch"><input type="checkbox" id="nbPublic"><span></span></label></div>
+    <div class="row"><span class="grow">PIN for senders <span class="saved" id="nbPinSaved">Saved</span></span><input type="text" id="nbPin" class="tdfield" maxlength="32" placeholder="Optional" spellcheck="false" autocomplete="off"></div>
+    <div class="row"><span class="grow" id="nbFolder">Save in Downloads</span><button class="btn" id="nbFolderBtn">Choose…</button><button class="btn" id="nbFolderReset" hidden>Downloads</button></div>
+    <p class="note">Works with the LocalSend app on phones and other computers on the same network. Every transfer asks first. Received files go to the shelf, and Windows treats them like downloads from the internet. Windows asks once whether <span class="appname">WALL-E</span> may receive on private networks: allow that, or sending still works but receiving doesn't.</p>
+  </section>
+
   <section data-tile="league">
     <h2>League of Legends</h2>
     <div class="row"><span class="grow">Item overlay in game</span><label class="switch"><input type="checkbox" id="ovShow"><span></span></label></div>
@@ -212,7 +223,7 @@
   </section>
 
 
-  <p class="privacy">Nothing leaves this PC except weather requests (Open-Meteo), album covers when the player doesn't provide one (iTunes Search), League pictures (Riot Data Dragon), OP.GG's open champion data, your To Do tasks if you connect Microsoft To Do, and update checks (GitHub). No accounts, no analytics.</p>
+  <p class="privacy">Nothing leaves this PC except weather requests (Open-Meteo), album covers when the player doesn't provide one (iTunes Search), League pictures (Riot Data Dragon), OP.GG's open champion data, your To Do tasks if you connect Microsoft To Do, and update checks (GitHub). Nearby sharing stays on your local network. No accounts, no analytics.</p>
   <div class="row" style="justify-content:center;margin-top:10px"><button class="btn danger" id="uninstall">Uninstall Notch</button></div>
 </main>
 <script src="settings.js"></script>

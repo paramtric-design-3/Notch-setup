@@ -1,12 +1,13 @@
 {
   "name": "fjbc-notch",
-  "version": "1.83.1",
+  "version": "1.84.0",
   "description": "A Dynamic Island for Windows",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win --x64 --publish never",
-    "release": "electron-builder --win --x64 --publish always"
+    "release": "electron-builder --win --x64 --publish always",
+    "test": "node --test test/nearby.test.js"
   },
   "keywords": [],
   "author": "FJBC",
@@ -18,7 +19,8 @@
   "productName": "Notch",
   "dependencies": {
     "electron-updater": "^6.8.9",
-    "koffi": "^2.16.3"
+    "koffi": "^2.16.3",
+    "selfsigned": "^5.5.0"
   },
   "repository": {
     "type": "git",
@@ -35,6 +37,7 @@
       "todo.js",
       "nativedrag.js",
       "taskbar.js",
+      "localsend.js",
       "!node_modules/koffi/build/koffi/!(win32_x64)/**",
       "!node_modules/koffi/src/**",
       "preload.js",

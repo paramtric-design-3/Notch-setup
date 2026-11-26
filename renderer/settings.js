@@ -1,7 +1,7 @@
 'use strict';
 const api = window.notch;
 const $ = s => document.querySelector(s);
-const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do' };
+const NAMES = { league: 'League of Legends', music: 'Music', weather: 'Weather', messages: 'Messages', controls: 'Quick controls', calendar: 'Next event', timer: 'Focus timer', shelf: 'Shelf', todo: 'To Do', nearby: 'Nearby' };
 let S = null;
 let DRAG = null;   // index of the tile row being dragged
 
@@ -206,6 +206,48 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   document.querySelectorAll('a[data-ext]').forEach(a => a.onclick = e => { e.preventDefault(); api.send('open-url', a.href); });
   tdRender();
   if (TD && TD.status === 'ok') tdLists();
+
+  // Nearby sharing
+  const NB = () => ({ alias: 'Notch PC', receive: true, publicOk: false, pin: '', folder: '', ...(S.nearby || {}) });
+  let NS = await api.invoke('nearby-state').catch(() => null);
+  const nbRender = () => {
+    const c = NB();
+    $('#nbReceive').checked = c.receive !== false;
+    $('#nbPublic').checked = !!c.publicOk;
+    if (document.activeElement !== $('#nbAlias')) $('#nbAlias').value = c.alias || '';
+    if (document.activeElement !== $('#nbPin')) $('#nbPin').value = c.pin || '';
+    $('#nbFolder').textContent = c.folder ? 'Save in ' + c.folder : 'Save in Downloads';
+    $('#nbFolder').title = c.folder || '';
+    $('#nbFolderReset').hidden = !c.folder;
+    const st = (NS && NS.status) || 'starting';
+    const n = NS && NS.devices ? NS.devices.length : 0;
+    const found = n ? ` · ${n} device${n === 1 ? '' : 's'} nearby` : '';
+    $('#nbStatus').textContent = {
+      on: `Receiving as ${(NS && NS.alias) || c.alias}${found}`,
+      off: 'Receiving is off' + found,
+      public: 'Receiving is off: Windows sees this network as public. Turn on "Also on public networks", or set the network to private in Windows.',
+      port: 'Port 53317 is in use, probably by the LocalSend app on this PC. Close it to receive here.',
+      error: 'Receiving is unavailable right now.',
+    }[st] || 'Starting…';
+    $('#nbNet').hidden = st !== 'public';
+  };
+  const nbSave = patch => save({ nearby: { ...NB(), ...patch } }).then(nbRender);
+  $('#nbReceive').onchange = e => nbSave({ receive: e.target.checked });
+  $('#nbPublic').onchange = e => nbSave({ publicOk: e.target.checked });
+  const nbText = (id, key, saved, clean) => {
+    const input = $(id);
+    const commit = () => { const v = clean(input.value); if (v !== (NB()[key] || '')) { nbSave({ [key]: v }); flash(saved); } };
+    input.addEventListener('change', commit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { commit(); input.blur(); } });
+  };
+  nbText('#nbAlias', 'alias', '#nbAliasSaved', v => v.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 40) || 'Notch PC');
+  nbText('#nbPin', 'pin', '#nbPinSaved', v => v.trim().slice(0, 32));
+  $('#nbFolderBtn').onclick = async () => { S = await api.invoke('nearby-folder'); render(); nbRender(); };
+  $('#nbFolderReset').onclick = () => nbSave({ folder: '' });
+  $('#nbNet').onclick = () => api.send('nearby-netsettings');
+  api.on('nearby', s => { NS = s; nbRender(); });
+  api.on('settings', () => nbRender());
+  nbRender();
 })();
 
 // Rounded dropdowns: Windows draws a <select>'s open list itself (square corners), so each select

@@ -1061,3 +1061,46 @@ html[data-theme="white"] .pbtn.allow, html[data-theme="white"] .badge, html[data
 .league .gout svg { width: 14px; height: 14px; flex: none; }
 .league .gout:hover { color: var(--text); }
 .league .gout.on { background: var(--btn-on); color: var(--accent); font-weight: 600; }
+
+/* ------------------------------------------------------------ nearby sharing (LocalSend) */
+.tile.nearby { gap: 6px; padding-top: 11px; }
+.tile.nearby.w1 { align-items: center; justify-content: center; }
+.tile.nearby .big-ico svg, .tile.nearby .empty .ico svg { width: 22px; height: 22px; }
+.nearby .nbhead { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.nearby .nbico { width: 22px; height: 22px; flex: none; display: grid; place-items: center; color: var(--accent); }
+.nearby .nbico svg { width: 18px; height: 18px; }
+.nearby .nbtitle { flex: 1; min-width: 0; font-size: 12.5px; }
+.nearby .nbtitle b { font-weight: 600; }
+.nearby .nbtitle .muted { font-size: 11px; margin-left: 2px; }
+.nearby .nbx { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; color: var(--text-2); cursor: pointer; font-size: 14px; line-height: 1; }
+.nearby .nbx:hover { background: var(--btn-hover); color: var(--text); }
+.nearby .nbx svg { width: 14px; height: 14px; }
+.nearby .nbdevs { flex: 1; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; align-items: stretch; }
+.nearby .nbdevs::-webkit-scrollbar { display: none; }
+.nearby .nbdev { flex: 0 0 66px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 4px; border-radius: 12px; min-width: 0; cursor: pointer; }
+.nearby .nbdev:hover, .nearby .nbdev.dropon { background: var(--btn-on); color: var(--accent); }
+.nearby .nbdev.dropon { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.nearby .nbdico { width: 34px; height: 34px; border-radius: 50%; background: var(--btn); display: grid; place-items: center; }
+.nearby .nbdico svg { width: 18px; height: 18px; }
+.nearby .nbdev.can .nbdico { background: var(--btn-on); color: var(--accent); }
+.nearby .nbdname { font-size: 10.5px; max-width: 100%; text-align: center; }
+.nearby .nbempty { font-size: 11.5px; }
+.nearby .nbwhat { font-size: 13px; font-weight: 600; }
+.nearby .nbwhat .muted { font-weight: 400; font-size: 11.5px; margin-left: 4px; }
+.nearby .nbwhat.msg { font-weight: 400; font-size: 12.5px; }
+.nearby .nbbar.wait i { width: 30% !important; animation: nbwait 1.4s var(--ease) infinite alternate; }
+@keyframes nbwait { from { margin-left: 0; } to { margin-left: 70%; } }
+.nearby .nbnames { font-size: 11px; margin-top: -3px; }
+.nearby .nbsub { font-size: 11.5px; line-height: 1.3; }
+.nearby .nbbtns { margin-top: auto; display: flex; gap: 6px; justify-content: flex-end; }
+.nearby .nbbtn { height: 28px; padding: 0 14px; border-radius: 999px; background: var(--btn); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
+.nearby .nbbtn:hover { background: var(--btn-hover); }
+.nearby .nbbtn.primary { background: var(--accent); color: #161316; }
+.nearby .nbbtn.primary:hover { filter: brightness(1.06); }
+.nearby .nbbar { margin-top: auto; height: 5px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.nearby .nbbar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .2s var(--ease); }
+.nearby .nbpin { height: 28px; border-radius: 999px; border: 1px solid var(--line); background: var(--btn); color: var(--text); font: inherit; font-size: 12.5px; padding: 0 12px; outline: none; letter-spacing: 2px; }
+.nearby .nbpin:focus { border-color: var(--accent); background: var(--tile); }
+.nearby .nbpin::placeholder { letter-spacing: 0; color: var(--text-2); }
+.tile.nearby.ask { border-color: var(--accent); }
+.tile.nearby .big-ico { width: 26px; height: 26px; color: var(--text-2); }
