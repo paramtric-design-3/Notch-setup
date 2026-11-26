@@ -135,6 +135,7 @@ api.on('outside-click', () => {
   const L = D.league;
   if (L && (L.cs || (L.game && L.game.players && L.game.players.length))) return;
   if (tdTyping && document.activeElement) document.activeElement.blur();   // ends typing a task
+  if (nbTyping) nbStopTyping();   // ends typing a PIN
   csPinned = false;
   if (pinned) { pinned = false; island.classList.remove('pinned'); }
   if (!hovering && state === 'open') settle();
@@ -205,7 +206,75 @@ function folderOutline(size) {
   return `<svg class="shoutline" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><path d="${p}"/></svg>`;
 }
 
+// Nearby sharing (LocalSend)
+const fmtSize = n => { n = +n || 0; if (n < 1024) return n + ' B'; const u = ['KB', 'MB', 'GB', 'TB']; let i = -1; do { n /= 1024; i++; } while (n >= 1024 && i < 3); return (n >= 10 ? Math.round(n) : n.toFixed(1)) + ' ' + u[i]; };
+const devIcon = type => type === 'mobile' ? I.phone : I.laptop;
+// A request or a PIN question takes the tile big and first, even when the tile is hidden.
+const nbForced = () => !!(D.nearby && (D.nearby.request || D.nearby.pinFor));
+function nbStatus(N) {
+  switch (N.status) {
+    case 'on': return `Visible as ${esc(N.alias)}`;
+    case 'public': return 'Receiving off · public network';
+    case 'off': return 'Receiving off';
+    case 'port': return 'Port 53317 in use';
+    case 'error': return 'Receiving unavailable';
+    default: return 'Starting…';
+  }
+}
+
 const TILE = {
+  nearby(size) {
+    const t = el('div', `tile nearby w${size}`);
+    const N = D.nearby;
+    if (!N) { t.innerHTML = `<div class="empty"><div class="ico">${I.nearby}</div>Starting…</div>`; return t; }
+    if (N.request) {
+      const r = N.request, msg = r.text != null;
+      t.classList.add('ask');
+      t.innerHTML = `
+        <div class="nbhead"><span class="nbico">${devIcon(r.type)}</span><span class="nbtitle ellipsis"><b>${esc(r.from)}</b> wants to send</span></div>
+        <div class="nbwhat ellipsis ${msg ? 'msg' : ''}" title="${esc(msg ? r.text : r.names.join('\n') + (r.count > 3 ? '\n…' : ''))}">${msg ? esc(r.text) : `${esc(r.count === 1 ? r.names[0] : r.count + ' files')} <span class="muted">${fmtSize(r.total)}</span>`}</div>
+        <div class="nbbtns"><button class="nbbtn" data-nbno>Decline</button><button class="nbbtn primary" data-nbyes>${msg ? 'Copy text' : 'Accept'}</button></div>`;
+      return t;
+    }
+    if (N.pinFor) {
+      t.classList.add('ask');
+      t.innerHTML = `
+        <div class="nbhead"><span class="nbico">${I.nearby}</span><span class="nbtitle ellipsis"><b>${esc(N.pinFor)}</b> asks for a PIN</span></div>
+        <input class="nbpin" data-nbpin type="password" inputmode="numeric" maxlength="64" placeholder="PIN, then Enter" spellcheck="false" autocomplete="off">
+        <div class="nbbtns"><button class="nbbtn" data-nbcancel>Cancel</button><button class="nbbtn primary" data-nbpinok>Send</button></div>`;
+      return t;
+    }
+    if (N.transfer) {
+      const x = N.transfer, pct = x.total ? Math.min(100, Math.round(x.bytes / x.total * 100)) : 0;
+      const asking = x.dir === 'out' && x.phase === 'asking';
+      const head = `<b>${esc(x.peer)}</b>`;
+      const sub = asking ? 'Waiting until they accept' : `${x.dir === 'in' ? 'Receiving' : 'Sending'} ${x.done + 1 > x.count ? x.count : x.done + 1} of ${x.count}`;
+      const sub2 = asking ? '' : `${fmtSize(x.bytes)} of ${fmtSize(x.total)}`;
+      t.innerHTML = size === 1
+        ? `<div class="big-ico">${I.nearby}</div><span class="badge">${pct}%</span>`
+        : `<div class="nbhead"><span class="nbico">${I.nearby}</span><span class="nbtitle ellipsis">${head}</span>${x.dir === 'out' ? `<button class="nbx" data-nbcancel title="Stop sending">×</button>` : ''}</div>
+          <div class="nbsub ellipsis muted">${esc(sub)}</div>${sub2 ? `<div class="nbsub ellipsis muted">${esc(sub2)}</div>` : ''}
+          <div class="nbbar ${asking ? 'wait' : ''}"><i style="width:${asking ? 0 : pct}%"></i></div>`;
+      return t;
+    }
+    const devs = N.devices || [];
+    const n = (D.shelf || []).length;
+    if (size === 1) {
+      t.title = `Nearby · ${nbStatus(N).replace(/<[^>]+>/g, '')}`;
+      t.innerHTML = `<div class="big-ico">${I.nearby}</div>${devs.length ? `<span class="badge">${devs.length}</span>` : ''}`;
+      return t;
+    }
+    const tip = d => n ? `Send the ${n === 1 ? 'file' : n + ' items'} on the shelf to ${d.alias}` : `Drop files here, or put them on the shelf and click, to send them to ${d.alias}`;
+    t.innerHTML = `
+      <div class="nbhead"><span class="nbtitle ellipsis" title="${nbStatus(N)}"><b>Nearby</b> ${size === 3 ? `<span class="muted">${nbStatus(N)}</span>` : ''}</span><button class="nbx" data-nbsearch title="Look again">${I.refresh}</button></div>
+      ${devs.length ? `<div class="nbdevs">${devs.map(d => `
+        <button class="nbdev ${n ? 'can' : ''}" data-nbdev="${esc(d.id)}" title="${esc(tip(d))}${d.model ? '&#10;' + esc(d.model) : ''} · ${esc(d.ip)}">
+          <span class="nbdico">${devIcon(d.type)}</span><span class="nbdname ellipsis">${esc(d.alias)}</span>
+        </button>`).join('')}</div>`
+        : `<div class="empty nbempty">${N.status !== 'on' && N.status !== 'starting' ? nbStatus(N) : N.scanning ? 'Looking around…' : 'Open LocalSend on your phone to see it here'}</div>`}`;
+    return t;
+  },
+
   music(size) {
     if (D.outPicker && size > 1) return outputsPicker(size);
     const t = el('div', `tile music w${size}`);
@@ -454,9 +523,11 @@ function renderTiles() {
   if (!D.settings) return;
   let shown = D.settings.tiles.filter(x => x.show && (x.id !== 'league' || (D.league && D.league.client))
     && (x.id !== 'shelf' || D.dragging || (D.shelf || []).length));   // the shelf shows while you drag files, or while it holds some
-  if (D.dragging && shown.some(x => x.id === 'shelf')) shown = shown.filter(x => x.id === 'shelf');   // dragging files in: only the shelf
+  const canDropNearby = D.nearby && (D.nearby.devices || []).length && !D.nearby.transfer;
+  if (D.dragging && shown.some(x => x.id === 'shelf' || x.id === 'nearby')) shown = shown.filter(x => x.id === 'shelf' || (x.id === 'nearby' && canDropNearby));   // dragging files in: the shelf, and devices to drop them on
   else if (leagueWide()) shown = shown.filter(x => x.id === 'league');   // the League panel takes the whole notch
   else if (D.league && D.league.client && shown.some(x => x.id === 'league')) shown = shown.filter(x => x.id === 'league' || x.id === 'music' || (x.id === 'shelf' && (D.shelf || []).length));   // playing League: just music and the League assistant
+  if (nbForced() && !D.dragging) shown = [{ id: 'nearby', show: true, size: 3 }, ...shown.filter(x => x.id !== 'nearby')];   // someone wants to send you something
   tilesView.style.width = layoutWidth(shown) + 'px';
   tilesView.replaceChildren(...shown.map(x => TILE[x.id](Math.max(1, Math.min(3, x.size || 2)))));
   if (!tilesView.children.length) tilesView.innerHTML = `<div class="tile w3"><div class="empty">All tiles are hidden. Right-click to open Settings.</div></div>`;
@@ -476,9 +547,10 @@ new ResizeObserver(() => {
 function rerenderTile(id) {
   if (state !== 'open' || !D.settings) return;
   const cfg = D.settings.tiles.find(t => t.id === id);
-  if (!cfg || !cfg.show) return;
+  const forced = id === 'nearby' && nbForced();
+  if (!cfg || (!cfg.show && !forced)) return;
   const old = tilesView.querySelector(`.tile.${id}`);
-  const fresh = TILE[id](Math.max(1, Math.min(3, cfg.size || 2)));
+  const fresh = TILE[id](forced ? 3 : Math.max(1, Math.min(3, cfg.size || 2)));
   if (old && old.outerHTML === fresh.outerHTML) return;   // nothing changed: don't redraw (no flicker)
   if (old) old.replaceWith(fresh); else renderTiles();
   tick();
@@ -494,6 +566,17 @@ tilesView.addEventListener('click', async e => {
     return;
   }
   if (b.dataset.url) { api.send('open-url', b.dataset.url); return; }
+  if (b.dataset.nbyes !== undefined) { api.send('nearby-decide', true); return; }
+  if (b.dataset.nbno !== undefined) { api.send('nearby-decide', false); return; }
+  if (b.dataset.nbcancel !== undefined) { nbStopTyping(); api.send('nearby-cancel'); return; }
+  if (b.dataset.nbsearch !== undefined) { api.send('nearby-search', true); return; }
+  if (b.dataset.nbpinok !== undefined) { const i = tilesView.querySelector('[data-nbpin]'); if (i && i.value.trim()) { api.send('nearby-pin', i.value.trim()); nbStopTyping(); } return; }
+  if (b.dataset.nbdev) {
+    if (!(D.shelf || []).length) { peek({ icon: I.nearby, title: 'Nothing to send yet', sub: 'Drop files on a device here, or put them on the shelf first', ms: 3500 }); return; }
+    const r = await api.invoke('nearby-send', { id: b.dataset.nbdev, shelf: true }).catch(() => null);
+    if (r && r.error) peek({ icon: I.nearby, tone: 'warn', title: r.error, ms: 3000 });
+    return;
+  }
   if (b.dataset.cstab) { D.csTab = b.dataset.cstab; rerenderTile('league'); return; }
   if (b.dataset.shelfx) { D.shelf = await api.invoke('shelf-remove', b.dataset.shelfx); renderTiles(); return; }
   if (b.dataset.tdlists !== undefined) {
@@ -576,26 +659,42 @@ tilesView.addEventListener('dblclick', e => { const one = e.target.closest('[dat
 const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
 let dropDepth = 0;
 const shelfOn = () => D.settings && D.settings.tiles.some(t => t.id === 'shelf' && t.show);
+const nearbyOn = () => D.settings && D.settings.tiles.some(t => t.id === 'nearby' && t.show) && D.nearby && (D.nearby.devices || []).length;
+const dropOn = () => shelfOn() || nearbyOn();
 document.addEventListener('dragenter', e => {
-  if (!hasFiles(e) || !shelfOn()) return;
+  if (!hasFiles(e) || !dropOn()) return;
   dropDepth++;
   document.body.classList.add('dropping');
   if (!D.dragging) { D.dragging = true; renderTiles(); }
   hovering = true; clearTimeout(leaveTimer);
   if (state !== 'open') setState('open');
 });
-document.addEventListener('dragover', e => { if (hasFiles(e) && shelfOn()) { e.preventDefault(); e.dataTransfer.dropEffect = 'link'; } });
+document.addEventListener('dragover', e => {
+  if (!hasFiles(e) || !dropOn()) return;
+  const dev = e.target.closest && e.target.closest('[data-nbdev]');
+  tilesView.querySelectorAll('.nbdev.dropon').forEach(x => { if (x !== dev) x.classList.remove('dropon'); });
+  if (dev) dev.classList.add('dropon');
+  if (dev || shelfOn()) { e.preventDefault(); e.dataTransfer.dropEffect = dev ? 'copy' : 'link'; }
+});
 document.addEventListener('dragleave', e => {
   if (!hasFiles(e)) return;
   dropDepth = Math.max(0, dropDepth - 1);
   if (!dropDepth) { document.body.classList.remove('dropping'); D.dragging = false; renderTiles(); pointerLeave(); }
 });
 document.addEventListener('drop', async e => {
-  if (!hasFiles(e) || !shelfOn()) return;
+  if (!hasFiles(e) || !dropOn()) return;
   e.preventDefault();
   dropDepth = 0; document.body.classList.remove('dropping'); D.dragging = false;
   const paths = [...e.dataTransfer.files].map(f => api.pathFor ? api.pathFor(f) : '').filter(Boolean);
-  if (paths.length) D.shelf = await api.invoke('shelf-add', paths).catch(() => D.shelf);
+  const dev = e.target.closest && e.target.closest('[data-nbdev]');
+  if (dev && paths.length) {
+    // dropped on a device: straight to it, the shelf stays as it was
+    renderTiles();
+    const r = await api.invoke('nearby-send', { id: dev.dataset.nbdev, paths }).catch(() => null);
+    if (r && r.error) peek({ icon: I.nearby, tone: 'warn', title: r.error, ms: 3000 });
+    return;
+  }
+  if (paths.length && shelfOn()) D.shelf = await api.invoke('shelf-add', paths).catch(() => D.shelf);
   renderTiles();
 });
 
@@ -1120,6 +1219,7 @@ api.on('peek', p => {
   if (p.kind === 'app') peek({ img: p.icon, icon: I.grid, title: p.title, sub: p.sub });
   else if (p.kind === 'league') peek({ icon: I.trophy, title: p.title, sub: p.sub, ms: p.ms || 4000 });
   else if (p.kind === 'update') peek({ icon: I.download, title: p.title, sub: p.sub, ms: p.ms || 3500 });
+  else if (p.kind === 'nearby') peek({ icon: I.nearby, title: p.title, sub: p.sub, tone: p.tone || '', ms: p.ms || 4000 });
   else peek(p);
 });
 
@@ -1181,13 +1281,45 @@ api.on('league', L => {
   startTicker();
   if (state === 'open') { if (layoutChanged) renderTiles(); else rerenderTile('league'); }
 });
+// Nearby: the state from main, and typing a PIN another device asks for.
+let nbTyping = false, nbLastSearch = 0;
+function nbStopTyping() {
+  if (!nbTyping) return;
+  nbTyping = false; api.send('island-focus', false);
+  pinned = false; island.classList.remove('pinned');
+}
+api.on('nearby', N => {
+  const before = nbForced(), hadDevs = !!(D.nearby && (D.nearby.devices || []).length);
+  D.nearby = N;
+  if (nbTyping && N && N.pinFor) return;   // keep what's being typed
+  if (nbTyping) nbStopTyping();
+  if (before !== nbForced() || hadDevs !== !!(N && (N.devices || []).length)) { if (state === 'open') renderTiles(); }
+  else rerenderTile('nearby');
+});
+tilesView.addEventListener('mousedown', e => {
+  if (!e.target.matches('[data-nbpin]') || nbTyping) return;
+  nbTyping = true; pinned = true; island.classList.add('pinned');
+  api.send('island-focus', true);
+  setTimeout(() => e.target.focus(), 40);
+});
+tilesView.addEventListener('keydown', e => {
+  if (!e.target.matches('[data-nbpin]')) return;
+  if (e.key === 'Enter' && e.target.value.trim()) { api.send('nearby-pin', e.target.value.trim()); nbStopTyping(); }
+  if (e.key === 'Escape') { nbStopTyping(); api.send('nearby-cancel'); }
+});
+// opening the notch looks around for devices (at most every 20 seconds; main throttles the scan)
+const nbShown = () => D.settings && D.settings.tiles.some(t => t.id === 'nearby' && t.show);
+new MutationObserver(() => {
+  if (island.classList.contains('s-open') && nbShown() && Date.now() - nbLastSearch > 20000) { nbLastSearch = Date.now(); api.send('nearby-search', false); }
+}).observe(island, { attributes: true, attributeFilter: ['class'] });
+
 // ------------------------------------------------------------------ boot
 (async () => {
   try {
     const init = await api.invoke('initial-state');
     D.settings = init.settings;
     const s = init.state || {};
-    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark;
+    D.media = s.media || null; D.league = s.league || null; if (D.league && D.league.icons) Object.assign(LICON, D.league.icons); D.outputs = s.outputs || []; D.shelf = s.shelf || []; D.todo = s.todo || null; D.radios = s.radios || {}; D.volume = s.volume; D.brightness = s.brightness; D.dark = s.dark; D.nearby = s.nearby || null;
   } catch { /* main sends settings shortly */ }
   applyTheme();
   settle();
