@@ -391,7 +391,7 @@ function overlayPayload() {
 
 // ---------------------------------------------------------------- tray
 // White Matte is EVE, Dark Matte is WALL-E.
-function appName() { return 'BJ'; }
+function appName() { return 'Notch'; }
 function themeIsDark() { return !settings || settings.theme !== 'white'; }
 // The page background / text for the current theme (for native window chrome).
 function themeChrome() { return themeIsDark() ? { bg: '#111111', fg: '#ECECEC' } : { bg: '#F7F8FA', fg: '#1E2129' }; }
@@ -1164,8 +1164,8 @@ ipcMain.handle('uninstall', async () => {
   } catch { /* ignore */ }
   const r = await dialog.showMessageBox(settingsWin || undefined, {
     type: 'warning', buttons: ['Cancel', 'Uninstall'], defaultId: 0, cancelId: 0,
-    title: 'Uninstall BJ', message: 'Uninstall BJ?',
-    detail: unins ? 'This closes BJ and opens the uninstaller.' : "The uninstaller wasn't found; Windows Apps settings will open so you can remove BJ there.",
+    title: 'Uninstall Notch', message: 'Uninstall Notch?',
+    detail: unins ? 'This closes Notch and opens the uninstaller.' : "The uninstaller wasn't found; Windows Apps settings will open so you can remove Notch there.",
   });
   if (r.response !== 1) return { ok: false };
   if (unins) { try { spawn(unins, ['--force-run'], { detached: true, stdio: 'ignore' }).unref(); } catch { shell.openExternal('ms-settings:appsfeatures'); } setTimeout(() => { quitting = true; app.quit(); }, 600); }

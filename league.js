@@ -666,7 +666,7 @@ class League {
     const spellsDone = await this.importSpells(spells);
     const me = this.cs && this.cs.me;
     if (!r || !me || r.perkIds.length < 6) return { ok: false, error: 'No recommended runes yet' };
-    const body = { name: `BJ: ${me.name}`, primaryStyleId: r.primary, subStyleId: r.secondary, selectedPerkIds: r.perkIds, current: true };
+    const body = { name: `Notch: ${me.name}`, primaryStyleId: r.primary, subStyleId: r.secondary, selectedPerkIds: r.perkIds, current: true };
     try {
       const pages = (await this.lcuGet('/lol-perks/v1/pages')) || [];
       const ours = pages.find(p => /^(BJ|Notch|WALL-E):/.test(p.name || '') && p.isEditable);
