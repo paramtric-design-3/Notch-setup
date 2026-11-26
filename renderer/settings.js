@@ -142,14 +142,21 @@ document.querySelectorAll('section:not(.nofold) > h2').forEach(h => {
   api.on('taskbar-state', tbNote);
   // your own icon above the title: click to pick any image (WALL-E saves it as icon.png), x to remove
   const appImg = $('#appIcon'), appPh = $('#appIconPh'), appClear = $('#appIconClear'), appBtn = $('#appIconBtn');
+  // built-in logo follows the theme: black tile in dark, white tile in light
+  const builtinLogo = () => document.documentElement.dataset.theme === 'white' ? '../assets/logo-light.png' : '../assets/icon.png';
+  let iconR = null;
   const setIcon = r => {
     if (typeof r === 'string') r = { url: r && r !== 'error' ? r : '', custom: true };   // older shape
-    const on = !!(r && r.url);
-    if (on) appImg.src = r.url; else appImg.removeAttribute('src');
-    appImg.hidden = !on; appPh.hidden = on;
-    appClear.hidden = !(r && r.custom);   // the × only when you set your own icon
-    appBtn.classList.toggle('set', on);
+    iconR = r;
+    const custom = !!(r && r.custom && r.url);
+    appImg.src = custom ? r.url : builtinLogo();   // your own icon as-is, else the theme-aware built-in logo
+    appImg.hidden = false; appPh.hidden = true;
+    appClear.hidden = !custom;   // the × only when you set your own icon
+    appBtn.classList.add('set');
   };
+  // re-pick the built-in logo whenever the theme changes
+  new MutationObserver(() => { if (!(iconR && iconR.custom && iconR.url)) appImg.src = builtinLogo(); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   api.invoke('app-icon').then(setIcon).catch(() => {});
   api.on('app-icon', setIcon);
   appBtn.onclick = e => { if (e.target === appClear) return; api.invoke('choose-icon').then(setIcon).catch(() => {}); };
