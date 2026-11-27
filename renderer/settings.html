@@ -26,7 +26,9 @@
     main { padding: 22px 22px 28px; max-width: 640px; margin: 0 auto; }
     h1 { font: 600 20px "BDO Grotesk","Segoe UI",system-ui; margin: 0 0 2px; letter-spacing: -.2px; }
    .lead { color: var(--text-2); margin: 0 0 18px; font-size: 13px; }
-    section { background: var(--panel); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid var(--glass-line); border-radius: 20px; padding: 14px 16px; margin-bottom: 12px; }
+    section { position: relative; background: var(--panel); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid var(--glass-line); border-radius: 20px; padding: 14px 16px; margin-bottom: 12px; }
+    /* a section whose dropdown is open sits above the panels below it, so the menu isn't covered */
+    section:has(.rsel.open) { z-index: 40; }
     h2 { font-size: 12px; font-weight: 600; letter-spacing:.6px; text-transform: uppercase; color: var(--text-2); margin: 0 0 10px; }
    .row { display: flex; align-items: center; gap: 10px; min-height: 36px; }
    .row +.row { border-top: 1px solid var(--line); }
